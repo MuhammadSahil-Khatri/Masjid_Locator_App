@@ -1,0 +1,6 @@
+{
+  "name": "Masjid Locator App",
+  "description": "Mobile-first PWA frontend emulator for locating nearby masajid, looking up prayer times, coordinating community RSVPs, daily ahadees, and sub-admin editing, alongside Supabase PostGIS schemas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
