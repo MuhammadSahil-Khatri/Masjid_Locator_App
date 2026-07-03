@@ -12,7 +12,7 @@ const NavigationContext = createContext<NavigationContextType | undefined>(undef
 
 export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [history, setHistory] = useState<Array<{ screen: AppScreen; params: any }>>([
-    { screen: 'Home', params: undefined }
+    { screen: 'Splash', params: undefined }
   ]);
 
   const current = history[history.length - 1] || { screen: 'Home', params: undefined };

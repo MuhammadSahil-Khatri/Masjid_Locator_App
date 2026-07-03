@@ -4,21 +4,42 @@
  */
 
 import React, { useState } from 'react';
-import { 
-  SafeAreaView, 
-  StatusBar, 
-  StyleSheet, 
+import {
+  StatusBar,
+  StyleSheet,
   View,
-  Text,
   TouchableOpacity,
   Modal,
   Platform
 } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Text } from './components/ui/Text';
+import { useFonts } from 'expo-font';
+import {
+  Inter_300Light,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from '@expo-google-fonts/inter';
+import {
+  NotoNaskhArabic_400Regular,
+  NotoNaskhArabic_500Medium,
+  NotoNaskhArabic_600SemiBold,
+  NotoNaskhArabic_700Bold,
+} from '@expo-google-fonts/noto-naskh-arabic';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from './context/AppContext';
 import { NavigationProvider, useNavigation } from './navigation/NavigationContext';
+import { AuthProvider } from './context/AuthContext';
 import RootNavigator from './navigation/RootNavigator';
 import { CustomToast } from './components/common/CustomToast';
+import Toast from 'react-native-toast-message';
+import { toastConfig } from './components/common/ToastConfig';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { colors, spacing, typography } from './theme';
+
+const queryClient = new QueryClient();
 
 function AppMain() {
   const { highContrast: isDarkMode, activeRole, handleRoleToggle, language, setLanguage, setHighContrast } = useApp();
@@ -34,14 +55,14 @@ function AppMain() {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, isDarkMode ? styles.darkBg : styles.lightBg]}>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+    <SafeAreaView style={[styles.safeArea, styles.lightBg]}>
+      <StatusBar barStyle="dark-content" backgroundColor={styles.lightBg.backgroundColor} />
       <View style={styles.container}>
         <RootNavigator />
       </View>
 
       {/* Floating Simulator Action Button */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[styles.floatingButton, isDarkMode ? styles.floatDark : styles.floatLight]}
         onPress={() => setSimPanelVisible(true)}
       >
@@ -50,22 +71,22 @@ function AppMain() {
 
       {/* Simulator Modal controls panel */}
       <Modal visible={simPanelVisible} transparent={true} animationType="slide" onRequestClose={() => setSimPanelVisible(false)}>
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
           onPress={() => setSimPanelVisible(false)}
         >
           <View style={[styles.modalContent, isDarkMode ? styles.modalContentDark : styles.modalContentLight]}>
             <Text style={[styles.modalTitle, isDarkMode ? styles.textLight : styles.textDark]}>
               Simulator Master Panel
             </Text>
-            
+
             <View style={styles.sectionDivider} />
 
             {/* Persona toggles */}
             <Text style={styles.sectionLabel}>Test Personas</Text>
             <View style={styles.personaRow}>
-              {(['worshipper', 'sub_admin', 'super_admin'] as const).map(role => (
+              {(['worshipper', 'admin', 'super_admin'] as const).map(role => (
                 <TouchableOpacity
                   key={role}
                   style={[
@@ -83,7 +104,7 @@ function AppMain() {
                   }}
                 >
                   <Text style={[styles.personaText, activeRole === role ? styles.personaTextActive : null]}>
-                    {role === 'worshipper' ? '🕌 User' : role === 'sub_admin' ? '🔑 Sub' : '👑 Super'}
+                    {role === 'worshipper' ? '🕌 User' : role === 'admin' ? '🔑 Admin' : '👑 Super'}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -106,8 +127,8 @@ function AppMain() {
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity 
-              style={styles.closeBtn} 
+            <TouchableOpacity
+              style={styles.closeBtn}
               onPress={() => setSimPanelVisible(false)}
             >
               <Text style={styles.closeBtnText}>Close Panel</Text>
@@ -120,13 +141,39 @@ function AppMain() {
 }
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    'Inter-Light': Inter_300Light,
+    'Inter-Regular': Inter_400Regular,
+    'Inter-Medium': Inter_500Medium,
+    'Inter-SemiBold': Inter_600SemiBold,
+    'Inter-Bold': Inter_700Bold,
+    'NotoNaskhArabic-Regular': NotoNaskhArabic_400Regular,
+    'NotoNaskhArabic-Medium': NotoNaskhArabic_500Medium,
+    'NotoNaskhArabic-SemiBold': NotoNaskhArabic_600SemiBold,
+    'NotoNaskhArabic-Bold': NotoNaskhArabic_700Bold,
+  });
+
+  if (!fontsLoaded) {
+    return null;
+  }
+
   return (
-    <AppProvider>
-      <NavigationProvider>
-        <AppMain />
-        <AppToastConsumer />
-      </NavigationProvider>
-    </AppProvider>
+    <QueryClientProvider client={queryClient}>
+      <SafeAreaProvider>
+        <AuthProvider>
+          <AppProvider>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+              <NavigationProvider>
+                <AppMain />
+                <AppToastConsumer />
+              </NavigationProvider>
+            </GestureHandlerRootView>
+          </AppProvider>
+          {/* react-native-toast-message must be outside all providers to overlay everything */}
+          <Toast config={toastConfig} />
+        </AuthProvider>
+      </SafeAreaProvider>
+    </QueryClientProvider>
   );
 }
 
@@ -138,7 +185,6 @@ function AppToastConsumer() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   darkBg: {
     backgroundColor: '#020617', // Slate-950

@@ -1,19 +1,20 @@
 import React, { useState, useMemo } from 'react';
 import { 
   View, 
-  Text, 
   StyleSheet, 
   ScrollView, 
   Image, 
   TouchableOpacity, 
-  Modal 
+  Modal,
+  Linking,
+  Platform
 } from 'react-native';
+import { Text } from '../../components/ui/Text';
 import { Phone, Users, Shield, Award, Calendar, Volume2, VolumeX, Navigation } from 'lucide-react-native';
 import { useApp } from '../../context/AppContext';
 import { colors, spacing, typography } from '../../theme';
 import { useNavigation } from '../../navigation/NavigationContext';
 import { Header } from '../../components/common/Header';
-import { CalculationMethod, JuristicMethod } from '../../types';
 
 export const MosqueDetailsScreen: React.FC = () => {
   const { 
@@ -34,48 +35,19 @@ export const MosqueDetailsScreen: React.FC = () => {
     return masjids.find(m => m.id === id) || masjids[0];
   }, [masjids, params]);
 
-  const [calcMethod, setCalcMethod] = useState<CalculationMethod>('Karachi');
-  const [juristicMethod, setJuristicMethod] = useState<JuristicMethod>('Hanafi');
   const [playingAdhan, setPlayingAdhan] = useState<string | null>(null);
-  const [showRoutePreview, setShowRoutePreview] = useState(false);
-
-  const [calcPickerVisible, setCalcPickerVisible] = useState(false);
-  const [juristicPickerVisible, setJuristicPickerVisible] = useState(false);
-
-  const getCalculatedTime = (baseTime: string, method: CalculationMethod, juristic: JuristicMethod, prayerKey: 'fajr' | 'asr' | 'isha') => {
-    const [h, m] = baseTime.split(':').map(Number);
-    let offsetMinutes = 0;
-
-    if (method === 'UmmAlQura') offsetMinutes -= 5;
-    if (method === 'ISNA') offsetMinutes += 4;
-    if (method === 'MWL') offsetMinutes -= 2;
-    if (method === 'Egypt') offsetMinutes += 1;
-
-    if (prayerKey === 'asr') {
-      if (juristic === 'Hanafi') {
-        offsetMinutes += 45;
-      }
-    }
-
-    let totalMins = h * 60 + m + offsetMinutes;
-    if (totalMins < 0) totalMins += 24 * 60;
-    const finalH = Math.floor(totalMins / 60) % 24;
-    const finalM = totalMins % 60;
-
-    return `${finalH.toString().padStart(2, '0')}:${finalM.toString().padStart(2, '0')}`;
-  };
 
   const formattedCalculatedTimes = useMemo(() => {
     const times = masjid.prayerTimes;
     return {
-      fajr: getCalculatedTime(times.fajr, calcMethod, juristicMethod, 'fajr'),
+      fajr: times.fajr,
       dhuhr: times.dhuhr,
-      asr: getCalculatedTime(times.asr, calcMethod, juristicMethod, 'asr'),
+      asr: times.asr,
       maghrib: times.maghrib,
-      isha: getCalculatedTime(times.isha, calcMethod, juristicMethod, 'isha'),
+      isha: times.isha,
       jummah: times.jummah,
     };
-  }, [masjid, calcMethod, juristicMethod]);
+  }, [masjid]);
 
   const handleToggleAdhan = (key: string) => {
     if (playingAdhan === key) {
@@ -138,33 +110,6 @@ export const MosqueDetailsScreen: React.FC = () => {
             )}
           </View>
 
-          {/* Dynamic Computation Controls */}
-          <View style={[styles.calcPanel, { backgroundColor: currentTheme.card, borderColor: currentTheme.border }]}>
-            <Text style={[styles.sectionHeading, { color: currentTheme.text }, isRtl && typography.alignRtl]}>
-              ⚙️ Computational Settings
-            </Text>
-
-            <View style={[styles.selectorRow, isRtl && styles.rowReverse]}>
-              <TouchableOpacity 
-                style={[styles.selectorBtn, { borderColor: currentTheme.border }]} 
-                onPress={() => setCalcPickerVisible(true)}
-              >
-                <Text style={[styles.selectorBtnText, { color: colors.primary }]}>
-                  {calcMethod} Method
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.selectorBtn, { borderColor: currentTheme.border }]} 
-                onPress={() => setJuristicPickerVisible(true)}
-              >
-                <Text style={[styles.selectorBtnText, { color: colors.primary }]}>
-                  {juristicMethod} (Asr)
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
           {/* Prayer Times Grid */}
           <Text style={[styles.sectionHeading, { color: currentTheme.text }, isRtl && typography.alignRtl, { marginTop: spacing.lg }]}>
             🕌 {translations.prayerTimes}
@@ -212,25 +157,19 @@ export const MosqueDetailsScreen: React.FC = () => {
             ))}
           </View>
 
-          {/* Map Direction Preview */}
+          {/* Map Direction */}
           <TouchableOpacity 
             style={[styles.directionsBtn, { backgroundColor: colors.primary }]}
-            onPress={() => setShowRoutePreview(prev => !prev)}
+            onPress={() => {
+              const url = Platform.OS === 'ios' 
+                ? `maps://app?daddr=${masjid.lat},${masjid.lng}`
+                : `google.navigation:q=${masjid.lat},${masjid.lng}`;
+              Linking.openURL(url);
+            }}
           >
             <Navigation size={14} color="#ffffff" fill="#ffffff" />
-            <Text style={styles.directionsText}>{translations.directionsPreview}</Text>
+            <Text style={styles.directionsText}>{translations.getDirections}</Text>
           </TouchableOpacity>
-
-          {showRoutePreview && (
-            <View style={[styles.routeCard, { backgroundColor: currentTheme.card, borderColor: currentTheme.border }]}>
-              <Text style={[styles.routeTitle, { color: currentTheme.text }]}>🛣️ Direct Route Mapping Instructions</Text>
-              <Text style={[styles.routeBody, { color: currentTheme.textMuted }]}>
-                1. Head North-West towards nearest arterial road.{"\n"}
-                2. Drive 2.4 km following GPS live navigation compass.{"\n"}
-                3. Arrive at destination: {masjid.nameEn}
-              </Text>
-            </View>
-          )}
 
           {/* Events Section */}
           {currentMasjidEvents.length > 0 && (
@@ -260,61 +199,6 @@ export const MosqueDetailsScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* Computational Modal pickers */}
-      <Modal visible={calcPickerVisible} transparent={true} animationType="fade">
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setCalcPickerVisible(false)}>
-          <View style={[styles.pickerModalContent, { backgroundColor: currentTheme.card }]}>
-            <Text style={[styles.pickerTitle, { color: currentTheme.text }]}>Select Calculation Method</Text>
-            {[
-              { value: 'Karachi' as const, label: 'University of Karachi' },
-              { value: 'UmmAlQura' as const, label: 'Umm Al-Qura (Makkah)' },
-              { value: 'ISNA' as const, label: 'ISNA (North America)' },
-              { value: 'MWL' as const, label: 'Muslim World League (MWL)' },
-              { value: 'Egypt' as const, label: 'Egyptian General Authority' }
-            ].map(item => (
-              <TouchableOpacity 
-                key={item.value} 
-                style={styles.pickerItem}
-                onPress={() => {
-                  setCalcMethod(item.value);
-                  setCalcPickerVisible(false);
-                  triggerToast(`Updated to: ${item.label}`);
-                }}
-              >
-                <Text style={[styles.pickerItemText, calcMethod === item.value ? { color: colors.primary, fontWeight: 'bold' } : { color: currentTheme.text }]}>
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      <Modal visible={juristicPickerVisible} transparent={true} animationType="fade">
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setJuristicPickerVisible(false)}>
-          <View style={[styles.pickerModalContent, { backgroundColor: currentTheme.card }]}>
-            <Text style={[styles.pickerTitle, { color: currentTheme.text }]}>Select Juristic Method</Text>
-            {[
-              { value: 'Hanafi' as const, label: 'Hanafi (Later shadow)' },
-              { value: 'Standard' as const, label: 'Standard (Shafi\'i, Maliki, Hanbali)' }
-            ].map(item => (
-              <TouchableOpacity 
-                key={item.value} 
-                style={styles.pickerItem}
-                onPress={() => {
-                  setJuristicMethod(item.value);
-                  setJuristicPickerVisible(false);
-                  triggerToast(`Updated Asr calculations: ${item.label}`);
-                }}
-              >
-                <Text style={[styles.pickerItemText, juristicMethod === item.value ? { color: colors.primary, fontWeight: 'bold' } : { color: currentTheme.text }]}>
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </TouchableOpacity>
-      </Modal>
     </View>
   );
 };

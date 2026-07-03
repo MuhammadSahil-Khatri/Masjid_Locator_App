@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useMemo, useEffect } from 'react';
+import { useAuth } from '../hooks/useAuth';
 import { 
   Language, 
   UserRole, 
@@ -18,6 +19,7 @@ import {
   INITIAL_ANNOUNCEMENTS, 
   i18n 
 } from '../data/mockData';
+import { showError, showSuccess, showInfo } from '../utils/toast';
 
 interface AppContextProps {
   language: Language;
@@ -55,7 +57,7 @@ interface AppContextProps {
   handleAddAnnouncement: (annData: Omit<Announcement, 'id' | 'masjidName' | 'isRead'>) => void;
   handleAddHadees: (hadeesData: Omit<Hadees, 'id'>) => void;
   handleAddMasjidLocation: (newMasjid: Omit<Masjid, 'id' | 'distance' | 'isVerified'>) => void;
-  handleRoleToggle: (role: 'worshipper' | 'sub_admin' | 'super_admin') => void;
+  handleRoleToggle: (role: 'worshipper' | 'admin' | 'super_admin') => void;
   handleAssignSubAdmin: (email: string, masjidId: string) => void;
   handleCreateUserByAdmin: (newUser: UserAccount) => void;
 }
@@ -79,14 +81,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       email: 'alaqsa@nur.com',
       name: 'Imam Bilal (Al-Aqsa)',
       password: 'subadmin123',
-      role: 'sub_admin',
+      role: 'admin',
       assignedMasjidId: 'm1'
     },
     {
       email: 'fatih@nur.com',
       name: 'Sheikh Mehmet (Fatih)',
       password: 'subadmin123',
-      role: 'sub_admin',
+      role: 'admin',
       assignedMasjidId: 'm2'
     },
     {
@@ -98,7 +100,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   ]);
 
+  const { user: supabaseUser, profile } = useAuth();
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
+
+  // Sync Supabase user and profile with local currentUser state
+  useEffect(() => {
+    if (supabaseUser) {
+      if (profile) {
+        const uiRole = profile.role;
+        setCurrentUser({
+          id: profile.id,
+          email: supabaseUser.email || '',
+          name: profile.name,
+          role: uiRole,
+          region: 'Karachi',
+          phone: profile.phone,
+          cnic: profile.cnic,
+          is_blocked: profile.is_blocked,
+        });
+        setActiveRole(uiRole);
+      } else {
+        // Set fallback info from auth metadata first if profile is not loaded yet
+        const metaName = supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User';
+        const metaPhone = supabaseUser.user_metadata?.phone_number || supabaseUser.user_metadata?.phone || '';
+        const metaCnic = supabaseUser.user_metadata?.cnic || '';
+        setCurrentUser({
+          id: supabaseUser.id,
+          email: supabaseUser.email || '',
+          name: metaName,
+          role: 'worshipper',
+          region: 'Karachi',
+          phone: metaPhone,
+          cnic: metaCnic,
+          is_blocked: false,
+        });
+        setActiveRole('worshipper');
+      }
+    } else {
+      setCurrentUser(null);
+    }
+  }, [supabaseUser, profile]);
+
   const [masjids, setMasjids] = useState<Masjid[]>(INITIAL_MASJID_DATA);
   const [announcements, setAnnouncements] = useState<Announcement[]>(INITIAL_ANNOUNCEMENTS);
   const [events, setEvents] = useState<MasjidEvent[]>(INITIAL_EVENTS);
@@ -113,18 +155,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [language]);
 
   const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage(prev => prev === msg ? null : prev);
-    }, 3000);
+    const msgLower = msg.toLowerCase();
+    if (
+      msgLower.includes('error') || 
+      msgLower.includes('failed') || 
+      msgLower.includes('invalid') || 
+      msgLower.includes('mandatory') || 
+      msgLower.includes('required') || 
+      msgLower.includes('نہیں') || 
+      msgLower.includes('غلط')
+    ) {
+      showError(msg);
+    } else if (
+      msgLower.includes('success') || 
+      msgLower.includes('approved') || 
+      msgLower.includes('published') || 
+      msgLower.includes('posted') || 
+      msgLower.includes('submitted') || 
+      msgLower.includes('کامیاب') || 
+      msgLower.includes('محفوظ')
+    ) {
+      showSuccess(msg);
+    } else {
+      showInfo(msg);
+    }
   };
 
-  useEffect(() => {
-    if (currentUser?.region) {
-      const reg = currentUser.region;
-      triggerToast(`📍 Switched to calculations for ${reg}!`);
-    }
-  }, [currentUser]);
+
 
   const handleRsvpToggle = (eventId: string) => {
     setEvents(prev => prev.map(evt => {
@@ -222,7 +279,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     triggerToast("Suggestion submitted to Super Admin!");
   };
 
-  const handleRoleToggle = (role: 'worshipper' | 'sub_admin' | 'super_admin') => {
+  const handleRoleToggle = (role: 'worshipper' | 'admin' | 'super_admin') => {
     setActiveRole(role);
     const primaryForRole = users.find(u => u.role === role);
     if (primaryForRole) {

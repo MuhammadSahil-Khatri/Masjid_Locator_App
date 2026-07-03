@@ -1,6 +1,9 @@
 {
   "name": "Masjid Locator App",
-  "description": "Mobile-first PWA frontend emulator for locating nearby masajid, looking up prayer times, coordinating community RSVPs, daily ahadees, and sub-admin editing, alongside Supabase PostGIS schemas.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "slug": "masjid-locator-app",
+  "version": "1.0.0",
+  "description": "A feature-rich React Native/Expo application that helps worshippers locate nearby masjids, view accurate prayer times, check Qibla direction, and receive community announcements.",
+  "author": "Muhammad Sahil Khatri",
+  "repository": "MuhammadSahil-Khatri/Masjid_Locator_App",
+  "license": "Apache-2.0"
 }

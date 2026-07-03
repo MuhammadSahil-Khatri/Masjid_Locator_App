@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
+import { Text } from '../ui/Text';
 import { SlidersHorizontal } from 'lucide-react-native';
 import { colors, spacing, typography } from '../../theme';
 import { useNavigation } from '../../navigation/NavigationContext';

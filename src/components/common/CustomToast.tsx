@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, StyleSheet, Animated } from 'react-native';
+import { Text } from '../ui/Text';
 import { colors, spacing, typography } from '../../theme';
 
 interface CustomToastProps {

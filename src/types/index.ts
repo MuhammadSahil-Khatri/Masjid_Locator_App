@@ -1,14 +1,30 @@
 export type Language = 'en' | 'ur';
 
-export type UserRole = 'worshipper' | 'sub_admin' | 'super_admin';
+export type UserRole = 'worshipper' | 'admin' | 'super_admin';
 
 export interface UserAccount {
+  id?: string;
   email: string;
   name: string;
   password?: string;
   role: UserRole;
-  assignedMasjidId?: string; // Sub-admins can be assigned to a specific masjid
+  assignedMasjidId?: string; // Admins can be assigned to a specific masjid
   region?: string; // Selected default region for calculation
+  phone?: string;
+  cnic?: string;
+  is_blocked?: boolean;
+}
+
+export interface Profile {
+  id: string;
+  name: string;
+  phone?: string;
+  cnic?: string;
+  role: 'worshipper' | 'admin' | 'super_admin';
+  email?: string;
+  is_blocked: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export type CalculationMethod = 'MWL' | 'ISNA' | 'UmmAlQura' | 'Karachi' | 'Egypt';
@@ -89,3 +105,71 @@ export interface NotificationPreference {
   events: boolean;
   dailyHadees: boolean;
 }
+
+// ── AlAdhan API Types ─────────────────────────────────────────────────────────
+
+export interface PrayerTimingsData {
+  Fajr: string;
+  Sunrise: string;
+  Dhuhr: string;
+  Asr: string;
+  Sunset: string;
+  Maghrib: string;
+  Isha: string;
+  Imsak: string;
+  Midnight: string;
+}
+
+export interface AlAdhanDate {
+  readable: string;
+  timestamp: string;
+  hijri: {
+    date: string;
+    day: string;
+    month: { number: number; en: string; ar: string };
+    year: string;
+    weekday: { en: string; ar: string };
+  };
+  gregorian: {
+    date: string;
+    day: string;
+    month: { number: number; en: string };
+    year: string;
+    weekday: { en: string };
+  };
+}
+
+export interface AlAdhanMeta {
+  latitude: number;
+  longitude: number;
+  timezone: string;
+  method: { id: number; name: string };
+}
+
+export interface AlAdhanTimingsResponse {
+  code: number;
+  status: string;
+  data: {
+    timings: PrayerTimingsData;
+    date: AlAdhanDate;
+    meta: AlAdhanMeta;
+  };
+}
+
+export interface ParsedPrayerTimes {
+  Fajr: string;
+  Dhuhr: string;
+  Asr: string;
+  Maghrib: string;
+  Isha: string;
+}
+
+export interface PrayerTimesState {
+  timings: ParsedPrayerTimes | null;
+  hijriDate: string;
+  gregorianDate: string;
+  city: string;
+  loading: boolean;
+  error: string | null;
+}
+

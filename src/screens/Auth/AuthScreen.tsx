@@ -1,363 +1,549 @@
-import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
-  Modal, 
-  FlatList 
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Animated,
+  ActivityIndicator,
+  ScrollView,
 } from 'react-native';
-import { Key, Mail, Lock, User, Sparkles, MapPin } from 'lucide-react-native';
+import { Text } from '../../components/ui/Text';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { ArrowLeft, Eye, EyeOff, User, Mail, Phone, Lock, CreditCard } from 'lucide-react-native';
+
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../hooks/useAuth';
 import { colors, spacing, typography } from '../../theme';
 import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
+import { FormInput } from '../../components/ui/FormInput';
 import { useNavigation } from '../../navigation/NavigationContext';
+import { showSuccess, showError, showInfo } from '../../utils/toast';
+import {
+  loginSchema,
+  signUpSchema,
+  forgotPasswordSchema,
+  LoginFormData,
+  SignUpFormData,
+  ForgotPasswordFormData,
+} from '../../utils/validationSchemas';
 
+// ─── Mode type ────────────────────────────────────────────────────────────────
+type AuthMode = 'login' | 'signup' | 'forgot';
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 export const AuthScreen: React.FC = () => {
-  const { 
-    users, 
-    setUsers, 
-    setCurrentUser, 
-    highContrast: isDark, 
-    language, 
-    translations, 
-    triggerToast 
-  } = useApp();
+  const { language } = useApp();
+  const { login, signUp, forgotPassword } = useAuth();
+  const { navigate, params } = useNavigation();
+  const theme = colors.light;
 
-  const currentTheme = isDark ? colors.dark : colors.light;
-  const { navigate } = useNavigation();
+  const [mode, setMode] = useState<AuthMode>(params?.isSignUp ? 'signup' : 'login');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
-  const [password, setPassword] = useState('');
-  const [region, setRegion] = useState('Karachi');
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [pickerVisible, setPickerVisible] = useState(false);
-
-  const regions = [
-    { value: 'Karachi', label: 'Karachi (PK) - University of Karachi' },
-    { value: 'Makkah', label: 'Makkah (SA) - Umm Al-Qura Option' },
-    { value: 'New York', label: 'New York (US) - ISNA Standard' },
-    { value: 'London', label: 'London (UK) - Muslim World League' },
-    { value: 'Cairo', label: 'Cairo (EG) - Egyptian Authority' }
-  ];
-
-  const handleSubmit = () => {
-    setErrorMsg(null);
-
-    if (!email || !password || (isSignUp && !name)) {
-      setErrorMsg(language === 'ur' ? 'برائے مہربانی تمام فیلڈز پُر کریں۔' : 'Please fill all required fields.');
-      return;
+  // Sync mode if route params change (e.g. pressing "Sign Up" on Welcome screen)
+  useEffect(() => {
+    if (params?.isSignUp !== undefined) {
+      setMode(params.isSignUp ? 'signup' : 'login');
     }
+  }, [params]);
 
-    if (isSignUp) {
-      const exists = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-      if (exists) {
-        setErrorMsg(language === 'ur' ? 'یہ ای میل پہلے سے رجسٹرڈ ہے۔' : 'This email is already registered.');
-        return;
-      }
+  // ── Animation ───────────────────────────────────────────────────────────────
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const slideAnim = React.useRef(new Animated.Value(12)).current;
 
-      const newUser = {
-        email: email.toLowerCase(),
-        name,
-        password,
-        role: 'worshipper' as const,
-        region
-      };
+  useEffect(() => {
+    fadeAnim.setValue(0);
+    slideAnim.setValue(12);
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 350, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 350, useNativeDriver: Platform.OS !== 'web' }),
+    ]).start();
+  }, [mode]);
 
-      setUsers(prev => [...prev, newUser]);
-      setCurrentUser(newUser);
-      triggerToast('Account created successfully!');
-      navigate('Home');
-    } else {
-      const matchedUser = users.find(
-        u => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-      );
-      if (matchedUser) {
-        setCurrentUser(matchedUser);
-        triggerToast(`Welcome back, ${matchedUser.name}!`);
-        navigate('Home');
-      } else {
-        setErrorMsg(
-          language === 'ur' ? 'غلط ای میل یا پاس ورڈ درج کیا گیا ہے۔' : 'Invalid email or password.'
+  // ── Login form ───────────────────────────────────────────────────────────────
+  const loginForm = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: '', password: '' },
+  });
+
+  // ── Sign Up form ─────────────────────────────────────────────────────────────
+  const signUpForm = useForm<SignUpFormData>({
+    resolver: zodResolver(signUpSchema),
+    defaultValues: { name: '', email: '', phone: '', cnic: '', password: '', confirmPassword: '' },
+  });
+
+  // ── Forgot Password form ─────────────────────────────────────────────────────
+  const forgotForm = useForm<ForgotPasswordFormData>({
+    resolver: zodResolver(forgotPasswordSchema),
+    defaultValues: { email: '' },
+  });
+
+  // ── Back handler ─────────────────────────────────────────────────────────────
+  const handleBack = () => {
+    if (mode === 'forgot') { setMode('login'); return; }
+    if (mode === 'signup') { setMode('login'); return; }
+    navigate('Welcome');
+  };
+
+  // ── Submit: Login ─────────────────────────────────────────────────────────────
+  const onLogin = loginForm.handleSubmit(async (data: LoginFormData) => {
+    try {
+      await login(data.email, data.password);
+      showSuccess(language === 'ur' ? 'لاگ ان کامیاب!' : 'Logged in successfully!');
+    } catch (err: any) {
+      const msg: string = err?.message || '';
+      if (msg.toLowerCase().includes('email not confirmed')) {
+        showError(
+          language === 'ur'
+            ? 'ای میل تصدیق نہیں ہوئی۔ ان باکس چیک کریں۔'
+            : 'Email not confirmed. Check your inbox.'
         );
+      } else if (msg.toLowerCase().includes('invalid login credentials')) {
+        showError(language === 'ur' ? 'ای میل یا پاس ورڈ غلط ہے۔' : 'Incorrect email or password.');
+      } else {
+        showError(msg || (language === 'ur' ? 'سائن ان ناکام ہوا۔' : 'Login failed. Please try again.'));
       }
     }
-  };
+  });
 
-  const handleShortcutLogin = (demoEmail: string) => {
-    setErrorMsg(null);
-    const matchedUser = users.find(u => u.email.toLowerCase() === demoEmail.toLowerCase());
-    if (matchedUser) {
-      setCurrentUser(matchedUser);
-      triggerToast(`Logged in as demo ${matchedUser.role}`);
-      navigate('Home');
+  // ── Submit: Sign Up ───────────────────────────────────────────────────────────
+  const onSignUp = signUpForm.handleSubmit(async (data: SignUpFormData) => {
+    try {
+      await signUp(data.email, data.password, {
+        name: data.name,
+        phone: data.phone,
+        cnic: data.cnic,
+      });
+      showSuccess(language === 'ur' ? 'اکاؤنٹ بن گیا!' : 'Account created! Logging in…');
+      try {
+        await login(data.email, data.password);
+      } catch {
+        showInfo(language === 'ur' ? 'اب سائن ان کریں۔' : 'Account created — please sign in.');
+        setMode('login');
+      }
+    } catch (err: any) {
+      showError(err?.message || (language === 'ur' ? 'سائن اپ ناکام۔' : 'Sign up failed.'));
     }
-  };
+  });
 
+  // ── Submit: Forgot Password ───────────────────────────────────────────────────
+  const onForgot = forgotForm.handleSubmit(async (data: ForgotPasswordFormData) => {
+    try {
+      await forgotPassword(data.email);
+      showSuccess(
+        language === 'ur'
+          ? 'ری سیٹ لنک ای میل پر بھیج دیا گیا۔'
+          : 'Password reset link sent to your email.'
+      );
+      setMode('login');
+    } catch (err: any) {
+      showError(err?.message || (language === 'ur' ? 'ناکام ہوا۔' : 'Failed to send reset link.'));
+    }
+  });
+
+  // Derive loading state from whichever form is submitting
+  const isSubmitting =
+    loginForm.formState.isSubmitting ||
+    signUpForm.formState.isSubmitting ||
+    forgotForm.formState.isSubmitting;
+
+  // ── Heading text ──────────────────────────────────────────────────────────────
+  const heading =
+    mode === 'forgot'
+      ? (language === 'ur' ? 'پاس ورڈ بھول گئے؟' : 'Forgot Password')
+      : mode === 'signup'
+        ? (language === 'ur' ? 'نیا اکاؤنٹ بنائیں' : 'Create Account')
+        : (language === 'ur' ? 'خوش آمدید' : 'Welcome Back');
+
+  const subtitle =
+    mode === 'forgot'
+      ? (language === 'ur' ? 'ری سیٹ کے لیے ای میل درج کریں۔' : 'Enter your email to reset password.')
+      : mode === 'signup'
+        ? (language === 'ur' ? 'کمیونٹی کا حصہ بنیں۔' : 'Join the community.')
+        : (language === 'ur' ? 'آگے بڑھنے کے لیے سائن ان کریں۔' : 'Sign in to continue.');
+
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <ScrollView style={[styles.container, { backgroundColor: currentTheme.background }]} contentContainerStyle={styles.scrollContent}>
-      <View style={styles.brandingHeader}>
-        <View style={[styles.logoIconBg, { backgroundColor: colors.primaryLight }]}>
-          <Sparkles size={32} color={colors.primary} />
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: theme.background }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View>
+          <View style={styles.headerBar}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={handleBack}
+              activeOpacity={0.7}
+              disabled={isSubmitting}
+            >
+              <ArrowLeft size={26} color={theme.text} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.headerSection}>
+            <Text style={[styles.headingText, { color: theme.text }]}>{heading}</Text>
+            <Text style={[styles.subtitleText, { color: theme.textMuted }]}>{subtitle}</Text>
+          </View>
         </View>
-        <Text style={[styles.appName, { color: currentTheme.text }]}>
-          {translations.appTitle}
-        </Text>
-        <Text style={[styles.subtitle, { color: currentTheme.textMuted }]}>
-          {translations.authSubtitle}
-        </Text>
-      </View>
 
-      {errorMsg && (
-        <View style={styles.errorCard}>
-          <Text style={styles.errorText}>{errorMsg}</Text>
-        </View>
-      )}
+        {/* Form card */}
+        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }], width: '100%' }}>
+          <View style={styles.card}>
 
-      {/* Main Authentication Card */}
-      <View style={[styles.authCard, { backgroundColor: currentTheme.card, borderColor: currentTheme.border }]}>
-        <Text style={[styles.cardTitle, { color: currentTheme.text }]}>
-          {isSignUp ? translations.signupBtn : translations.authTitle}
-        </Text>
+            {/* ── LOGIN FORM ─────────────────────────────────────────────── */}
+            {mode === 'login' && (
+              <>
+                <Controller
+                  control={loginForm.control}
+                  name="email"
+                  render={({ field, fieldState }) => (
+                    <FormInput
+                      placeholder={language === 'ur' ? 'ای میل' : 'Email'}
+                      value={field.value}
+                      onChangeText={field.onChange}
+                      onBlur={field.onBlur}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      leftIcon={<Mail size={20} color={theme.textMuted} />}
+                      error={fieldState.error}
+                      style={{ marginBottom: spacing.sm }}
+                    />
+                  )}
+                />
+                <Controller
+                  control={loginForm.control}
+                  name="password"
+                  render={({ field, fieldState }) => (
+                    <FormInput
+                      placeholder={language === 'ur' ? 'پاس ورڈ' : 'Password'}
+                      value={field.value}
+                      onChangeText={field.onChange}
+                      onBlur={field.onBlur}
+                      secureTextEntry={!showPassword}
+                      leftIcon={<Lock size={20} color={theme.textMuted} />}
+                      rightIcon={
+                        <TouchableOpacity onPress={() => setShowPassword(v => !v)} style={styles.eyeButton}>
+                          {showPassword ? <EyeOff size={20} color={theme.textMuted} /> : <Eye size={20} color={theme.textMuted} />}
+                        </TouchableOpacity>
+                      }
+                      error={fieldState.error}
+                      style={{ marginBottom: spacing.xs }}
+                    />
+                  )}
+                />
+                <TouchableOpacity
+                  onPress={() => setMode('forgot')}
+                  style={styles.forgotPasswordContainer}
+                  disabled={isSubmitting}
+                >
+                  <Text style={[styles.forgotPasswordText, { color: colors.primary }]}>
+                    {language === 'ur' ? 'پاس ورڈ بھول گئے؟' : 'Forgot Password?'}
+                  </Text>
+                </TouchableOpacity>
+                <Button
+                  title={isSubmitting ? '...' : (language === 'ur' ? 'سائن ان کریں' : 'Sign In')}
+                  onPress={onLogin}
+                  style={styles.primaryButton}
+                  textStyle={styles.buttonText}
+                  variant="primary"
+                  disabled={isSubmitting}
+                />
+              </>
+            )}
 
-        {isSignUp && (
-          <Input
-            label="Full Name"
-            placeholder="John Doe"
-            value={name}
-            onChangeText={setName}
-            isDark={isDark}
-            inputStyle={{ paddingLeft: spacing.md }}
+            {/* ── SIGN UP FORM ───────────────────────────────────────────── */}
+            {mode === 'signup' && (
+              <>
+                <Controller
+                  control={signUpForm.control}
+                  name="name"
+                  render={({ field, fieldState }) => (
+                    <FormInput
+                      placeholder={language === 'ur' ? 'مکمل نام' : 'Full Name'}
+                      value={field.value}
+                      onChangeText={field.onChange}
+                      onBlur={field.onBlur}
+                      autoCapitalize="words"
+                      leftIcon={<User size={20} color={theme.textMuted} />}
+                      error={fieldState.error}
+                      style={{ marginBottom: spacing.sm }}
+                    />
+                  )}
+                />
+                <Controller
+                  control={signUpForm.control}
+                  name="email"
+                  render={({ field, fieldState }) => (
+                    <FormInput
+                      placeholder={language === 'ur' ? 'ای میل' : 'Email'}
+                      value={field.value}
+                      onChangeText={field.onChange}
+                      onBlur={field.onBlur}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      leftIcon={<Mail size={20} color={theme.textMuted} />}
+                      error={fieldState.error}
+                      style={{ marginBottom: spacing.sm }}
+                    />
+                  )}
+                />
+                <Controller
+                  control={signUpForm.control}
+                  name="phone"
+                  render={({ field, fieldState }) => (
+                    <FormInput
+                      placeholder={language === 'ur' ? 'فون نمبر' : 'Phone Number'}
+                      value={field.value}
+                      onChangeText={field.onChange}
+                      onBlur={field.onBlur}
+                      keyboardType="phone-pad"
+                      leftIcon={<Phone size={20} color={theme.textMuted} />}
+                      error={fieldState.error}
+                      style={{ marginBottom: spacing.sm }}
+                    />
+                  )}
+                />
+                <Controller
+                  control={signUpForm.control}
+                  name="cnic"
+                  render={({ field, fieldState }) => (
+                    <FormInput
+                      placeholder={language === 'ur' ? 'قومی شناختی کارڈ نمبر' : 'CNIC Number'}
+                      value={field.value ?? ''}
+                      onChangeText={field.onChange}
+                      onBlur={field.onBlur}
+                      keyboardType="numeric"
+                      leftIcon={<CreditCard size={20} color={theme.textMuted} />}
+                      error={fieldState.error}
+                      style={{ marginBottom: spacing.sm }}
+                    />
+                  )}
+                />
+                <Controller
+                  control={signUpForm.control}
+                  name="password"
+                  render={({ field, fieldState }) => (
+                    <FormInput
+                      placeholder={language === 'ur' ? 'پاس ورڈ' : 'Password'}
+                      value={field.value}
+                      onChangeText={field.onChange}
+                      onBlur={field.onBlur}
+                      secureTextEntry={!showPassword}
+                      leftIcon={<Lock size={20} color={theme.textMuted} />}
+                      rightIcon={
+                        <TouchableOpacity onPress={() => setShowPassword(v => !v)} style={styles.eyeButton}>
+                          {showPassword ? <EyeOff size={20} color={theme.textMuted} /> : <Eye size={20} color={theme.textMuted} />}
+                        </TouchableOpacity>
+                      }
+                      error={fieldState.error}
+                      style={{ marginBottom: spacing.sm }}
+                    />
+                  )}
+                />
+                <Controller
+                  control={signUpForm.control}
+                  name="confirmPassword"
+                  render={({ field, fieldState }) => (
+                    <FormInput
+                      placeholder={language === 'ur' ? 'پاس ورڈ کی تصدیق' : 'Confirm Password'}
+                      value={field.value}
+                      onChangeText={field.onChange}
+                      onBlur={field.onBlur}
+                      secureTextEntry={!showConfirmPassword}
+                      leftIcon={<Lock size={20} color={theme.textMuted} />}
+                      rightIcon={
+                        <TouchableOpacity onPress={() => setShowConfirmPassword(v => !v)} style={styles.eyeButton}>
+                          {showConfirmPassword ? <EyeOff size={20} color={theme.textMuted} /> : <Eye size={20} color={theme.textMuted} />}
+                        </TouchableOpacity>
+                      }
+                      error={fieldState.error}
+                      style={{ marginBottom: spacing.xs }}
+                    />
+                  )}
+                />
+                <Button
+                  title={isSubmitting ? '...' : (language === 'ur' ? 'سائن اپ کریں' : 'Create Account')}
+                  onPress={onSignUp}
+                  style={styles.primaryButton}
+                  textStyle={styles.buttonText}
+                  variant="primary"
+                  disabled={isSubmitting}
+                />
+              </>
+            )}
+
+            {/* ── FORGOT PASSWORD FORM ───────────────────────────────────── */}
+            {mode === 'forgot' && (
+              <>
+                <Controller
+                  control={forgotForm.control}
+                  name="email"
+                  render={({ field, fieldState }) => (
+                    <FormInput
+                      placeholder={language === 'ur' ? 'ای میل' : 'Email'}
+                      value={field.value}
+                      onChangeText={field.onChange}
+                      onBlur={field.onBlur}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      leftIcon={<Mail size={20} color={theme.textMuted} />}
+                      error={fieldState.error}
+                      style={{ marginBottom: spacing.sm }}
+                    />
+                  )}
+                />
+                <Button
+                  title={isSubmitting ? '...' : (language === 'ur' ? 'ری سیٹ لنک بھیجیں' : 'Send Reset Link')}
+                  onPress={onForgot}
+                  style={styles.primaryButton}
+                  textStyle={styles.buttonText}
+                  variant="primary"
+                  disabled={isSubmitting}
+                />
+              </>
+            )}
+          </View>
+
+          {/* Toggle link */}
+          <TouchableOpacity
+            style={styles.toggleContainer}
+            onPress={() => {
+              if (mode === 'forgot') { setMode('login'); return; }
+              setMode(mode === 'login' ? 'signup' : 'login');
+            }}
+            activeOpacity={0.7}
+            disabled={isSubmitting}
+          >
+            <Text style={[styles.toggleText, { color: theme.textMuted }]}>
+              {mode === 'forgot'
+                ? (language === 'ur' ? 'لاگ ان پر واپس جائیں؟ ' : 'Remembered your password? ')
+                : mode === 'signup'
+                  ? (language === 'ur' ? 'پہلے سے اکاؤنٹ ہے؟ ' : 'Already have an account? ')
+                  : (language === 'ur' ? 'اکاؤنٹ نہیں ہے؟ ' : "Don't have an account? ")}
+              <Text style={{ color: colors.primary, fontWeight: typography.weights.bold }}>
+                {mode === 'forgot'
+                  ? (language === 'ur' ? 'سائن ان کریں' : 'Sign In')
+                  : mode === 'signup'
+                    ? (language === 'ur' ? 'لاگ ان کریں' : 'Sign In')
+                    : (language === 'ur' ? 'سائن اپ کریں' : 'Sign Up')}
+              </Text>
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Bottom branding */}
+        <View style={styles.brandingContainer}>
+          <Image
+            source={require('../../../assets/logo.png')}
+            style={styles.brandingLogo}
+            resizeMode="contain"
           />
-        )}
-
-        <Input
-          label={translations.emailLabel}
-          placeholder="email@domain.com"
-          value={email}
-          onChangeText={setEmail}
-          isDark={isDark}
-        />
-
-        <Input
-          label={translations.passLabel}
-          placeholder="••••••••"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry={true}
-          isDark={isDark}
-        />
-
-        {isSignUp && (
-          <View style={styles.formGroup}>
-            <Text style={[styles.pickerLabel, { color: currentTheme.textMuted }]}>Computation Region</Text>
-            <TouchableOpacity 
-              style={[styles.pickerTrigger, { borderColor: currentTheme.border }]} 
-              onPress={() => setPickerVisible(true)}
-            >
-              <MapPin size={14} color={colors.primary} />
-              <Text style={{ color: currentTheme.text }}>
-                {regions.find(r => r.value === region)?.label || 'Select region'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        <Button
-          title={isSignUp ? 'Sign Up' : translations.loginBtn}
-          onPress={handleSubmit}
-          style={{ marginTop: spacing.md }}
-        />
-
-        <TouchableOpacity 
-          style={styles.toggleModeBtn}
-          onPress={() => setIsSignUp(prev => !prev)}
-        >
-          <Text style={{ color: colors.primary, fontSize: typography.sizes.xs + 1, fontWeight: 'bold' }}>
-            {isSignUp ? 'Already have an account? Sign In' : 'Create new Worshipper Account'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Shortcut logins for simulator personas */}
-      <View style={[styles.shortcutCard, { backgroundColor: currentTheme.card, borderColor: currentTheme.border }]}>
-        <Text style={[styles.shortcutTitle, { color: currentTheme.text }]}>
-          🛠️ Quick Demo Accounts (Tap to Login)
-        </Text>
-        <View style={styles.shortcutRow}>
-          {[
-            { label: '🕌 Worshipper', email: 'worshipper@nur.com' },
-            { label: '🔑 Sub-Admin', email: 'alaqsa@nur.com' },
-            { label: '👑 Super-Admin', email: 'superadmin@nur.com' }
-          ].map((item, idx) => (
-            <TouchableOpacity 
-              key={idx} 
-              style={[styles.shortcutBtn, { backgroundColor: colors.primaryLight }]}
-              onPress={() => handleShortcutLogin(item.email)}
-            >
-              <Text style={{ color: colors.primary, fontSize: typography.sizes.xs - 1, fontWeight: 'bold' }}>
-                {item.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          <Text style={[styles.brandingName, { color: theme.text }]}>Masjid Locator</Text>
+          <Text style={[styles.brandingVersion, { color: theme.textMuted }]}>Version 1.0.0</Text>
         </View>
-      </View>
-
-      {/* Region Picker Modal */}
-      <Modal visible={pickerVisible} transparent={true} animationType="fade">
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setPickerVisible(false)}>
-          <View style={[styles.pickerContent, { backgroundColor: currentTheme.card }]}>
-            <Text style={[styles.pickerTitle, { color: currentTheme.text }]}>Select Calculation Region</Text>
-            {regions.map((item) => (
-              <TouchableOpacity
-                key={item.value}
-                style={styles.pickerItem}
-                onPress={() => {
-                  setRegion(item.value);
-                  setPickerVisible(false);
-                }}
-              >
-                <Text style={[styles.pickerItemText, { color: currentTheme.text }]}>
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </TouchableOpacity>
-      </Modal>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
   scrollContent: {
-    padding: spacing.lg,
-    alignItems: 'center',
-    paddingBottom: 50,
+    flexGrow: 1,
+    paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.sm,
+    justifyContent: 'space-between',
   },
-  brandingHeader: {
+  headerBar: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    marginVertical: spacing.xl,
+    paddingTop: spacing.sm,
   },
-  logoIconBg: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  backButton: {
+    padding: spacing.xs,
+    marginLeft: -spacing.sm,
+  },
+  headerSection: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.md,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
   },
-  appName: {
-    fontSize: typography.sizes.xxl,
+  headingText: {
+    fontSize: typography.sizes.huge,
     fontWeight: typography.weights.bold,
+    textAlign: 'center',
   },
-  subtitle: {
-    fontSize: typography.sizes.xs,
+  subtitleText: {
+    fontSize: typography.sizes.base,
     marginTop: spacing.xs,
     textAlign: 'center',
   },
-  errorCard: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    borderWidth: 1,
-    borderColor: '#ef4444',
-    padding: spacing.md,
-    borderRadius: spacing.borderRadiusSm,
-    marginBottom: spacing.md,
+  card: {
     width: '100%',
-  },
-  errorText: {
-    color: '#ef4444',
-    fontSize: typography.sizes.xs,
-    textAlign: 'center',
-  },
-  authCard: {
-    width: '100%',
-    borderRadius: spacing.borderRadiusLg,
-    borderWidth: 1,
-    padding: spacing.lg,
-  },
-  cardTitle: {
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.bold,
-    marginBottom: spacing.md,
-    textAlign: 'center',
-  },
-  formGroup: {
-    marginBottom: spacing.md,
-  },
-  pickerLabel: {
-    fontSize: typography.sizes.xs - 1,
-    fontWeight: '700',
     marginBottom: spacing.xs,
   },
-  pickerTrigger: {
-    height: spacing.touchTargetMin,
-    borderWidth: 1,
-    borderRadius: spacing.borderRadiusSm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    gap: spacing.sm,
-  },
-  toggleModeBtn: {
-    marginTop: spacing.lg,
-    alignItems: 'center',
-  },
-  shortcutCard: {
-    width: '100%',
-    borderRadius: spacing.borderRadiusLg,
-    borderWidth: 1,
-    padding: spacing.md,
-    marginTop: spacing.lg,
-  },
-  shortcutTitle: {
-    fontSize: typography.sizes.xs + 1,
-    fontWeight: 'bold',
-    marginBottom: spacing.sm,
-    textAlign: 'center',
-  },
-  shortcutRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-  },
-  shortcutBtn: {
-    flex: 1,
-    height: 38,
-    borderRadius: spacing.borderRadiusSm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  eyeButton: {
+    padding: spacing.xs,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.lg,
   },
-  pickerContent: {
-    borderRadius: spacing.borderRadiusLg,
-    width: '100%',
-    padding: spacing.lg,
-  },
-  pickerTitle: {
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.bold,
-    textAlign: 'center',
+  forgotPasswordContainer: {
+    alignSelf: 'flex-end',
     marginBottom: spacing.md,
+    marginTop: -spacing.xs,
   },
-  pickerItem: {
-    paddingVertical: spacing.md,
+  forgotPasswordText: {
+    fontSize: typography.sizes.base - 2,
+    fontWeight: typography.weights.semibold,
+  },
+  primaryButton: {
+    width: '100%',
+    height: 48,
+    borderRadius: spacing.borderRadiusRound,
+    marginTop: spacing.xs,
+  },
+  buttonText: {
+    fontSize: typography.sizes.md,
+  },
+  toggleContainer: {
     alignItems: 'center',
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
   },
-  pickerItemText: {
-    fontSize: typography.sizes.sm,
+  toggleText: {
+    fontSize: typography.sizes.base - 2,
+  },
+  brandingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: spacing.xs,
+  },
+  brandingLogo: {
+    width: 30,
+    height: 30,
+    marginBottom: spacing.xs,
+  },
+  brandingName: {
+    fontSize: typography.sizes.sm - 2,
+    fontWeight: typography.weights.bold,
+  },
+  brandingVersion: {
+    fontSize: typography.sizes.xs - 2,
+    marginTop: 1,
   },
 });

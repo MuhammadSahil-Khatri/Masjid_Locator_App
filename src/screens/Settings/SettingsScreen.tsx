@@ -22,7 +22,8 @@ import {
   Send, 
   UserCheck, 
   Activity, 
-  Users 
+  Users,
+  Compass
 } from 'lucide-react-native';
 import { useApp } from '../../context/AppContext';
 import { colors, spacing, typography } from '../../theme';
@@ -52,7 +53,7 @@ export const SettingsScreen: React.FC = () => {
   const { navigate } = useNavigation();
 
   // If user is not logged in or is a worshipper, show unauthorized screen
-  const isAdmin = currentUser && (currentUser.role === 'sub_admin' || currentUser.role === 'super_admin');
+  const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'super_admin');
 
   // Tab state within admin panel
   const [adminTab, setAdminTab] = useState<'publish' | 'analytics' | 'queue' | 'subadmins'>('publish');
@@ -76,7 +77,7 @@ export const SettingsScreen: React.FC = () => {
 
   // Setup selectedMasjidId based on role & assignedMasjidId
   useEffect(() => {
-    if (currentUser?.role === 'sub_admin' && currentUser?.assignedMasjidId) {
+    if (currentUser?.role === 'admin' && currentUser?.assignedMasjidId) {
       setSelectedMasjidId(currentUser.assignedMasjidId);
     } else if (masjids.length > 0 && !selectedMasjidId) {
       const firstVerified = masjids.find(m => m.isVerified);
@@ -147,7 +148,7 @@ export const SettingsScreen: React.FC = () => {
   }, [masjids]);
 
   const subAdmins = useMemo(() => {
-    return users.filter(u => u.role === 'sub_admin');
+    return users.filter(u => u.role === 'admin');
   }, [users]);
 
   // Form Submissions
@@ -237,7 +238,7 @@ export const SettingsScreen: React.FC = () => {
       email: newSubAdminEmail,
       name: newSubAdminName,
       password: newSubAdminPassword,
-      role: 'sub_admin',
+      role: 'admin',
       assignedMasjidId: newSubAdminMasjidId,
     });
     setNewSubAdminEmail('');
@@ -247,17 +248,43 @@ export const SettingsScreen: React.FC = () => {
 
   if (!isAdmin) {
     return (
-      <View style={[styles.container, { backgroundColor: currentTheme.background }, styles.unauthContainer]}>
-        <AlertTriangle size={48} color={colors.warning} style={{ marginBottom: spacing.md }} />
-        <Text style={[styles.unauthTitle, { color: currentTheme.text }]}>Admin Privileges Required</Text>
-        <Text style={[styles.unauthText, { color: currentTheme.textMuted }]}>
-          You must log in with an administrator account to view dashboard controls. Go to Profile to log in.
-        </Text>
-        <Button
-          title="Go to Login Screen"
-          onPress={() => navigate('Auth')}
-          style={{ marginTop: spacing.lg }}
-        />
+      <View style={[styles.container, { backgroundColor: currentTheme.background }]}>
+        {/* Qibla Direction Feature Card — visible to all users */}
+        <View style={[styles.featureSection, { backgroundColor: currentTheme.background }]}>
+          <Text style={[styles.featureSectionTitle, { color: currentTheme.text }]}>
+            🧭 Islamic Features
+          </Text>
+          <TouchableOpacity
+            style={[styles.featureCard, { backgroundColor: colors.cream, borderColor: colors.peach }]}
+            onPress={() => navigate('Qibla')}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.featureIconWrap, { backgroundColor: colors.primaryLight, borderColor: colors.primaryBorder }]}>
+              <Compass size={26} color={colors.primary} />
+            </View>
+            <View style={styles.featureCardText}>
+              <Text style={[styles.featureCardTitle, { color: colors.brown }]}>Qibla Direction</Text>
+              <Text style={[styles.featureCardDesc, { color: currentTheme.textMuted }]}>
+                Find the direction of the Holy Kaaba based on your current location
+              </Text>
+            </View>
+            <Shield size={16} color={colors.peach} style={{ alignSelf: 'center' }} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Admin access notice */}
+        <View style={[styles.unauthContainer, { backgroundColor: currentTheme.background }]}>
+          <AlertTriangle size={48} color={colors.warning} style={{ marginBottom: spacing.md }} />
+          <Text style={[styles.unauthTitle, { color: currentTheme.text }]}>Admin Privileges Required</Text>
+          <Text style={[styles.unauthText, { color: currentTheme.textMuted }]}>
+            You must log in with an administrator account to view dashboard controls. Go to Profile to log in.
+          </Text>
+          <Button
+            title="Go to Login Screen"
+            onPress={() => navigate('Auth')}
+            style={{ marginTop: spacing.lg }}
+          />
+        </View>
       </View>
     );
   }
@@ -269,7 +296,7 @@ export const SettingsScreen: React.FC = () => {
         <View style={styles.headerTitleRow}>
           <Shield size={18} color={colors.primary} />
           <Text style={[styles.adminHeaderTitle, { color: currentTheme.text }]}>
-            {currentUser.role === 'super_admin' ? translations.activeSuperAdmin : translations.activeSubAdmin}
+            {currentUser.role === 'super_admin' ? translations.activeSuperAdmin : translations.activeAdmin}
           </Text>
         </View>
         <Text style={[styles.adminHeaderEmail, { color: currentTheme.textMuted }]}>
@@ -730,6 +757,45 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  featureSection: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.md,
+  },
+  featureSectionTitle: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold,
+    marginBottom: spacing.md,
+  },
+  featureCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    borderRadius: spacing.borderRadiusLg,
+    borderWidth: 1.5,
+    padding: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  featureIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featureCardText: {
+    flex: 1,
+  },
+  featureCardTitle: {
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.bold,
+    marginBottom: 2,
+  },
+  featureCardDesc: {
+    fontSize: typography.sizes.xs,
+    lineHeight: 16,
   },
   adminHeader: {
     padding: spacing.md,

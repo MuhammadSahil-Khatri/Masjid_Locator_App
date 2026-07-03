@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Image, TouchableOpacity, Linking } from 'react-native';
+import { Text } from '../ui/Text';
 import { Shield, Navigation, Heart } from 'lucide-react-native';
 import { colors, spacing, typography } from '../../theme';
 import { Masjid } from '../../types';
@@ -13,6 +14,7 @@ interface MasjidCardProps {
   onDirectionsPress?: () => void;
   isFavorite?: boolean;
   onFavoriteToggle?: () => void;
+  isSelected?: boolean;
 }
 
 export const MasjidCard: React.FC<MasjidCardProps> = ({
@@ -24,6 +26,7 @@ export const MasjidCard: React.FC<MasjidCardProps> = ({
   onDirectionsPress,
   isFavorite = false,
   onFavoriteToggle,
+  isSelected = false,
 }) => {
   const currentTheme = isDark ? colors.dark : colors.light;
 
@@ -32,8 +35,9 @@ export const MasjidCard: React.FC<MasjidCardProps> = ({
       style={[
         styles.card,
         {
-          backgroundColor: currentTheme.card,
-          borderColor: currentTheme.border,
+          backgroundColor: isSelected ? (isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.1)') : currentTheme.card,
+          borderColor: isSelected ? colors.primary : currentTheme.border,
+          borderWidth: isSelected ? 2 : 1,
         },
       ]}
       onPress={onPress}
@@ -83,33 +87,34 @@ export const MasjidCard: React.FC<MasjidCardProps> = ({
 
         <View style={[styles.metaRow, isRtl && styles.rowReverse]}>
           <View style={[styles.metaItem, isRtl && styles.rowReverse]}>
-            <Text style={[styles.metaLabel, { color: currentTheme.textMuted }]}>
-              {translations.distance}:
-            </Text>
-            <Text style={[styles.metaValue, { color: currentTheme.text }]}>
-              {masjid.distance} km
-            </Text>
-          </View>
-
-          <View style={[styles.metaItem, isRtl && styles.rowReverse]}>
-            <Text style={[styles.metaLabel, { color: currentTheme.textMuted }]}>
-              {translations.capacity}:
-            </Text>
-            <Text style={[styles.metaValue, { color: currentTheme.text }]}>
-              {masjid.capacity}
+            <Text style={[styles.metaValue, { color: currentTheme.text, fontSize: typography.sizes.sm }]}>
+              {masjid.distance < 1000 
+                ? `${masjid.distance} m` 
+                : `${(masjid.distance / 1000).toFixed(1)} km`}
+              {' • '}
+              {Math.max(1, Math.ceil(masjid.distance / 80))} min walk
             </Text>
           </View>
         </View>
 
-        {onDirectionsPress && (
+        <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
           <TouchableOpacity
-            style={styles.directionsBtn}
-            onPress={onDirectionsPress}
+            style={[styles.directionsBtn, { flex: 1, backgroundColor: isDark ? '#1e293b' : '#f1f5f9' }]}
+            onPress={() => Linking.openURL(`google.navigation:q=${masjid.lat},${masjid.lng}`)}
           >
-            <Navigation size={12} color="#ffffff" fill="#ffffff" />
-            <Text style={styles.directionsText}>{translations.getDirections}</Text>
+            <Navigation size={12} color={currentTheme.text} />
+            <Text style={[styles.directionsText, { color: currentTheme.text }]}>Directions</Text>
           </TouchableOpacity>
-        )}
+
+          {onDirectionsPress && (
+            <TouchableOpacity
+              style={[styles.directionsBtn, { flex: 1 }]}
+              onPress={onDirectionsPress}
+            >
+              <Text style={styles.directionsText}>More Info</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     </TouchableOpacity>
   );

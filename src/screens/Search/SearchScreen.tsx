@@ -1,21 +1,29 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   View, 
-  Text, 
   StyleSheet, 
   ScrollView, 
   TextInput, 
-  TouchableOpacity, 
-  FlatList, 
-  Modal 
+  TouchableOpacity,
+  Keyboard
 } from 'react-native';
-import { Search, SlidersHorizontal, Map as MapIcon, List as ListIcon, CheckCircle } from 'lucide-react-native';
+import { Text } from '../../components/ui/Text';
+import { Search, MapPin, CheckCircle, Navigation } from 'lucide-react-native';
 import { useApp } from '../../context/AppContext';
 import { colors, spacing, typography } from '../../theme';
-import { MasjidCard } from '../../components/cards/MasjidCard';
 import MapComponent from '../../components/MapComponent';
 import { useNavigation } from '../../navigation/NavigationContext';
-import { USER_DEFAULT_LOCATION } from '../../data/mockData';
+import { useUserLocation } from '../../hooks/useUserLocation';
+import { getDistance } from 'geolib';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+  Easing
+} from 'react-native-reanimated';
+import { AnimatedBottomSheet } from '../../components/ui/AnimatedBottomSheet';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const SearchScreen: React.FC = () => {
   const { 
@@ -28,17 +36,28 @@ export const SearchScreen: React.FC = () => {
 
   const currentTheme = isDark ? colors.dark : colors.light;
   const { navigate } = useNavigation();
+  const { location, refreshLocation } = useUserLocation();
+  const insets = useSafeAreaInsets();
 
-  const [activeTab, setActiveTab] = useState<'map' | 'list'>('map');
+  const [selectedMasjidId, setSelectedMasjidId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Filter States
   const [filterOpenNow, setFilterOpenNow] = useState(false);
   const [filterLadiesSpace, setFilterLadiesSpace] = useState(false);
   const [filterJanazaServices, setFilterJanazaServices] = useState(false);
   const [filterVerifiedOnly, setFilterVerifiedOnly] = useState(false);
-  const [showFilterDrawer, setShowFilterDrawer] = useState(false);
+
+  // Bottom Sheet State
+  const [isBottomSheetVisible, setBottomSheetVisible] = useState(false);
+
+  // Animations
+  const searchFocused = useSharedValue(0);
 
   const filteredMasjids = useMemo(() => {
-    return masjids.filter(m => {
+    if (!location) return [];
+
+    const filtered = masjids.filter(m => {
       const matchSearch = 
         m.nameEn.toLowerCase().includes(searchTerm.toLowerCase()) ||
         m.nameUr.includes(searchTerm) ||
@@ -51,138 +70,198 @@ export const SearchScreen: React.FC = () => {
 
       return matchSearch && matchLadies && matchJanaza && matchVerified && matchOpen;
     });
-  }, [masjids, searchTerm, filterOpenNow, filterLadiesSpace, filterJanazaServices, filterVerifiedOnly]);
 
-  const activeFiltersCount = 
-    (filterOpenNow ? 1 : 0) + 
-    (filterLadiesSpace ? 1 : 0) + 
-    (filterJanazaServices ? 1 : 0) + 
-    (filterVerifiedOnly ? 1 : 0);
+    const withDistance = filtered.map(m => {
+      const distance = getDistance(
+        { latitude: location.lat, longitude: location.lng },
+        { latitude: m.lat, longitude: m.lng }
+      );
+      return { ...m, distance };
+    });
+
+    withDistance.sort((a, b) => a.distance - b.distance);
+    return withDistance.slice(0, 10);
+  }, [masjids, searchTerm, filterOpenNow, filterLadiesSpace, filterJanazaServices, filterVerifiedOnly, location]);
+
+  const selectedMasjid = useMemo(() => {
+    return filteredMasjids.find(m => m.id === selectedMasjidId) || null;
+  }, [selectedMasjidId, filteredMasjids]);
+
+  const handleSelectMasjid = (m: any) => {
+    setSelectedMasjidId(m.id);
+    setBottomSheetVisible(true);
+    Keyboard.dismiss();
+  };
+
+  const handleFocus = () => {
+    searchFocused.value = withTiming(1, { duration: 300, easing: Easing.out(Easing.exp) });
+  };
+
+  const handleBlur = () => {
+    searchFocused.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.exp) });
+  };
+
+  const rSearchContainerStyle = useAnimatedStyle(() => {
+    return {
+      elevation: withTiming(searchFocused.value ? 10 : 4),
+      shadowOpacity: withTiming(searchFocused.value ? 0.3 : 0.1),
+      borderColor: searchFocused.value ? colors.primary : currentTheme.border,
+      borderWidth: searchFocused.value ? 1.5 : 1,
+    };
+  });
+
+  const FilterChip = ({ label, active, onPress }: { label: string, active: boolean, onPress: () => void }) => {
+    return (
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={onPress}
+        style={[
+          styles.filterChip,
+          { 
+            backgroundColor: active ? colors.primary : currentTheme.card,
+            borderColor: active ? colors.primary : currentTheme.border
+          }
+        ]}
+      >
+        <Text style={[styles.filterChipText, { color: active ? '#ffffff' : currentTheme.text }]}>
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
 
   return (
-    <View style={[styles.container, { backgroundColor: currentTheme.background }]}>
-      {/* Search Input and Filter Bar */}
-      <View style={[styles.searchBar, { backgroundColor: currentTheme.card, borderBottomColor: currentTheme.border }, isRtl && styles.rowReverse]}>
-        <View style={[styles.searchInputContainer, { backgroundColor: currentTheme.input, borderColor: currentTheme.border }, isRtl && styles.rowReverse]}>
-          <Search size={16} color={currentTheme.textMuted} style={styles.searchIcon} />
+    <View style={styles.container}>
+      {/* 1. Full Screen Map */}
+      <View style={StyleSheet.absoluteFillObject}>
+        {location ? (
+          <MapComponent 
+            masjids={filteredMasjids} 
+            selectedMasjid={selectedMasjid} 
+            onSelectMasjid={handleSelectMasjid}
+            userLocation={location}
+            language={language}
+            showRoutePreview={false}
+            onCurrentLocationPress={() => refreshLocation()}
+          />
+        ) : (
+          <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center', backgroundColor: currentTheme.background }]}>
+            <Text style={{ color: currentTheme.textMuted, fontSize: typography.sizes.sm }}>Acquiring GPS location...</Text>
+          </View>
+        )}
+      </View>
+
+      {/* 2. Floating Top UI (Search + Filters) */}
+      <View style={[styles.floatingUI, { top: insets.top + spacing.md }]}>
+        <Animated.View style={[
+          styles.searchBarWrapper, 
+          { backgroundColor: currentTheme.card }, 
+          rSearchContainerStyle,
+          isRtl && styles.rowReverse
+        ]}>
+          <Search size={20} color={currentTheme.textMuted} style={styles.searchIcon} />
           <TextInput
-            placeholder={translations.searchPlaceholder}
+            placeholder={translations.searchPlaceholder || "Search Masjid..."}
             placeholderTextColor={currentTheme.textMuted}
             value={searchTerm}
             onChangeText={setSearchTerm}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
             style={[
               styles.input, 
               { color: currentTheme.text },
               isRtl && typography.alignRtl
             ]}
           />
-        </View>
+        </Animated.View>
 
-        <TouchableOpacity 
-          style={[styles.filterBtn, { borderColor: activeFiltersCount > 0 ? colors.primary : currentTheme.border, backgroundColor: activeFiltersCount > 0 ? colors.primaryLight : 'transparent' }]}
-          onPress={() => setShowFilterDrawer(true)}
-        >
-          <SlidersHorizontal size={18} color={activeFiltersCount > 0 ? colors.primary : currentTheme.text} />
-          {activeFiltersCount > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{activeFiltersCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/* Segment Selector View Toggle (Map vs List) */}
-      <View style={[styles.segmentContainer, { backgroundColor: currentTheme.card, borderBottomColor: currentTheme.border }, isRtl && styles.rowReverse]}>
-        <TouchableOpacity 
-          style={[styles.segmentBtn, activeTab === 'map' && styles.segmentBtnActive, isRtl && styles.rowReverse]}
-          onPress={() => setActiveTab('map')}
-        >
-          <MapIcon size={14} color={activeTab === 'map' ? '#ffffff' : currentTheme.textMuted} />
-          <Text style={[styles.segmentText, activeTab === 'map' ? styles.textActive : { color: currentTheme.textMuted }]}>
-            {translations.findNearbyMasjid}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.segmentBtn, activeTab === 'list' && styles.segmentBtnActive, isRtl && styles.rowReverse]}
-          onPress={() => setActiveTab('list')}
-        >
-          <ListIcon size={14} color={activeTab === 'list' ? '#ffffff' : currentTheme.textMuted} />
-          <Text style={[styles.segmentText, activeTab === 'list' ? styles.textActive : { color: currentTheme.textMuted }]}>
-            {translations.masjidList} ({filteredMasjids.length})
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Render map component or listings list */}
-      {activeTab === 'map' ? (
-        <View style={styles.flexOne}>
-          <MapComponent 
-            masjids={filteredMasjids} 
-            selectedMasjid={null} 
-            onSelectMasjid={(m) => {
-              if (m) navigate('MosqueDetails', { masjidId: m.id });
-            }}
-            userLocation={USER_DEFAULT_LOCATION}
-            language={language}
-            showRoutePreview={false}
-          />
-        </View>
-      ) : (
-        <FlatList
-          data={filteredMasjids}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
-            <MasjidCard
-              masjid={item}
-              isDark={isDark}
-              isRtl={isRtl}
-              translations={translations}
-              onPress={() => navigate('MosqueDetails', { masjidId: item.id })}
-              onDirectionsPress={() => navigate('MosqueDetails', { masjidId: item.id })}
+        <View style={styles.filtersContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.filtersScrollContent, isRtl && styles.rowReverse]}>
+            <FilterChip 
+              label={translations.nowOpen || "Nearest"} 
+              active={filterOpenNow} 
+              onPress={() => setFilterOpenNow(!filterOpenNow)} 
             />
-          )}
-        />
-      )}
+            <FilterChip 
+              label={translations.jummah || "Jumu'ah"} 
+              active={filterVerifiedOnly} // Mocking Jumu'ah mapping
+              onPress={() => setFilterVerifiedOnly(!filterVerifiedOnly)} 
+            />
+            <FilterChip 
+              label={translations.genderHall || "Female Prayer"} 
+              active={filterLadiesSpace} 
+              onPress={() => setFilterLadiesSpace(!filterLadiesSpace)} 
+            />
+            <FilterChip 
+              label={translations.janazaFacility || "Janaza Services"} 
+              active={filterJanazaServices} 
+              onPress={() => setFilterJanazaServices(!filterJanazaServices)} 
+            />
+          </ScrollView>
+        </View>
+      </View>
 
-      {/* Filter drawer Drawer Modal */}
-      <Modal visible={showFilterDrawer} transparent={true} animationType="slide" onRequestClose={() => setShowFilterDrawer(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowFilterDrawer(false)}>
-          <View style={[styles.modalContent, { backgroundColor: currentTheme.card, borderTopColor: currentTheme.border }]}>
-            <Text style={[styles.modalTitle, { color: currentTheme.text }]}>Filters</Text>
-            
-            <View style={styles.divider} />
-
-            {[
-              { label: translations.nowOpen, state: filterOpenNow, setState: setFilterOpenNow },
-              { label: translations.genderHall, state: filterLadiesSpace, setState: setFilterLadiesSpace },
-              { label: translations.janazaFacility, state: filterJanazaServices, setState: setFilterJanazaServices },
-              { label: translations.verifiedOnly, state: filterVerifiedOnly, setState: setFilterVerifiedOnly }
-            ].map((item, idx) => (
-              <TouchableOpacity 
-                key={idx}
-                style={[styles.filterRow, isRtl && styles.rowReverse]}
-                onPress={() => item.setState(!item.state)}
-              >
-                <Text style={[styles.filterLabel, { color: currentTheme.text }]}>{item.label}</Text>
-                <View style={[styles.checkbox, item.state ? styles.checkboxChecked : { borderColor: currentTheme.border }]}>
-                  {item.state && <CheckCircle size={14} color="#ffffff" fill={colors.primary} />}
+      {/* 3. Custom Animated Bottom Sheet */}
+      <AnimatedBottomSheet 
+        isVisible={isBottomSheetVisible} 
+        onClose={() => {
+          setBottomSheetVisible(false);
+          setSelectedMasjidId(null);
+        }}
+        backgroundColor={currentTheme.card}
+        snapPoint={320}
+      >
+        {selectedMasjid && (
+          <View style={styles.sheetContent}>
+            <View style={[styles.sheetHeader, isRtl && styles.rowReverse]}>
+              <View style={styles.sheetTitleContainer}>
+                <Text style={[styles.sheetTitle, { color: currentTheme.text }, isRtl && typography.alignRtl]} numberOfLines={1}>
+                  {isRtl ? selectedMasjid.nameUr : selectedMasjid.nameEn}
+                </Text>
+                <Text style={[styles.sheetDistance, { color: colors.primary }, isRtl && typography.alignRtl]}>
+                  {(selectedMasjid.distance / 1000).toFixed(1)} km away
+                </Text>
+              </View>
+              {selectedMasjid.isVerified && (
+                <View style={styles.verifiedBadge}>
+                  <CheckCircle size={14} color={colors.primary} />
                 </View>
-              </TouchableOpacity>
-            ))}
+              )}
+            </View>
+
+            <Text style={[styles.sheetAddress, { color: currentTheme.textMuted }, isRtl && typography.alignRtl]} numberOfLines={2}>
+              {isRtl ? selectedMasjid.addressUr : selectedMasjid.addressEn}
+            </Text>
+
+            <View style={[styles.sheetFeatures, isRtl && styles.rowReverse]}>
+              {selectedMasjid.genderHalls && (
+                <View style={[styles.featureTag, { backgroundColor: currentTheme.surface }]}>
+                  <Text style={[styles.featureTagText, { color: currentTheme.text }]}>{isRtl ? 'خواتین کی جگہ' : 'Female Space'}</Text>
+                </View>
+              )}
+              {selectedMasjid.janazaFacility && (
+                <View style={[styles.featureTag, { backgroundColor: currentTheme.surface }]}>
+                  <Text style={[styles.featureTagText, { color: currentTheme.text }]}>{isRtl ? 'جنازہ' : 'Janaza'}</Text>
+                </View>
+              )}
+            </View>
 
             <TouchableOpacity 
-              style={[styles.closeBtn, { backgroundColor: colors.primary }]}
-              onPress={() => setShowFilterDrawer(false)}
+              style={[styles.directionsBtn, { backgroundColor: colors.primary }, isRtl && styles.rowReverse]}
+              onPress={() => {
+                setBottomSheetVisible(false);
+                navigate('MosqueDetails', { masjidId: selectedMasjid.id });
+              }}
+              activeOpacity={0.8}
             >
-              <Text style={styles.closeBtnText}>Apply Filters</Text>
+              <Navigation size={18} color="#ffffff" />
+              <Text style={styles.directionsBtnText}>
+                {translations.getDirections || 'Get Directions & Details'}
+              </Text>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
-      </Modal>
-
-      <View style={styles.bottomSpacer} />
+        )}
+      </AnimatedBottomSheet>
     </View>
   );
 };
@@ -191,145 +270,115 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  searchBar: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    alignItems: 'center',
+  floatingUI: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 10,
   },
-  searchInputContainer: {
-    flex: 1,
+  searchBarWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: spacing.touchTargetMin,
-    borderWidth: 1,
-    borderRadius: spacing.borderRadiusSm,
-    paddingHorizontal: spacing.sm,
+    marginHorizontal: spacing.md,
+    height: 52,
+    borderRadius: spacing.borderRadiusLg,
+    paddingHorizontal: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
   },
   searchIcon: {
-    marginHorizontal: spacing.xs,
+    marginRight: spacing.sm,
   },
   input: {
     flex: 1,
-    fontSize: typography.sizes.sm,
     height: '100%',
+    fontSize: typography.sizes.base,
+    fontFamily: 'Inter-Regular',
   },
-  filterBtn: {
-    width: spacing.touchTargetMin,
-    height: spacing.touchTargetMin,
+  filtersContainer: {
+    marginTop: spacing.sm,
+  },
+  filtersScrollContent: {
+    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
+    paddingBottom: spacing.sm, // space for shadow
+  },
+  filterChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 20,
     borderWidth: 1,
-    borderRadius: spacing.borderRadiusSm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: colors.danger,
-    borderRadius: 8,
-    width: 16,
-    height: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badgeText: {
-    color: '#ffffff',
-    fontSize: 9,
-    fontWeight: 'bold',
-  },
-  segmentContainer: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    height: 48,
-  },
-  segmentBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-  },
-  segmentBtnActive: {
-    borderBottomWidth: 3,
-    borderBottomColor: colors.primary,
-    backgroundColor: 'rgba(16, 185, 129, 0.05)',
-  },
-  segmentText: {
+  filterChipText: {
     fontSize: typography.sizes.xs + 1,
-    fontWeight: typography.weights.bold,
+    fontWeight: typography.weights.medium,
   },
-  textActive: {
-    color: colors.primary,
-  },
-  flexOne: {
+  sheetContent: {
     flex: 1,
+    paddingTop: spacing.sm,
   },
-  listContent: {
-    padding: spacing.md,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    borderTopLeftRadius: spacing.borderRadiusLg * 1.5,
-    borderTopRightRadius: spacing.borderRadiusLg * 1.5,
-    padding: spacing.xl,
-    borderTopWidth: 1,
-  },
-  modalTitle: {
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.bold,
-    textAlign: 'center',
-    marginBottom: spacing.md,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(148, 163, 184, 0.1)',
-    marginBottom: spacing.md,
-  },
-  filterRow: {
+  sheetHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
+    alignItems: 'flex-start',
+    marginBottom: spacing.xs,
   },
-  filterLabel: {
+  sheetTitleContainer: {
+    flex: 1,
+  },
+  sheetTitle: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold,
+  },
+  sheetDistance: {
     fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+    marginTop: 2,
   },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
+  verifiedBadge: {
+    marginLeft: spacing.sm,
+    padding: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderRadius: 12,
   },
-  checkboxChecked: {
-    borderColor: colors.primary,
-    backgroundColor: 'transparent',
+  sheetAddress: {
+    fontSize: typography.sizes.sm,
+    lineHeight: 20,
+    marginBottom: spacing.md,
   },
-  closeBtn: {
-    height: spacing.touchTargetMin + 4,
+  sheetFeatures: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginBottom: spacing.xl,
+  },
+  featureTag: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
     borderRadius: spacing.borderRadiusSm,
+  },
+  featureTagText: {
+    fontSize: typography.sizes.xs,
+  },
+  directionsBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: spacing.lg,
+    height: 52,
+    borderRadius: spacing.borderRadiusLg,
+    gap: spacing.sm,
   },
-  closeBtnText: {
+  directionsBtnText: {
     color: '#ffffff',
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.base,
     fontWeight: typography.weights.bold,
   },
   rowReverse: {
     flexDirection: 'row-reverse',
-  },
-  bottomSpacer: {
-    height: 80,
   },
 });

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { View, StyleSheet, FlatList } from 'react-native';
+import { Text } from '../../components/ui/Text';
 import { Heart } from 'lucide-react-native';
 import { useApp } from '../../context/AppContext';
 import { colors, spacing, typography } from '../../theme';

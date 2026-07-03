@@ -23,7 +23,21 @@ interface MapComponentProps {
   userLocation: { lat: number; lng: number };
   language: Language;
   showRoutePreview: boolean;
+  onCurrentLocationPress?: () => void;
+  routeCoordinates?: { latitude: number; longitude: number }[];
 }
+
+const customMapStyle = [
+  {
+    featureType: "poi",
+    elementType: "labels",
+    stylers: [
+      {
+        visibility: "off"
+      }
+    ]
+  }
+];
 
 const RADAR_ANGLES = [45, 135, 230, 310];
 const RADAR_RADII = [35, 65, 85, 105];
@@ -35,20 +49,44 @@ export default function MapComponent({
   userLocation,
   language,
   showRoutePreview,
+  onCurrentLocationPress,
+  routeCoordinates,
 }: MapComponentProps) {
   const [usingOfflineRadar, setUsingOfflineRadar] = useState(false);
   const mapRef = useRef<MapView | null>(null);
 
-  // Auto pan to selected masjid
+  // Auto pan to selected masjid & route coordinates
   useEffect(() => {
     if (usingOfflineRadar || !selectedMasjid || !mapRef.current) return;
-    mapRef.current.animateToRegion({
-      latitude: selectedMasjid.lat,
-      longitude: selectedMasjid.lng,
-      latitudeDelta: 0.02,
-      longitudeDelta: 0.02,
-    }, 1000);
-  }, [selectedMasjid, usingOfflineRadar]);
+    
+    if (routeCoordinates && routeCoordinates.length > 0) {
+      mapRef.current.fitToCoordinates(
+        routeCoordinates,
+        {
+          edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
+          animated: true,
+        }
+      );
+    } else if (userLocation && userLocation.lat && userLocation.lng) {
+      mapRef.current.fitToCoordinates(
+        [
+          { latitude: userLocation.lat, longitude: userLocation.lng },
+          { latitude: selectedMasjid.lat, longitude: selectedMasjid.lng }
+        ],
+        {
+          edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
+          animated: true,
+        }
+      );
+    } else {
+      mapRef.current.animateToRegion({
+        latitude: selectedMasjid.lat,
+        longitude: selectedMasjid.lng,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      }, 1000);
+    }
+  }, [selectedMasjid, usingOfflineRadar, userLocation, routeCoordinates]);
 
   const handleToggleRadar = () => {
     setUsingOfflineRadar(!usingOfflineRadar);
@@ -61,28 +99,14 @@ export default function MapComponent({
 
   return (
     <View style={styles.container}>
-      {/* Top Banner showing connection status */}
-      <View style={[styles.topBanner, isRtl && styles.rowReverse]}>
-        <View style={styles.statusIndicator}>
-          <View style={[styles.pulseDot, usingOfflineRadar ? styles.pulseDotOffline : styles.pulseDotLive]} />
-          <Text style={styles.statusText}>
-            {usingOfflineRadar ? 'OFFLINE RADAR' : 'LIVE GPS MAP'}
-          </Text>
-        </View>
 
-        <TouchableOpacity onPress={handleToggleRadar} style={styles.toggleBtn}>
-          <RefreshCw size={12} color={usingOfflineRadar ? '#f59e0b' : '#10b981'} />
-          <Text style={styles.toggleBtnText}>
-            {usingOfflineRadar ? 'Online Map' : 'Offline Mode'}
-          </Text>
-        </TouchableOpacity>
-      </View>
 
       {/* Main Map Viewport */}
       {!usingOfflineRadar ? (
         <MapView
           ref={mapRef}
           style={styles.map}
+          customMapStyle={customMapStyle}
           initialRegion={{
             latitude: userLocation.lat,
             longitude: userLocation.lng,
@@ -120,23 +144,15 @@ export default function MapComponent({
             );
           })}
 
-          {/* Route Preview Polyline */}
-          {showRoutePreview && selectedMasjid && (
+          {/* Real Route Polyline */}
+          {routeCoordinates && routeCoordinates.length > 0 && (
             <Polyline
-              coordinates={[
-                { latitude: userLocation.lat, longitude: userLocation.lng },
-                // midpoint curve
-                { 
-                  latitude: (userLocation.lat + selectedMasjid.lat) / 2 + 0.001,
-                  longitude: (userLocation.lng + selectedMasjid.lng) / 2 - 0.001
-                },
-                { latitude: selectedMasjid.lat, longitude: selectedMasjid.lng }
-              ]}
-              strokeColor="#d97706" // amber-600
-              strokeWidth={3}
-              lineDashPattern={[6, 6]}
+              coordinates={routeCoordinates}
+              strokeColor="#3b82f6"
+              strokeWidth={4}
             />
           )}
+
         </MapView>
       ) : (
         /* OFFLINE VECTOR RADAR (Using react-native-svg for vectors) */
@@ -231,6 +247,26 @@ export default function MapComponent({
             </View>
           </View>
         </View>
+      )}
+
+      {/* Current Location Button */}
+      {!usingOfflineRadar && (
+        <TouchableOpacity
+          style={styles.currentLocationBtn}
+          onPress={() => {
+            if (onCurrentLocationPress) onCurrentLocationPress();
+            if (userLocation && mapRef.current) {
+               mapRef.current.animateToRegion({
+                 latitude: userLocation.lat,
+                 longitude: userLocation.lng,
+                 latitudeDelta: 0.02,
+                 longitudeDelta: 0.02,
+               }, 1000);
+            }
+          }}
+        >
+          <Compass size={24} color="#10b981" />
+        </TouchableOpacity>
       )}
     </View>
   );
@@ -422,5 +458,23 @@ const styles = StyleSheet.create({
   },
   rowReverse: {
     flexDirection: 'row-reverse' as const,
+  },
+  currentLocationBtn: {
+    position: 'absolute',
+    bottom: 24,
+    right: 16,
+    backgroundColor: '#0f172a',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
   }
 });
