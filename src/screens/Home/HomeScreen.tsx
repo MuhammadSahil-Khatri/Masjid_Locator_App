@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -20,6 +20,7 @@ import { useNavigation } from '../../navigation/NavigationContext';
 import { usePrayerTimes } from '../../hooks/usePrayerTimes';
 import { hadithService, Hadith } from '../../services/hadithService';
 import { announcementService, Announcement } from '../../services/announcementService';
+import { CacheService } from '../../services/cacheService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -51,35 +52,117 @@ export const HomeScreen: React.FC = () => {
     refetch: refetchPrayer,
   } = usePrayerTimes();
 
+  // ── Day / Night detection (Fajr → Maghrib = day) ──
+  const isDaytime = useMemo(() => {
+    if (!timings) return true; // default to day if no data yet
+    try {
+      const now = new Date();
+      const currentMin = now.getHours() * 60 + now.getMinutes();
+      const toMin = (t: string) => {
+        const parts = t.trim().split(' ');
+        const [h, m] = parts[0].split(':').map(Number);
+        let hours = h;
+        if (parts[1]) {
+          const p = parts[1].toUpperCase();
+          if (p === 'AM' && hours === 12) hours = 0;
+          if (p === 'PM' && hours !== 12) hours += 12;
+        }
+        return hours * 60 + m;
+      };
+      const fajrMin = toMin(timings.Fajr);
+      const maghribMin = toMin(timings.Maghrib);
+      return currentMin >= fajrMin && currentMin < maghribMin;
+    } catch {
+      return true;
+    }
+  }, [timings]);
+
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
 
-  // ── Supabase: Hadith ──
-  const [hadithList, setHadithList] = useState<Hadith[]>([]);
-  const [hadithLoading, setHadithLoading] = useState(false);
+  // ── Hadith State ──
+  const [hadithList, setHadithList] = useState<Hadith[]>(() => {
+    const cached = CacheService.getHadith(true);
+    return cached || [];
+  });
+  const [hadithLoading, setHadithLoading] = useState(() => {
+    if (CacheService.isHadithWarmed()) return false;
+    const cached = CacheService.getHadith(true);
+    return !cached || cached.length === 0;
+  });
 
-  // ── Supabase: Announcements ──
-  const [announcementList, setAnnouncementList] = useState<Announcement[]>([]);
-  const [annLoading, setAnnLoading] = useState(false);
+  // ── Announcements State ──
+  const [announcementList, setAnnouncementList] = useState<Announcement[]>(() => {
+    const cached = CacheService.getAnnouncements(true);
+    return cached ? cached.slice(0, 3) : [];
+  });
+  const [annLoading, setAnnLoading] = useState(() => {
+    if (CacheService.isAnnouncementsWarmed()) return false;
+    const cached = CacheService.getAnnouncements(true);
+    return !cached || cached.length === 0;
+  });
 
-  const loadHomeData = useCallback(async () => {
-    setHadithLoading(true);
-    setAnnLoading(true);
+  // Fetch Hadith independently
+  const loadHadithData = useCallback(async () => {
+    if (CacheService.isHadithWarmed()) return;
+
+    const hasCache = (CacheService.getHadith(true) || []).length > 0;
+    const isExpired = CacheService.isHadithExpired();
+
+    if (hasCache && !isExpired) {
+      const cached = CacheService.getHadith(true);
+      if (cached) {
+        CacheService.setHadith(cached);
+      }
+      return;
+    }
+
     try {
-      const [hadith, anns] = await Promise.all([
-        hadithService.fetchPublicHadith(),
-        announcementService.fetchPublicAnnouncements(),
-      ]);
-      setHadithList(hadith);
-      setAnnouncementList(anns);
+      if (!hasCache) {
+        setHadithLoading(true);
+      }
+      const data = await hadithService.fetchPublicHadith();
+      CacheService.setHadith(data);
+      setHadithList(data);
     } catch (e) {
-      // Silent fail - sections show empty state
+      console.warn('[HomeScreen] Hadith fetch failed:', e);
     } finally {
       setHadithLoading(false);
+    }
+  }, []);
+
+  // Fetch Announcements independently
+  const loadAnnouncementsData = useCallback(async () => {
+    if (CacheService.isAnnouncementsWarmed()) return;
+
+    const hasCache = (CacheService.getAnnouncements(true) || []).length > 0;
+    const isExpired = CacheService.isAnnouncementsExpired();
+
+    if (hasCache && !isExpired) {
+      const cached = CacheService.getAnnouncements(true);
+      if (cached) {
+        CacheService.setAnnouncements(cached);
+      }
+      return;
+    }
+
+    try {
+      if (!hasCache) {
+        setAnnLoading(true);
+      }
+      const data = await announcementService.fetchPublicAnnouncements();
+      CacheService.setAnnouncements(data);
+      setAnnouncementList(data.slice(0, 3));
+    } catch (e) {
+      console.warn('[HomeScreen] Announcements fetch failed:', e);
+    } finally {
       setAnnLoading(false);
     }
   }, []);
 
-  useEffect(() => { loadHomeData(); }, []);
+  useEffect(() => {
+    loadHadithData();
+    loadAnnouncementsData();
+  }, [loadHadithData, loadAnnouncementsData]);
 
   const handleShareHadees = async (text: string, ref: string) => {
     try {
@@ -196,10 +279,14 @@ export const HomeScreen: React.FC = () => {
         {/* Live prayer card */}
         {timings && upcoming && (
           <ImageBackground
-            source={require('../../../assets/prayer_time_card_bg.png')}
+            source={
+              isDaytime
+                ? require('../../../assets/prayer_time_daycard_bg.webp')
+                : require('../../../assets/prayer_time_nightcard_bg.webp')
+            }
             style={styles.prayerCard}
             imageStyle={styles.prayerCardImage}
-            resizeMode="cover"
+            resizeMode="stretch"
           >
             {/* Dark overlay for readability */}
             <View style={styles.prayerCardOverlay}>

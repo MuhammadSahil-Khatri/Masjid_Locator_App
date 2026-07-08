@@ -7,12 +7,13 @@ import { useNavigation } from './NavigationContext';
 import { HomeScreen } from '../screens/Home/HomeScreen';
 import { HadeesScreen } from '../screens/Hadees/HadeesScreen';
 import { SearchScreen } from '../screens/Search/SearchScreen';
-import { AnnouncementsScreen } from '../screens/Announcements/AnnouncementsScreen';
+import { NearestMosquesScreen } from '../screens/Announcements/NearestMosquesScreen';
 import { ProfileScreen } from '../screens/Profile/ProfileScreen';
 import { SettingsScreen } from '../screens/Settings/SettingsScreen';
 import { MosqueDetailsScreen } from '../screens/MosqueDetails/MosqueDetailsScreen';
 import { QiblaScreen } from '../screens/Qibla/QiblaScreen';
 import { FavoritesScreen } from '../screens/Favorites/FavoritesScreen';
+import { storageService } from '../services/storageService';
 
 // Super Admin Imports
 import { SuperAdminPanel } from '../screens/SuperAdmin/SuperAdminPanel';
@@ -30,6 +31,11 @@ export const MainNavigator: React.FC = () => {
   const { highContrast: isDark, isRtl, translations } = useApp();
   const currentTheme = isDark ? colors.dark : colors.light;
 
+  // Hydrate storageService at app start
+  React.useEffect(() => {
+    storageService.hydrate();
+  }, []);
+
   // Screen Dispatcher routing
   const renderScreen = () => {
     switch (currentScreen) {
@@ -40,13 +46,7 @@ export const MainNavigator: React.FC = () => {
       case 'Search':
         return <SearchScreen />;
       case 'Announcements':
-        return (
-          <View style={[styles.container, { backgroundColor: currentTheme.background, justifyContent: 'center', alignItems: 'center' }]}>
-            <Text style={{ color: currentTheme.textMuted, fontSize: typography.sizes.md, fontWeight: 'bold' }}>
-              {isRtl ? 'خالی صفحہ' : 'Blank Screen'}
-            </Text>
-          </View>
-        );
+        return <NearestMosquesScreen />;
       case 'Profile':
         return <ProfileScreen />;
       case 'Settings':
@@ -83,8 +83,8 @@ export const MainNavigator: React.FC = () => {
   const navItems = [
     { key: 'Home' as const, label: isRtl ? 'ہوم' : 'Home', icon: Home },
     { key: 'Hadees' as const, label: isRtl ? 'اپ ڈیٹس' : 'Updates', icon: Newspaper },
-    { key: 'Search' as const, label: isRtl ? 'مساجد' : 'Masjids', icon: MapPin },
-    { key: 'Announcements' as const, label: isRtl ? 'مزید' : 'More', icon: Layers },
+    { key: 'Search' as const, label: isRtl ? 'نقشہ' : 'Map', icon: MapPin },
+    { key: 'Announcements' as const, label: isRtl ? 'مساجد' : 'Mosjids', icon: Layers },
     { key: 'Profile' as const, label: isRtl ? 'ترتیبات' : 'Settings', icon: User },
   ];
 

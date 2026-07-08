@@ -13,7 +13,7 @@ import { colors, spacing, typography } from '../../theme';
 import { useQibla } from '../../hooks/useQibla';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const COMPASS_SIZE = Math.min(SCREEN_WIDTH, SCREEN_HEIGHT) * 0.75;
+const COMPASS_SIZE = Math.min(SCREEN_WIDTH, SCREEN_HEIGHT) * 0.95;
 
 const getShortestAngle = (from: number, to: number) => {
   let diff = to - from;
@@ -128,7 +128,7 @@ export const QiblaScreen: React.FC = () => {
       <View style={styles.compassWrapper}>
         {/* Rotating Compass Dial */}
         <Animated.Image
-          source={require('../../../assets/compass.png')}
+          source={require('../../../assets/compass.webp')}
           style={[
             styles.compassImage,
             {
@@ -136,23 +136,10 @@ export const QiblaScreen: React.FC = () => {
             },
           ]}
           resizeMode="contain"
+          fadeDuration={0}
         />
 
-        {/* Rotating Qibla Needle */}
-        <Animated.View
-          style={[
-            styles.needleContainer,
-            {
-              transform: [{ rotate: needleRotationStr }],
-            },
-          ]}
-          pointerEvents="none"
-        >
-          {/* Kaaba emoji at the tip of the needle */}
-          <Text style={styles.kaabaEmoji}>🕋</Text>
-          {/* Arrow shaft */}
-          {/* <View style={styles.needleShaft} /> */}
-        </Animated.View>
+
       </View>
 
       {/* Bearing Display */}
@@ -209,25 +196,7 @@ const styles = StyleSheet.create({
     height: COMPASS_SIZE,
     position: 'absolute',
   },
-  needleContainer: {
-    position: 'absolute',
-    width: COMPASS_SIZE,
-    height: COMPASS_SIZE,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-  },
-  kaabaEmoji: {
-    fontSize: 32,
-    lineHeight: 38,
-    marginTop: -10, // sits slightly offset at the edge of the compass
-    zIndex: 10,
-  },
-  needleShaft: {
-    width: 4,
-    height: COMPASS_SIZE / 2 - 28,
-    backgroundColor: colors.primary,
-    borderRadius: 2,
-  },
+
   bearingContainer: {
     alignItems: 'center',
     marginBottom: spacing.md,

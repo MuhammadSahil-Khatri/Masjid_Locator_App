@@ -1,19 +1,9 @@
-/**
- * usePrayerTimes — Custom hook
- *
- * Fetches live prayer times from the AlAdhan API using the device's GPS
- * coordinates. Re-fetches whenever the location changes.
- *
- * Returns parsed timings, Hijri/Gregorian dates, city, upcoming prayer
- * info, loading state, error state, and a manual refetch function.
- */
-
-import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useUserLocation } from './useUserLocation';
-import { fetchPrayerTimes, PrayerTimesResult } from '../services/prayerTimesService';
+import { fetchPrayerTimes, reverseGeocode, PrayerTimesResult } from '../services/prayerTimesService';
 import { ParsedPrayerTimes } from '../types';
 import { storageService } from '../services/storageService';
+import { CacheService } from '../services/cacheService';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -99,10 +89,16 @@ export interface UsePrayerTimesReturn {
 export const usePrayerTimes = (): UsePrayerTimesReturn => {
   const { location, loading: locationLoading, errorMsg: locationError } = useUserLocation();
 
-  // Load from MMKV initially
-  const cachedData = storageService.getCachedPrayerTimes();
-
-  const [data, setData] = useState<PrayerTimesResult | null>(cachedData);
+  // Load from cache initially
+  const [data, setData] = useState<PrayerTimesResult | null>(() => {
+    return storageService.getCachedPrayerTimes();
+  });
+  
+  const [loading, setLoading] = useState(() => {
+    const cached = storageService.getCachedPrayerTimes();
+    return !cached;
+  });
+  const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(new Date());
 
   // Tick clock every 30 seconds for countdown accuracy
@@ -111,46 +107,99 @@ export const usePrayerTimes = (): UsePrayerTimesReturn => {
     return () => clearInterval(timer);
   }, []);
 
-  // Round location to 2 decimal places to avoid tiny movement triggering requests
-  const roundedLat = location ? Math.round(location.lat * 100) / 100 : null;
-  const roundedLng = location ? Math.round(location.lng * 100) / 100 : null;
-  const dateStr = now.toISOString().split('T')[0];
+  const fetchingRef = useRef(false);
+  const userLocationRef = useRef(location);
 
-  // Query is enabled when location is available
-  const { data: fetchedData, error: queryError, isPending, refetch } = useQuery({
-    queryKey: ['prayerTimes', roundedLat, roundedLng, dateStr],
-    queryFn: async () => {
-      if (!location) throw new Error('Location not available');
-      return fetchPrayerTimes(location.lat, location.lng);
-    },
-    enabled: !!location,
-    staleTime: 1000 * 60 * 60 * 2, // 2 hours
-  });
-
-  // Keep state in sync with fetchedData
   useEffect(() => {
-    if (fetchedData) {
-      const cached = storageService.getCachedPrayerTimes();
-      // Check if new data differs from cached data
-      const isDifferent = !cached ||
-        JSON.stringify(cached.timings) !== JSON.stringify(fetchedData.timings) ||
-        cached.city !== fetchedData.city ||
-        cached.hijriDate !== fetchedData.hijriDate ||
-        cached.gregorianDate !== fetchedData.gregorianDate;
+    userLocationRef.current = location;
+  }, [location]);
 
-      if (isDifferent) {
-        storageService.savePrayerTimes(fetchedData);
-        setData(fetchedData);
+  const fetchTimes = useCallback(async (lat: number, lng: number, force = false) => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+
+    try {
+      setError(null);
+      if (force) {
+        const fresh = await fetchPrayerTimes(lat, lng);
+        CacheService.setPrayerTimes(fresh.city, fresh);
+        setData(fresh);
+      } else {
+        // Detect city first
+        const detectedCity = await reverseGeocode(lat, lng);
+        if (detectedCity) {
+          const cached = CacheService.getPrayerTimes(detectedCity);
+          if (cached) {
+            setData(cached);
+            setLoading(false);
+            fetchingRef.current = false;
+            return;
+          }
+        }
+        
+        // Fetch if city/date mismatch or geocoding empty
+        const fresh = await fetchPrayerTimes(lat, lng);
+        const finalCity = fresh.city || detectedCity || 'Karachi';
+        CacheService.setPrayerTimes(finalCity, { ...fresh, city: finalCity });
+        setData({ ...fresh, city: finalCity });
       }
+    } catch (err: any) {
+      console.error('[usePrayerTimes] error fetching prayer times:', err);
+      setError(err.message || 'Error retrieving prayer times');
+    } finally {
+      setLoading(false);
+      fetchingRef.current = false;
     }
-  }, [fetchedData]);
+  }, []);
+
+  // Effect to trigger fetch when location resolves or changes
+  useEffect(() => {
+    if (location) {
+      reverseGeocode(location.lat, location.lng).then(detectedCity => {
+        const city = detectedCity || 'Karachi';
+
+        // 1. If session is already warmed, use in-memory data and don't query
+        if (CacheService.isPrayerTimesWarmed(city)) {
+          const cached = CacheService.getPrayerTimes(city);
+          if (cached) {
+            setData(cached);
+            setLoading(false);
+          }
+          return;
+        }
+
+        // 2. Otherwise, check persistent cache
+        const cached = CacheService.getPrayerTimes(city);
+        if (cached) {
+          setData(cached);
+          setLoading(false);
+          // Save in session
+          CacheService.setPrayerTimes(city, cached);
+        } else {
+          // Expiry or missing -> fetch
+          fetchTimes(location.lat, location.lng);
+        }
+      }).catch(() => {
+        const cached = storageService.getCachedPrayerTimes();
+        if (cached) {
+          setData(cached);
+          setLoading(false);
+        } else {
+          fetchTimes(location.lat, location.lng);
+        }
+      });
+    }
+  }, [location?.lat, location?.lng, fetchTimes]);
 
   const upcoming = data?.timings ? computeUpcoming(data.timings, now) : null;
+  const combinedError = locationError || error;
 
-  const error = locationError || (queryError ? (queryError as Error).message : null);
-
-  // loading is true only if no cached data exists AND we are currently loading
-  const loading = !data && (locationLoading || isPending);
+  const refetch = useCallback(() => {
+    const loc = userLocationRef.current;
+    if (loc) {
+      fetchTimes(loc.lat, loc.lng, true);
+    }
+  }, [fetchTimes]);
 
   return {
     timings: data?.timings ?? null,
@@ -158,9 +207,8 @@ export const usePrayerTimes = (): UsePrayerTimesReturn => {
     gregorianDate: data?.gregorianDate ?? '',
     city: data?.city ?? '',
     upcoming,
-    loading,
-    error,
+    loading: loading && !data,
+    error: combinedError,
     refetch,
   };
 };
-

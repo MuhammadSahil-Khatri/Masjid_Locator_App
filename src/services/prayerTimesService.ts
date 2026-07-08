@@ -24,7 +24,7 @@ const to12Hour = (time24: string): string => {
 };
 
 /** Reverse geocode coordinates to city name using Nominatim */
-const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
+export const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=en`,

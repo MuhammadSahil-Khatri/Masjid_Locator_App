@@ -16,6 +16,7 @@ import { useApp } from '../../context/AppContext';
 import { colors, spacing, typography } from '../../theme';
 import { hadithService, Hadith } from '../../services/hadithService';
 import { announcementService, Announcement } from '../../services/announcementService';
+import { CacheService } from '../../services/cacheService';
 
 export const HadeesScreen: React.FC = () => {
   const {
@@ -30,39 +31,95 @@ export const HadeesScreen: React.FC = () => {
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
 
   // ── Hadith State ──
-  const [hadithList, setHadithList] = useState<Hadith[]>([]);
-  const [hadithLoading, setHadithLoading] = useState(false);
+  const [hadithList, setHadithList] = useState<Hadith[]>(() => {
+    const cached = CacheService.getHadith(true);
+    return cached || [];
+  });
+  const [hadithLoading, setHadithLoading] = useState(() => {
+    if (CacheService.isHadithWarmed()) return false;
+    const cached = CacheService.getHadith(true);
+    return !cached || cached.length === 0;
+  });
   const [hadithError, setHadithError] = useState<string | null>(null);
 
   // ── Announcements State ──
-  const [announcementList, setAnnouncementList] = useState<Announcement[]>([]);
-  const [annLoading, setAnnLoading] = useState(false);
+  const [announcementList, setAnnouncementList] = useState<Announcement[]>(() => {
+    const cached = CacheService.getAnnouncements(true);
+    return cached || [];
+  });
+  const [annLoading, setAnnLoading] = useState(() => {
+    if (CacheService.isAnnouncementsWarmed()) return false;
+    const cached = CacheService.getAnnouncements(true);
+    return !cached || cached.length === 0;
+  });
   const [annError, setAnnError] = useState<string | null>(null);
 
   const [refreshing, setRefreshing] = useState(false);
 
   // ── Fetch Functions ──
-  const loadHadith = useCallback(async () => {
-    setHadithLoading(true);
-    setHadithError(null);
+  const loadHadith = useCallback(async (force = false) => {
+    if (!force && CacheService.isHadithWarmed()) {
+      return;
+    }
+
+    const hasCache = (CacheService.getHadith(true) || []).length > 0;
+    const isExpired = CacheService.isHadithExpired();
+
+    if (!force && hasCache && !isExpired) {
+      const cached = CacheService.getHadith(true);
+      if (cached) {
+        CacheService.setHadith(cached);
+      }
+      return;
+    }
+
     try {
+      if (!hasCache) {
+        setHadithLoading(true);
+      }
+      setHadithError(null);
       const data = await hadithService.fetchPublicHadith();
+      CacheService.setHadith(data);
       setHadithList(data);
     } catch (e: any) {
-      setHadithError(e?.message || 'Failed to load hadith');
+      console.warn('[HadeesScreen] Hadith fetch failed:', e);
+      if (!hasCache) {
+        setHadithError(e?.message || 'Failed to load hadith');
+      }
     } finally {
       setHadithLoading(false);
     }
   }, []);
 
-  const loadAnnouncements = useCallback(async () => {
-    setAnnLoading(true);
-    setAnnError(null);
+  const loadAnnouncements = useCallback(async (force = false) => {
+    if (!force && CacheService.isAnnouncementsWarmed()) {
+      return;
+    }
+
+    const hasCache = (CacheService.getAnnouncements(true) || []).length > 0;
+    const isExpired = CacheService.isAnnouncementsExpired();
+
+    if (!force && hasCache && !isExpired) {
+      const cached = CacheService.getAnnouncements(true);
+      if (cached) {
+        CacheService.setAnnouncements(cached);
+      }
+      return;
+    }
+
     try {
+      if (!hasCache) {
+        setAnnLoading(true);
+      }
+      setAnnError(null);
       const data = await announcementService.fetchPublicAnnouncements();
+      CacheService.setAnnouncements(data);
       setAnnouncementList(data);
     } catch (e: any) {
-      setAnnError(e?.message || 'Failed to load announcements');
+      console.warn('[HadeesScreen] Announcements fetch failed:', e);
+      if (!hasCache) {
+        setAnnError(e?.message || 'Failed to load announcements');
+      }
     } finally {
       setAnnLoading(false);
     }
@@ -71,11 +128,11 @@ export const HadeesScreen: React.FC = () => {
   useEffect(() => {
     loadHadith();
     loadAnnouncements();
-  }, []);
+  }, [loadHadith, loadAnnouncements]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([loadHadith(), loadAnnouncements()]);
+    await Promise.all([loadHadith(true), loadAnnouncements(true)]);
     setRefreshing(false);
   }, [loadHadith, loadAnnouncements]);
 
@@ -252,7 +309,7 @@ export const HadeesScreen: React.FC = () => {
               <View style={[styles.errorCard, { backgroundColor: currentTheme.card, borderColor: currentTheme.border }]}>
                 <AlertCircle size={36} color={colors.danger} />
                 <Text style={[styles.stateText, { color: colors.danger }]}>{hadithError}</Text>
-                <TouchableOpacity style={[styles.retryBtn, { backgroundColor: colors.primaryLight }]} onPress={loadHadith}>
+                <TouchableOpacity style={[styles.retryBtn, { backgroundColor: colors.primaryLight }]} onPress={() => loadHadith(true)}>
                   <RefreshCw size={14} color={colors.primary} />
                   <Text style={[styles.retryBtnText, { color: colors.primary }]}>Retry</Text>
                 </TouchableOpacity>
@@ -288,7 +345,7 @@ export const HadeesScreen: React.FC = () => {
               <View style={[styles.errorCard, { backgroundColor: currentTheme.card, borderColor: currentTheme.border }]}>
                 <AlertCircle size={36} color={colors.danger} />
                 <Text style={[styles.stateText, { color: colors.danger }]}>{annError}</Text>
-                <TouchableOpacity style={[styles.retryBtn, { backgroundColor: colors.primaryLight }]} onPress={loadAnnouncements}>
+                <TouchableOpacity style={[styles.retryBtn, { backgroundColor: colors.primaryLight }]} onPress={() => loadAnnouncements(true)}>
                   <RefreshCw size={14} color={colors.primary} />
                   <Text style={[styles.retryBtnText, { color: colors.primary }]}>Retry</Text>
                 </TouchableOpacity>

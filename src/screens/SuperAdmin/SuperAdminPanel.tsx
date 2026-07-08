@@ -114,40 +114,40 @@ export const SuperAdminPanel: React.FC = () => {
   ];
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.offWhite }]} edges={['top']}>
-      <Animated.View style={styles.container} entering={FadeIn.duration(400)}>
-        <SectionHeader title="Super Admin Panel" />
+    // <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.offWhite }]} edges={['top']}>
+    <Animated.View style={styles.container} entering={FadeIn.duration(400)}>
+      <SectionHeader title="Super Admin Panel" />
 
-        <ScrollView
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + spacing.xl }]}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Welcome/Banner Section */}
-          <Animated.View entering={FadeInDown.duration(350).delay(50)} style={[styles.bannerCard, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}>
-            <Text style={[styles.bannerTitle, { color: themeColors.text }]} weight="bold">
-              Root Administration
-            </Text>
-            <Text style={[styles.bannerSubtitle, { color: themeColors.textMuted }]}>
-              Access system configuration, control data tables, audit moderators, and broadcast messages globally.
-            </Text>
-          </Animated.View>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + spacing.xl }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Welcome/Banner Section */}
+        <Animated.View entering={FadeInDown.duration(350).delay(50)} style={[styles.bannerCard, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}>
+          <Text style={[styles.bannerTitle, { color: themeColors.text }]} weight="bold">
+            Root Administration
+          </Text>
+          <Text style={[styles.bannerSubtitle, { color: themeColors.textMuted }]}>
+            Access system configuration, control data tables, audit moderators, and broadcast messages globally.
+          </Text>
+        </Animated.View>
 
-          {/* Options List */}
-          <View style={styles.optionsList}>
-            {options.map((opt, index) => (
-              <AdminOptionRow
-                key={opt.key}
-                icon={opt.icon}
-                title={opt.title}
-                subtitle={opt.subtitle}
-                index={index}
-                onPress={() => navigate(opt.route)}
-              />
-            ))}
-          </View>
-        </ScrollView>
-      </Animated.View>
-    </SafeAreaView>
+        {/* Options List */}
+        <View style={styles.optionsList}>
+          {options.map((opt, index) => (
+            <AdminOptionRow
+              key={opt.key}
+              icon={opt.icon}
+              title={opt.title}
+              subtitle={opt.subtitle}
+              index={index}
+              onPress={() => navigate(opt.route)}
+            />
+          ))}
+        </View>
+      </ScrollView>
+    </Animated.View>
+    // </SafeAreaView>
   );
 };
 

@@ -17,10 +17,23 @@ const LOCATION_KEY = 'user_last_location';
 const PRAYER_TIMES_KEY = 'prayer_times_cache';
 const QIBLA_KEY = 'qibla_cache';
 const CACHE_VERSION_KEY = 'cache_version';
+const NEARBY_MOSQUES_KEY = 'nearby_mosques_cache';
+const ANNOUNCEMENTS_KEY = 'announcements_cache';
+const HADITH_KEY = 'hadith_cache';
+const ALL_MOSQUES_KEY = 'all_mosques_cache';
 // Bump this whenever the prayer times format changes to auto-purge old cache
 const CACHE_VERSION = '2'; // v2: 12-hour AM/PM format
 
-const ALL_KEYS = [LOCATION_KEY, PRAYER_TIMES_KEY, QIBLA_KEY, CACHE_VERSION_KEY];
+const ALL_KEYS = [
+  LOCATION_KEY,
+  PRAYER_TIMES_KEY,
+  QIBLA_KEY,
+  CACHE_VERSION_KEY,
+  NEARBY_MOSQUES_KEY,
+  ANNOUNCEMENTS_KEY,
+  HADITH_KEY,
+  ALL_MOSQUES_KEY,
+];
 
 // ── In-memory sync cache (populated at hydration time) ─────────────────────
 const memoryCache = new Map<string, string>();
@@ -83,6 +96,7 @@ export interface CachedPrayerTimes {
   hijriDate: string;
   gregorianDate: string;
   city: string;
+  fetchedAtDate?: string;
 }
 
 export interface CachedQibla {
@@ -164,4 +178,21 @@ export const storageService = {
     if (!raw) return null;
     try { return JSON.parse(raw); } catch { return null; }
   },
+
+  // ── Generic Caching ───────────────────────────────────────────────────────
+
+  saveGenericItem(key: string, value: string): void {
+    syncSet(key, value);
+  },
+
+  getGenericItem(key: string): string | null {
+    return syncGet(key) || null;
+  },
+
+  KEYS: {
+    NEARBY_MOSQUES: NEARBY_MOSQUES_KEY,
+    ANNOUNCEMENTS: ANNOUNCEMENTS_KEY,
+    HADITH: HADITH_KEY,
+    ALL_MOSQUES: ALL_MOSQUES_KEY,
+  }
 };

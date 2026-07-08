@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { authService } from '../services/auth';
 import { User, Session } from '@supabase/supabase-js';
 import { Profile } from '../types';
+import { CacheService } from '../services/cacheService';
 
 interface AuthContextType {
   user: User | null;
@@ -146,6 +147,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(null);
       setProfile(null);
       lastUserIdRef.current = null;
+      CacheService.clearAllCache();
     } finally {
       setActionLoading(false);
     }

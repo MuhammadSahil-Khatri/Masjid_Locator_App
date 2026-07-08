@@ -35,6 +35,7 @@ import { colors, spacing, typography } from '../../theme';
 import { useApp } from '../../context/AppContext';
 import { useUserLocation } from '../../hooks/useUserLocation';
 import { useAuth } from '../../hooks/useAuth';
+import { useNavigation } from '../../navigation/NavigationContext';
 import { AnimatedBottomSheet } from '../../components/ui/AnimatedBottomSheet';
 import { useSearchMosques } from '../../hooks/useSearchMosques';
 
@@ -196,13 +197,14 @@ export const SearchScreen: React.FC = () => {
   const { isRtl } = useApp();
   const theme = colors.light;
   const { location, loading: locationLoading, refreshLocation } = useUserLocation();
+  const { params } = useNavigation();
   const mapRef = useRef<MapView | null>(null);
 
   const locationRef = useRef(location);
   useEffect(() => { locationRef.current = location; }, [location]);
 
   // ── States ───────────────────────────────────────────────────────────────────
-  const { mosques, loading, error, refetch } = useSearchMosques();
+  const { mosques, loading, error, refetch } = useSearchMosques(location);
   const [searchText, setSearchText] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTER);
@@ -210,6 +212,28 @@ export const SearchScreen: React.FC = () => {
   const [selectedMosque, setSelectedMosque] = useState<any | null>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [isBottomSheetVisible, setBottomSheetVisible] = useState(false);
+
+  // ── Auto focus from params ──
+  useEffect(() => {
+    if (params?.selectMasjidId && mosques.length > 0) {
+      const mosqueId = params.selectMasjidId;
+      const mosque = mosques.find((m) => m.id === mosqueId);
+      if (mosque) {
+        setSelectedMosque(mosque);
+        setBottomSheetVisible(true);
+        setTimeout(() => {
+          mapRef.current?.animateToRegion(
+            {
+              latitude: mosque.latitude,
+              longitude: mosque.longitude,
+              ...MOSQUE_ZOOM_DELTA,
+            },
+            600
+          );
+        }, 100);
+      }
+    }
+  }, [params?.selectMasjidId, mosques]);
 
   // ── Debounce search input locally ─────────────────────────────────────────────
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);

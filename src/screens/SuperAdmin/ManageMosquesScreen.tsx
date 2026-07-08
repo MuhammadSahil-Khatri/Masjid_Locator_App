@@ -599,7 +599,7 @@ export const ManageMosquesScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={styles.safeArea} >
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
