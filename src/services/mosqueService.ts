@@ -1,4 +1,6 @@
-import { supabase } from '../lib/supabase';
+import { Buffer } from "buffer";
+import * as FileSystem from "expo-file-system/legacy";
+import { supabase } from "../lib/supabase";
 
 export interface MosqueRow {
   id: string;
@@ -11,7 +13,6 @@ export interface MosqueRow {
   image_url: string | null;
   admin_id: string | null;
   capacity: number | null;
-  google_maps_url: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -33,27 +34,29 @@ export const mosqueService = {
    * Fetches all mosques with their assigned admin name and tags.
    */
   async fetchAllMosques(): Promise<MosqueWithAdmin[]> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Authentication required.');
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("Authentication required.");
 
     const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
       .maybeSingle();
 
-    if (!profile || profile.role !== 'super_admin') {
-      throw new Error('403: Forbidden - Super Admin access required.');
+    if (!profile || profile.role !== "super_admin") {
+      throw new Error("403: Forbidden - Super Admin access required.");
     }
 
     // Fetch mosques
     const { data: mosques, error: mosquesError } = await supabase
-      .from('mosques')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .from("mosques")
+      .select("*")
+      .order("created_at", { ascending: false });
 
     if (mosquesError) {
-      console.error('Error fetching mosques:', mosquesError);
+      console.error("Error fetching mosques:", mosquesError);
       throw mosquesError;
     }
 
@@ -67,13 +70,16 @@ export const mosqueService = {
     let adminMap: Record<string, { name: string; email: string }> = {};
     if (adminIds.length > 0) {
       const { data: admins } = await supabase
-        .from('profiles')
-        .select('id, name, email')
-        .in('id', adminIds);
+        .from("profiles")
+        .select("id, name, email")
+        .in("id", adminIds);
 
       if (admins) {
         adminMap = Object.fromEntries(
-          admins.map((a) => [a.id, { name: a.name || 'Unknown', email: a.email || '' }])
+          admins.map((a) => [
+            a.id,
+            { name: a.name || "Unknown", email: a.email || "" },
+          ]),
         );
       }
     }
@@ -81,9 +87,9 @@ export const mosqueService = {
     // Fetch tags for all mosques
     const mosqueIds = mosques.map((m) => m.id);
     const { data: assignments } = await supabase
-      .from('mosque_tag_assignments')
-      .select('mosque_id, tag_id')
-      .in('mosque_id', mosqueIds);
+      .from("mosque_tag_assignments")
+      .select("mosque_id, tag_id")
+      .in("mosque_id", mosqueIds);
 
     let tagIds: string[] = [];
     if (assignments) {
@@ -93,9 +99,9 @@ export const mosqueService = {
     let tagMap: Record<string, string> = {};
     if (tagIds.length > 0) {
       const { data: tags } = await supabase
-        .from('mosque_tags')
-        .select('id, name')
-        .in('id', tagIds);
+        .from("mosque_tags")
+        .select("id, name")
+        .in("id", tagIds);
 
       if (tags) {
         tagMap = Object.fromEntries(tags.map((t) => [t.id, t.name]));
@@ -126,12 +132,12 @@ export const mosqueService = {
    */
   async fetchAllTags(): Promise<MosqueTag[]> {
     const { data, error } = await supabase
-      .from('mosque_tags')
-      .select('id, name')
-      .order('name', { ascending: true });
+      .from("mosque_tags")
+      .select("id, name")
+      .order("name", { ascending: true });
 
     if (error) {
-      console.error('Error fetching tags:', error);
+      console.error("Error fetching tags:", error);
       throw error;
     }
     return data || [];
@@ -142,13 +148,13 @@ export const mosqueService = {
    */
   async createTag(name: string): Promise<MosqueTag> {
     const { data, error } = await supabase
-      .from('mosque_tags')
+      .from("mosque_tags")
       .insert({ name: name.trim() })
       .select()
       .single();
 
     if (error) {
-      console.error('Error creating tag:', error);
+      console.error("Error creating tag:", error);
       throw error;
     }
     return data;
@@ -158,31 +164,43 @@ export const mosqueService = {
    * Uploads an image to the mosque-images bucket and returns the public URL.
    */
   async uploadMosqueImage(uri: string): Promise<string> {
-    // Generate a unique file name
-    const fileName = `mosque_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.jpg`;
+    try {
+      const rawExt = uri.split(".").pop()?.toLowerCase() ?? "jpg";
+      const extension = ["jpg", "jpeg", "png", "webp", "heic", "gif"].includes(
+        rawExt,
+      )
+        ? rawExt
+        : "jpg";
+      const mimeType = `image/${extension === "jpg" ? "jpeg" : extension}`;
+      const fileName = `mosque_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${extension}`;
 
-    // Read the file as blob/binary
-    const response = await fetch(uri);
-    const blob = await response.blob();
-
-    const { data, error } = await supabase.storage
-      .from('mosque-images')
-      .upload(fileName, blob, {
-        contentType: 'image/jpeg',
-        upsert: false,
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: "base64",
       });
 
-    if (error) {
-      console.error('Error uploading image:', error);
-      throw error;
+      const arrayBuffer = Buffer.from(base64, "base64");
+
+      const { data, error } = await supabase.storage
+        .from("mosque-images")
+        .upload(fileName, arrayBuffer, {
+          contentType: mimeType,
+          upsert: false,
+        });
+
+      if (error) {
+        console.error("Error uploading image:", error);
+        throw error;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from("mosque-images")
+        .getPublicUrl(data.path);
+
+      return publicUrlData.publicUrl;
+    } catch (err: any) {
+      console.error("Upload failed:", err?.message ?? err);
+      throw err;
     }
-
-    // Get the public URL
-    const { data: publicUrlData } = supabase.storage
-      .from('mosque-images')
-      .getPublicUrl(data.path);
-
-    return publicUrlData.publicUrl;
   },
 
   /**
@@ -190,43 +208,53 @@ export const mosqueService = {
    * Returns the profile only if the user has role='admin'.
    * Throws an error if not found or not an admin.
    */
-  async findAdminByEmail(email: string): Promise<{ id: string; name: string; email: string }> {
+  async findAdminByEmail(
+    email: string,
+  ): Promise<{ id: string; name: string; email: string }> {
     const trimmed = email.trim().toLowerCase();
 
     const { data, error } = await supabase
-      .from('profiles')
-      .select('id, name, email, role')
-      .eq('email', trimmed)
+      .from("profiles")
+      .select("id, name, email, role")
+      .eq("email", trimmed)
       .maybeSingle();
 
     if (error) {
-      console.error('Error finding admin by email:', error);
+      console.error("Error finding admin by email:", error);
       throw error;
     }
 
     if (!data) {
-      throw new Error('No user found with this email address.');
+      throw new Error("No user found with this email address.");
     }
 
-    if (data.role !== 'admin') {
-      throw new Error('This user is not an Admin. Only users with role "admin" can be assigned.');
+    if (data.role !== "admin") {
+      throw new Error(
+        'This user is not an Admin. Only users with role "admin" can be assigned.',
+      );
     }
 
-    return { id: data.id, name: data.name || 'Unknown', email: data.email || '' };
+    return {
+      id: data.id,
+      name: data.name || "Unknown",
+      email: data.email || "",
+    };
   },
 
   /**
    * Fetches the mosque name assigned to an admin. Returns null if none.
    */
-  async fetchMosqueByAdminId(adminId: string): Promise<{ id: string; name: string } | null> {
+  async fetchMosqueByAdminId(
+    adminId: string,
+  ): Promise<{ id: string; name: string } | null> {
     const { data, error } = await supabase
-      .from('mosques')
-      .select('id, name')
-      .eq('admin_id', adminId)
+      .from("mosques")
+      .select("id, name")
+      .eq("admin_id", adminId)
       .maybeSingle();
 
     if (error) {
-      console.error('Error fetching mosque by admin ID:', error);
+      console.error("Error fetching mosque by admin ID:", error);
       return null;
     }
     return data || null;
@@ -237,16 +265,18 @@ export const mosqueService = {
    */
   async fetchDistinctCities(): Promise<string[]> {
     const { data, error } = await supabase
-      .from('mosques')
-      .select('city')
-      .order('city', { ascending: true });
+      .from("mosques")
+      .select("city")
+      .order("city", { ascending: true });
 
     if (error) {
-      console.error('Error fetching cities:', error);
+      console.error("Error fetching cities:", error);
       throw error;
     }
 
-    const cities = [...new Set((data || []).map((r) => r.city).filter(Boolean))];
+    const cities = [
+      ...new Set((data || []).map((r) => r.city).filter(Boolean)),
+    ];
     return cities;
   },
 
@@ -255,17 +285,19 @@ export const mosqueService = {
    * Returns null if no mosque is assigned.
    */
   async fetchAdminMosque(): Promise<MosqueWithAdmin | null> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Authentication required.');
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("Authentication required.");
 
     const { data: mosques, error } = await supabase
-      .from('mosques')
-      .select('*')
-      .eq('admin_id', user.id)
+      .from("mosques")
+      .select("*")
+      .eq("admin_id", user.id)
       .limit(1);
 
     if (error) {
-      console.error('Error fetching admin mosque:', error);
+      console.error("Error fetching admin mosque:", error);
       throw error;
     }
 
@@ -278,9 +310,9 @@ export const mosqueService = {
     let adminEmail: string | null = null;
     if (mosque.admin_id) {
       const { data: admin } = await supabase
-        .from('profiles')
-        .select('name, email')
-        .eq('id', mosque.admin_id)
+        .from("profiles")
+        .select("name, email")
+        .eq("id", mosque.admin_id)
         .maybeSingle();
       if (admin) {
         adminName = admin.name;
@@ -290,19 +322,19 @@ export const mosqueService = {
 
     // Get tags
     const { data: assignments } = await supabase
-      .from('mosque_tag_assignments')
-      .select('tag_id')
-      .eq('mosque_id', mosque.id);
+      .from("mosque_tag_assignments")
+      .select("tag_id")
+      .eq("mosque_id", mosque.id);
 
     let tags: string[] = [];
     if (assignments && assignments.length > 0) {
-      const tagIds = [...new Set(assignments.map(a => a.tag_id))];
+      const tagIds = [...new Set(assignments.map((a) => a.tag_id))];
       const { data: tagData } = await supabase
-        .from('mosque_tags')
-        .select('name')
-        .in('id', tagIds);
+        .from("mosque_tags")
+        .select("name")
+        .in("id", tagIds);
       if (tagData) {
-        tags = tagData.map(t => t.name);
+        tags = tagData.map((t) => t.name);
       }
     }
 
@@ -319,12 +351,12 @@ export const mosqueService = {
    */
   async fetchAdmins(): Promise<{ id: string; name: string; email: string }[]> {
     const { data, error } = await supabase
-      .from('profiles')
-      .select('id, name, email')
-      .eq('role', 'admin');
+      .from("profiles")
+      .select("id, name, email")
+      .eq("role", "admin");
 
     if (error) {
-      console.error('Error fetching admins:', error);
+      console.error("Error fetching admins:", error);
       throw error;
     }
     return data || [];
@@ -335,15 +367,15 @@ export const mosqueService = {
    */
   async updateMosque(
     mosqueId: string,
-    updates: Partial<Omit<MosqueRow, 'id' | 'created_at' | 'updated_at'>>
+    updates: Partial<Omit<MosqueRow, "id" | "created_at" | "updated_at">>,
   ): Promise<void> {
     const { error } = await supabase
-      .from('mosques')
+      .from("mosques")
       .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', mosqueId);
+      .eq("id", mosqueId);
 
     if (error) {
-      console.error('Error updating mosque:', error);
+      console.error("Error updating mosque:", error);
       throw error;
     }
   },
@@ -352,16 +384,16 @@ export const mosqueService = {
    * Creates a new mosque record.
    */
   async createMosque(
-    mosque: Omit<MosqueRow, 'id' | 'created_at' | 'updated_at'>
+    mosque: Omit<MosqueRow, "id" | "created_at" | "updated_at">,
   ): Promise<MosqueRow> {
     const { data, error } = await supabase
-      .from('mosques')
+      .from("mosques")
       .insert(mosque)
       .select()
       .single();
 
     if (error) {
-      console.error('Error creating mosque:', error);
+      console.error("Error creating mosque:", error);
       throw error;
     }
     return data;
@@ -372,12 +404,12 @@ export const mosqueService = {
    */
   async deleteMosque(mosqueId: string): Promise<void> {
     const { error } = await supabase
-      .from('mosques')
+      .from("mosques")
       .delete()
-      .eq('id', mosqueId);
+      .eq("id", mosqueId);
 
     if (error) {
-      console.error('Error deleting mosque:', error);
+      console.error("Error deleting mosque:", error);
       throw error;
     }
   },
@@ -388,12 +420,12 @@ export const mosqueService = {
   async updateMosqueTags(mosqueId: string, tagIds: string[]): Promise<void> {
     // Delete existing assignments
     const { error: deleteError } = await supabase
-      .from('mosque_tag_assignments')
+      .from("mosque_tag_assignments")
       .delete()
-      .eq('mosque_id', mosqueId);
+      .eq("mosque_id", mosqueId);
 
     if (deleteError) {
-      console.error('Error deleting old tag assignments:', deleteError);
+      console.error("Error deleting old tag assignments:", deleteError);
       throw deleteError;
     }
 
@@ -406,11 +438,11 @@ export const mosqueService = {
     }));
 
     const { error: insertError } = await supabase
-      .from('mosque_tag_assignments')
+      .from("mosque_tag_assignments")
       .insert(assignments);
 
     if (insertError) {
-      console.error('Error inserting tag assignments:', insertError);
+      console.error("Error inserting tag assignments:", insertError);
       throw insertError;
     }
   },
@@ -420,12 +452,12 @@ export const mosqueService = {
    */
   async getMosqueTagIds(mosqueId: string): Promise<string[]> {
     const { data, error } = await supabase
-      .from('mosque_tag_assignments')
-      .select('tag_id')
-      .eq('mosque_id', mosqueId);
+      .from("mosque_tag_assignments")
+      .select("tag_id")
+      .eq("mosque_id", mosqueId);
 
     if (error) {
-      console.error('Error fetching mosque tag IDs:', error);
+      console.error("Error fetching mosque tag IDs:", error);
       throw error;
     }
     return (data || []).map((a) => a.tag_id);

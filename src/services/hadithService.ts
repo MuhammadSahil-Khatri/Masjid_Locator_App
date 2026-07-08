@@ -14,6 +14,21 @@ export interface Hadith {
 }
 
 export const hadithService = {
+  /** Public – no admin role required. Returns all active hadith ordered by newest first. */
+  async fetchPublicHadith(): Promise<Hadith[]> {
+    const { data, error } = await supabase
+      .from('hadith')
+      .select('*')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching public hadith:', error);
+      throw error;
+    }
+    return data || [];
+  },
+
   async fetchAllHadith(): Promise<Hadith[]> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Authentication required.');

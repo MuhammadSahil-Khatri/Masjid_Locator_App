@@ -81,12 +81,13 @@ export const MainNavigator: React.FC = () => {
   };
 
   const navItems = [
-    { key: 'Home' as const, label: translations.home || 'Home', icon: Home },
-    { key: 'Hadees' as const, label: `${translations.hadeesTab} & ${translations.announcements || 'Updates'}`, icon: Newspaper },
-    { key: 'Search' as const, label: translations.masjidsTab || 'Masjids', icon: MapPin },
+    { key: 'Home' as const, label: isRtl ? 'ہوم' : 'Home', icon: Home },
+    { key: 'Hadees' as const, label: isRtl ? 'اپ ڈیٹس' : 'Updates', icon: Newspaper },
+    { key: 'Search' as const, label: isRtl ? 'مساجد' : 'Masjids', icon: MapPin },
     { key: 'Announcements' as const, label: isRtl ? 'مزید' : 'More', icon: Layers },
-    { key: 'Profile' as const, label: translations.settings || 'Settings', icon: User },
+    { key: 'Profile' as const, label: isRtl ? 'ترتیبات' : 'Settings', icon: User },
   ];
+
 
   const showBottomBar = ![
     'SuperAdminPanel',
@@ -155,6 +156,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    overflow: 'hidden',
   },
   bottomBar: {
     height: 60,

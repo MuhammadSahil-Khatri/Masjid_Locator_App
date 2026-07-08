@@ -12,13 +12,7 @@ import {
   CalculationMethod,
   JuristicMethod
 } from '../types';
-import { 
-  INITIAL_MASJID_DATA, 
-  INITIAL_AHADEES, 
-  INITIAL_EVENTS, 
-  INITIAL_ANNOUNCEMENTS, 
-  i18n 
-} from '../data/mockData';
+
 import { showError, showSuccess, showInfo } from '../utils/toast';
 
 interface AppContextProps {
@@ -42,7 +36,7 @@ interface AppContextProps {
   hadeesList: Hadees[];
   setHadeesList: React.Dispatch<React.SetStateAction<Hadees[]>>;
   
-  translations: typeof i18n['en'];
+  translations: Record<string, string>;
   isRtl: boolean;
   
   toastMessage: string | null;
@@ -66,7 +60,7 @@ const AppContext = createContext<AppContextProps | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [language, setLanguage] = useState<Language>('en');
-  const [highContrast, setHighContrast] = useState<boolean>(true);
+  const [highContrast, setHighContrast] = useState<boolean>(false);
   const [activeRole, setActiveRole] = useState<UserRole>('worshipper');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -141,13 +135,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [supabaseUser, profile]);
 
-  const [masjids, setMasjids] = useState<Masjid[]>(INITIAL_MASJID_DATA);
-  const [announcements, setAnnouncements] = useState<Announcement[]>(INITIAL_ANNOUNCEMENTS);
-  const [events, setEvents] = useState<MasjidEvent[]>(INITIAL_EVENTS);
-  const [hadeesList, setHadeesList] = useState<Hadees[]>(INITIAL_AHADEES);
+  const [masjids, setMasjids] = useState<Masjid[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [events, setEvents] = useState<MasjidEvent[]>([]);
+  const [hadeesList, setHadeesList] = useState<Hadees[]>([]);
 
   const translations = useMemo(() => {
-    return i18n[language];
+    return {} as Record<string, string>;
   }, [language]);
 
   const isRtl = useMemo(() => {

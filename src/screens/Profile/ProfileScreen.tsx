@@ -85,7 +85,7 @@ export const ProfileScreen: React.FC = () => {
   });
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.offWhite, paddingTop: insets.top }]}>
+    <View style={[styles.container, { backgroundColor: colors.offWhite }]}>
       {/* Header */}
       <View style={[styles.header, isRtl && styles.rowReverse]}>
         <Text style={[styles.headerTitle, { color: '#000000' }]}>

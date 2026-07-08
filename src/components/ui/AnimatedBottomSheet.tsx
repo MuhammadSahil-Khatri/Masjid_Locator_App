@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { View, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -8,6 +8,7 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import { X, ChevronDown } from 'lucide-react-native';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MAX_TRANSLATE_Y = -SCREEN_HEIGHT + 100;
@@ -81,7 +82,17 @@ export const AnimatedBottomSheet: React.FC<AnimatedBottomSheetProps> = ({
   return (
     <GestureDetector gesture={panGesture}>
       <Animated.View style={[styles.bottomSheetContainer, rBottomSheetStyle, { backgroundColor }]}>
-        <View style={styles.line} />
+        <View style={styles.handleRow}>
+          {/* <TouchableOpacity
+            style={styles.closeBtn}
+            onPress={onClose}
+            accessibilityLabel="Close bottom sheet"
+            activeOpacity={0.7}
+          >
+            <ChevronDown size={20} color="#64748b" />
+          </TouchableOpacity> */}
+          <View style={styles.line} />
+        </View>
         {children}
       </Animated.View>
     </GestureDetector>
@@ -94,7 +105,7 @@ const styles = StyleSheet.create({
     width: '100%',
     position: 'absolute',
     top: SCREEN_HEIGHT,
-    borderRadius: 25,
+    borderRadius: 50,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
@@ -107,8 +118,26 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     backgroundColor: '#cbd5e1',
-    alignSelf: 'center',
-    marginVertical: 12,
     borderRadius: 2,
   },
+  handleRow: {
+    height: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    width: '100%',
+  },
+  // closeBtn: {
+  //   position: 'absolute',
+  //   backgroundColor: '#86868671',
+  //   top: 6,
+  //   left: 2,
+  //   padding: 8,
+  //   width: 30,
+  //   height: 30,
+  //   borderRadius: 15,
+  //   justifyContent: 'center',
+  //   alignItems: 'center',
+  // },
 });

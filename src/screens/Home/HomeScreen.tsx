@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -13,11 +13,13 @@ import {
   Image,
 } from 'react-native';
 import { Text } from '../../components/ui/Text';
-import { MapPin, Clock, Copy, Share2, RefreshCw, AlertTriangle, Compass, Languages } from 'lucide-react-native';
+import { MapPin, Copy, Share2, RefreshCw, AlertTriangle } from 'lucide-react-native';
 import { useApp } from '../../context/AppContext';
 import { colors, spacing, typography } from '../../theme';
 import { useNavigation } from '../../navigation/NavigationContext';
 import { usePrayerTimes } from '../../hooks/usePrayerTimes';
+import { hadithService, Hadith } from '../../services/hadithService';
+import { announcementService, Announcement } from '../../services/announcementService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -26,9 +28,6 @@ const PRAYER_KEYS = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'] as const;
 export const HomeScreen: React.FC = () => {
   const {
     currentUser,
-    hadeesList,
-    announcements,
-    handleAnnounceRead,
     highContrast: isDark,
     isRtl,
     translations,
@@ -52,26 +51,51 @@ export const HomeScreen: React.FC = () => {
     refetch: refetchPrayer,
   } = usePrayerTimes();
 
-  const [selectedAnnouncement, setSelectedAnnouncement] = useState<any>(null);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
 
-  const handleShareHadees = async (text: string, ref: string, source: string) => {
+  // ── Supabase: Hadith ──
+  const [hadithList, setHadithList] = useState<Hadith[]>([]);
+  const [hadithLoading, setHadithLoading] = useState(false);
+
+  // ── Supabase: Announcements ──
+  const [announcementList, setAnnouncementList] = useState<Announcement[]>([]);
+  const [annLoading, setAnnLoading] = useState(false);
+
+  const loadHomeData = useCallback(async () => {
+    setHadithLoading(true);
+    setAnnLoading(true);
     try {
-      await Share.share({
-        message: `"${text}"\nReference: ${ref} (${source})`,
-      });
-    } catch (error) {
+      const [hadith, anns] = await Promise.all([
+        hadithService.fetchPublicHadith(),
+        announcementService.fetchPublicAnnouncements(),
+      ]);
+      setHadithList(hadith);
+      setAnnouncementList(anns);
+    } catch (e) {
+      // Silent fail - sections show empty state
+    } finally {
+      setHadithLoading(false);
+      setAnnLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadHomeData(); }, []);
+
+  const handleShareHadees = async (text: string, ref: string) => {
+    try {
+      await Share.share({ message: `"${text}"\n\nReference: ${ref}` });
+    } catch {
       triggerToast('Error sharing Hadees');
     }
   };
 
   const handleCopyHadees = (textAr: string, textEn: string, ref: string) => {
-    const shareText = `${textAr}\n\n${textEn}\n\nReference: ${ref}`;
-    Clipboard.setString(shareText);
+    Clipboard.setString(`${textAr}\n\n${textEn}\n\nReference: ${ref}`);
     triggerToast(translations.copiedText || 'Copied to clipboard!');
   };
 
-  // Get daily Hadith
-  const dailyHadith = hadeesList && hadeesList.length > 0 ? hadeesList[0] : null;
+  // Get daily Hadith from Supabase data
+  const dailyHadith = hadithList.length > 0 ? hadithList[0] : null;
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.offWhite }]}>
@@ -240,35 +264,37 @@ export const HomeScreen: React.FC = () => {
       {/* ── 3. ANNOUNCEMENTS SECTION ── */}
       <View style={styles.sectionContainer}>
         <Text style={[styles.sectionTitle, { color: currentTheme.text }, isRtl && typography.alignRtl]}>
-          📢 {isRtl ? 'اعلانات' : 'Updates'}
+          {isRtl ? 'اعلانات' : 'Updates'}
         </Text>
 
-        {announcements && announcements.length > 0 ? (
+        {annLoading && announcementList.length === 0 ? (
+          <View style={[styles.emptyCard, { backgroundColor: currentTheme.card, borderColor: currentTheme.border }]}>
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+        ) : announcementList.length > 0 ? (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.announcementsCarousel}
           >
-            {announcements.map((ann) => {
-              const isUnread = !ann.isRead;
+            {announcementList.map((ann) => {
+              const dateLabel = ann.event_date
+                ? new Date(ann.event_date).toLocaleDateString(isRtl ? 'ur-PK' : 'en-US', { day: 'numeric', month: 'short' })
+                : new Date(ann.created_at).toLocaleDateString(isRtl ? 'ur-PK' : 'en-US', { day: 'numeric', month: 'short' });
               return (
                 <View
                   key={ann.id}
                   style={[
                     styles.announcementCard,
-                    {
-                      backgroundColor: currentTheme.card,
-                      borderColor: isUnread ? colors.primary : currentTheme.border,
-                      borderLeftWidth: isUnread ? 4 : 1
-                    }
+                    { backgroundColor: currentTheme.card, borderColor: currentTheme.border }
                   ]}
                 >
                   <View style={[styles.announcementHeader, isRtl && styles.rowReverse]}>
                     <Text style={[styles.announcementMasjid, { color: colors.primary }]}>
-                      🕌 {ann.masjidName}
+                      🕌 {ann.mosque_name || 'Masjid'}
                     </Text>
                     <Text style={[styles.announcementDate, { color: currentTheme.textMuted }]}>
-                      {ann.date}
+                      {dateLabel}
                     </Text>
                   </View>
 
@@ -276,14 +302,14 @@ export const HomeScreen: React.FC = () => {
                     numberOfLines={1}
                     style={[styles.announcementTitle, { color: currentTheme.text }, isRtl && typography.alignRtl]}
                   >
-                    {isRtl ? ann.titleUr : ann.titleEn}
+                    {ann.title}
                   </Text>
 
                   <Text
                     numberOfLines={2}
                     style={[styles.announcementContent, { color: currentTheme.textMuted }, isRtl && typography.alignRtl]}
                   >
-                    {isRtl ? ann.contentUr : ann.contentEn}
+                    {ann.description}
                   </Text>
 
                   <View style={[styles.announcementFooter, isRtl && styles.rowReverse]}>
@@ -312,31 +338,33 @@ export const HomeScreen: React.FC = () => {
       {/* ── 4. DAILY HADITH SECTION ── */}
       <View style={[styles.sectionContainer, { marginBottom: spacing.huge }]}>
         <Text style={[styles.sectionTitle, { color: currentTheme.text }, isRtl && typography.alignRtl]}>
-          📖 {isRtl ? 'آج کی حدیث' : 'Daily Hadees'}
+          {isRtl ? 'آج کی حدیث' : 'Daily Hadees'}
         </Text>
 
-        {dailyHadith ? (
+        {hadithLoading && !dailyHadith ? (
+          <View style={[styles.emptyCard, { backgroundColor: currentTheme.card, borderColor: currentTheme.border }]}>
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+        ) : dailyHadith ? (
           <View style={[styles.hadithCard, { backgroundColor: currentTheme.card, borderColor: currentTheme.border }]}>
             <Text style={styles.arabicHadith}>
-              {dailyHadith.textAr}
+              {dailyHadith.arabic_text}
             </Text>
 
-            {/* Divider */}
             <View style={[styles.cardDivider, { backgroundColor: currentTheme.border }]} />
 
-            <Text style={[styles.translationHadith, { color: currentTheme.text }]}>
-              {isRtl ? dailyHadith.textUr : dailyHadith.textEn}
+            <Text style={[styles.translationHadith, { color: currentTheme.text }, isRtl && typography.alignRtl]}>
+              {isRtl ? dailyHadith.urdu_translation : dailyHadith.english_translation}
             </Text>
 
             <Text style={[styles.hadithRef, { color: currentTheme.textMuted }, isRtl && typography.alignRtl]}>
-              📌 {translations.reference || 'Reference'}: {isRtl ? dailyHadith.referenceUr : dailyHadith.referenceEn} ({dailyHadith.source})
+              📌 {translations.reference || 'Reference'}: {dailyHadith.reference}
             </Text>
 
-            {/* Hadith Actions */}
             <View style={[styles.hadithActionsRow, isRtl && styles.rowReverse]}>
               <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: colors.primaryLight }]}
-                onPress={() => handleCopyHadees(dailyHadith.textAr, isRtl ? dailyHadith.textUr : dailyHadith.textEn, isRtl ? dailyHadith.referenceUr : dailyHadith.referenceEn)}
+                onPress={() => handleCopyHadees(dailyHadith.arabic_text, isRtl ? dailyHadith.urdu_translation : dailyHadith.english_translation, dailyHadith.reference)}
               >
                 <Copy size={16} color={colors.primary} />
                 <Text style={[styles.actionBtnText, { color: colors.primary }]}>
@@ -346,7 +374,7 @@ export const HomeScreen: React.FC = () => {
 
               <TouchableOpacity
                 style={[styles.actionButton, { backgroundColor: colors.primaryLight }]}
-                onPress={() => handleShareHadees(isRtl ? dailyHadith.textUr : dailyHadith.textEn, isRtl ? dailyHadith.referenceUr : dailyHadith.referenceEn, dailyHadith.source)}
+                onPress={() => handleShareHadees(isRtl ? dailyHadith.urdu_translation : dailyHadith.english_translation, dailyHadith.reference)}
               >
                 <Share2 size={16} color={colors.primary} />
                 <Text style={[styles.actionBtnText, { color: colors.primary }]}>
@@ -358,7 +386,7 @@ export const HomeScreen: React.FC = () => {
         ) : (
           <View style={[styles.emptyCard, { backgroundColor: currentTheme.card, borderColor: currentTheme.border }]}>
             <Text style={[styles.emptyText, { color: currentTheme.textMuted }]}>
-              {isRtl ? 'حدیث آج دستیاب نہیں ہے۔' : 'Daily Hadith not loaded.'}
+              {isRtl ? 'حدیث آج دستیاب نہیں ہے۔' : 'No hadith available.'}
             </Text>
           </View>
         )}
@@ -377,37 +405,27 @@ export const HomeScreen: React.FC = () => {
           <View style={styles.modalBackdrop}>
             <View style={[styles.modalCard, { backgroundColor: currentTheme.surface }]}>
               <Text style={[styles.modalMasjidRef, { color: colors.primary }]}>
-                🕌 {selectedAnnouncement.masjidName}
+                🕌 {selectedAnnouncement.mosque_name || 'Masjid'}
               </Text>
 
               <Text style={[styles.modalTitle, { color: currentTheme.text }]}>
-                {isRtl ? selectedAnnouncement.titleUr : selectedAnnouncement.titleEn}
+                {selectedAnnouncement.title}
               </Text>
 
               <Text style={[styles.modalDate, { color: currentTheme.textMuted }]}>
-                {selectedAnnouncement.date}
+                {selectedAnnouncement.event_date
+                  ? new Date(selectedAnnouncement.event_date).toLocaleDateString(isRtl ? 'ur-PK' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+                  : new Date(selectedAnnouncement.created_at).toLocaleDateString(isRtl ? 'ur-PK' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
+                {selectedAnnouncement.event_time && ` · ${selectedAnnouncement.event_time}`}
               </Text>
 
               <ScrollView style={styles.modalContentScroll}>
                 <Text style={[styles.modalBodyText, { color: currentTheme.text }]}>
-                  {isRtl ? selectedAnnouncement.contentUr : selectedAnnouncement.contentEn}
+                  {selectedAnnouncement.description}
                 </Text>
               </ScrollView>
 
               <View style={styles.modalFooter}>
-                {selectedAnnouncement.isRead === false && (
-                  <TouchableOpacity
-                    style={[styles.modalReadBtn, { backgroundColor: colors.primary }]}
-                    onPress={() => {
-                      handleAnnounceRead(selectedAnnouncement.id);
-                      setSelectedAnnouncement(null);
-                    }}
-                  >
-                    <Text style={styles.modalReadBtnText}>
-                      {translations.markRead || 'Mark as Read'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
                 <TouchableOpacity
                   style={[styles.modalCloseBtn, { borderColor: currentTheme.border }]}
                   onPress={() => setSelectedAnnouncement(null)}

@@ -25,6 +25,49 @@ export interface AnnouncementCategory {
 }
 
 export const announcementService = {
+  /** Public – no admin role required. Returns all active announcements with mosque & category names. */
+  async fetchPublicAnnouncements(): Promise<Announcement[]> {
+    const { data: announcements, error } = await supabase
+      .from('announcements')
+      .select('*')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching public announcements:', error);
+      throw error;
+    }
+    if (!announcements || announcements.length === 0) return [];
+
+    // Get category names
+    const categoryIds = [...new Set(announcements.map(a => a.category_id).filter(Boolean))];
+    let categoryMap: Record<string, string> = {};
+    if (categoryIds.length > 0) {
+      const { data: categories } = await supabase
+        .from('announcement_categories')
+        .select('id, name')
+        .in('id', categoryIds);
+      if (categories) categoryMap = Object.fromEntries(categories.map(c => [c.id, c.name]));
+    }
+
+    // Get mosque names
+    const mosqueIds = [...new Set(announcements.map(a => a.mosque_id).filter(Boolean))];
+    let mosqueMap: Record<string, string> = {};
+    if (mosqueIds.length > 0) {
+      const { data: mosques } = await supabase
+        .from('mosques')
+        .select('id, name')
+        .in('id', mosqueIds);
+      if (mosques) mosqueMap = Object.fromEntries(mosques.map(m => [m.id, m.name]));
+    }
+
+    return announcements.map(a => ({
+      ...a,
+      category_name: a.category_id ? categoryMap[a.category_id] || null : null,
+      mosque_name: a.mosque_id ? mosqueMap[a.mosque_id] || null : null,
+    }));
+  },
+
   async fetchAllAnnouncements(): Promise<Announcement[]> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Authentication required.');

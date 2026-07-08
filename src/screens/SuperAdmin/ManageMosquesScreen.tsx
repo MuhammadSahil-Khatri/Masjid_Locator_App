@@ -278,7 +278,7 @@ export const ManageMosquesScreen: React.FC = () => {
       // Launch image picker
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: true,
+        allowsEditing: false,
         quality: 0.8,
       });
 
@@ -429,7 +429,6 @@ export const ManageMosquesScreen: React.FC = () => {
         image_url: addImageUrl.trim() || null,
         admin_id: addAdminId || null,
         capacity: addCapacity ? parseInt(addCapacity, 10) : null,
-        google_maps_url: null,
         is_active: true,
       });
 
