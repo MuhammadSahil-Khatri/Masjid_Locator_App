@@ -11,6 +11,8 @@ import {
   ActivityIndicator,
   ImageBackground,
   Image,
+  RefreshControl,
+  Animated,
 } from 'react-native';
 import { Text } from '../../components/ui/Text';
 import { MapPin, Copy, Share2, RefreshCw, AlertTriangle } from 'lucide-react-native';
@@ -24,7 +26,49 @@ import { CacheService } from '../../services/cacheService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const PRAYER_KEYS = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'] as const;
+const PRAYER_KEYS = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'] as const;
+
+// Skeleton Component
+const Skeleton = ({ width, height, borderRadius = 4, style }: any) => {
+  const animatedValue = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(animatedValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animatedValue, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [animatedValue]);
+
+  const opacity = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.7],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        {
+          width,
+          height,
+          borderRadius,
+          backgroundColor: '#E0E0E0',
+          opacity,
+        },
+        style,
+      ]}
+    />
+  );
+};
 
 export const HomeScreen: React.FC = () => {
   const {
@@ -39,6 +83,7 @@ export const HomeScreen: React.FC = () => {
 
   const currentTheme = colors.light;
   const { navigate } = useNavigation();
+  const [refreshing, setRefreshing] = useState(false);
 
   // ── Live prayer times from AlAdhan API ──
   const {
@@ -50,7 +95,7 @@ export const HomeScreen: React.FC = () => {
     loading: prayerLoading,
     error: prayerError,
     refetch: refetchPrayer,
-  } = usePrayerTimes();
+  } = usePrayerTimes(language);
 
   // ── Day / Night detection (Fajr → Maghrib = day) ──
   const isDaytime = useMemo(() => {
@@ -102,13 +147,13 @@ export const HomeScreen: React.FC = () => {
   });
 
   // Fetch Hadith independently
-  const loadHadithData = useCallback(async () => {
-    if (CacheService.isHadithWarmed()) return;
+  const loadHadithData = useCallback(async (forceFetch = false) => {
+    if (!forceFetch && CacheService.isHadithWarmed()) return;
 
     const hasCache = (CacheService.getHadith(true) || []).length > 0;
     const isExpired = CacheService.isHadithExpired();
 
-    if (hasCache && !isExpired) {
+    if (!forceFetch && hasCache && !isExpired) {
       const cached = CacheService.getHadith(true);
       if (cached) {
         CacheService.setHadith(cached);
@@ -131,13 +176,13 @@ export const HomeScreen: React.FC = () => {
   }, []);
 
   // Fetch Announcements independently
-  const loadAnnouncementsData = useCallback(async () => {
-    if (CacheService.isAnnouncementsWarmed()) return;
+  const loadAnnouncementsData = useCallback(async (forceFetch = false) => {
+    if (!forceFetch && CacheService.isAnnouncementsWarmed()) return;
 
     const hasCache = (CacheService.getAnnouncements(true) || []).length > 0;
     const isExpired = CacheService.isAnnouncementsExpired();
 
-    if (hasCache && !isExpired) {
+    if (!forceFetch && hasCache && !isExpired) {
       const cached = CacheService.getAnnouncements(true);
       if (cached) {
         CacheService.setAnnouncements(cached);
@@ -164,6 +209,21 @@ export const HomeScreen: React.FC = () => {
     loadAnnouncementsData();
   }, [loadHadithData, loadAnnouncementsData]);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        refetchPrayer(),
+        loadHadithData(true),
+        loadAnnouncementsData(true)
+      ]);
+    } catch (error) {
+      console.warn('[HomeScreen] Refresh failed:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetchPrayer, loadHadithData, loadAnnouncementsData]);
+
   const handleShareHadees = async (text: string, ref: string) => {
     try {
       await Share.share({ message: `"${text}"\n\nReference: ${ref}` });
@@ -181,7 +241,17 @@ export const HomeScreen: React.FC = () => {
   const dailyHadith = hadithList.length > 0 ? hadithList[0] : null;
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.offWhite }]}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.offWhite }]}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={[colors.primary]}
+          tintColor={colors.primary}
+        />
+      }
+    >
 
       {/* ── 1. GREETING SECTION ── */}
       <View style={[styles.headerSection, isRtl && styles.rowReverse]}>
@@ -249,18 +319,8 @@ export const HomeScreen: React.FC = () => {
       {/* ── 2. PRAYER TIME CARD ── */}
       <View style={styles.prayerCardContainer}>
 
-        {/* Loading skeleton */}
-        {prayerLoading && !timings && (
-          <View style={[styles.prayerCard, styles.prayerCardSkeleton]}>
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={[styles.skeletonText, { color: currentTheme.textMuted }]}>
-              Fetching prayer times…
-            </Text>
-          </View>
-        )}
-
         {/* Error state */}
-        {!timings && prayerError && (
+        {!prayerLoading && !timings && prayerError && (
           <View style={[styles.prayerCard, styles.prayerCardError]}>
             <AlertTriangle size={20} color={colors.warning} />
             <Text style={[styles.errorCardText, { color: colors.brown }]}>
@@ -277,7 +337,7 @@ export const HomeScreen: React.FC = () => {
         )}
 
         {/* Live prayer card */}
-        {timings && upcoming && (
+        {(prayerLoading || refreshing || (timings && upcoming)) && (
           <ImageBackground
             source={
               isDaytime
@@ -294,58 +354,133 @@ export const HomeScreen: React.FC = () => {
               {/* TOP ROW: Hijri Date (left) + Location (right) */}
               <View style={styles.prayerTopRow}>
                 <View>
-                  <Text style={styles.prayerHijriDate}>
-                    {hijriDate.replace(' AH', '')}
-                  </Text>
-                  <Text style={styles.prayerGregorianDate}>
-                    {gregorianDate}
-                  </Text>
+                  {((prayerLoading && !timings) || refreshing) ? (
+                    <View style={{ gap: 4 }}>
+                      <Skeleton width={100} height={16} />
+                      <Skeleton width={80} height={12} />
+                    </View>
+                  ) : (
+                    <>
+                      <Text style={styles.prayerHijriDate}>
+                        {hijriDate.replace(' AH', '')}
+                      </Text>
+                      <Text style={styles.prayerGregorianDate}>
+                        {gregorianDate}
+                      </Text>
+                    </>
+                  )}
                 </View>
                 <View style={styles.locationChip}>
-                  <MapPin size={11} color="#ffffff" />
-                  <Text style={styles.locationChipText}>
-                    {city || currentUser?.region || 'Locating…'}
+                  <MapPin size={11} color="#000000" />
+                  <Text style={[styles.locationChipText, { color: '#000000ff' }]}>
+
+                    {prayerLoading && !city ? 'Locating…' : (city || currentUser?.region || 'Locating…')}
                   </Text>
                 </View>
               </View>
 
               {/* CENTER: Prayer Name + Time */}
               <View style={styles.prayerCenterBlock}>
-                <Text style={styles.prayerNameLarge}>
-                  {isRtl ? ((translations as any)[upcoming.name.toLowerCase()] || upcoming.name) : upcoming.name}
-                </Text>
-                <Text style={styles.prayerTimeLarge}>
-                  {upcoming.time}
-                </Text>
+                {((prayerLoading && !timings) || refreshing) ? (
+                  <>
+                    <Skeleton width={140} height={32} style={{ marginBottom: 10 }} />
+                    <Skeleton width={100} height={32} />
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.prayerNameLarge}>
+                      {isRtl ? ((translations as any)[upcoming?.currentActive?.toLowerCase() || ''] || upcoming?.currentActive) : upcoming?.currentActive}
+                    </Text>
+                    <Text style={styles.prayerTimeLarge}>
+                      {timings![upcoming?.currentActive as keyof typeof timings]}
+                    </Text>
+                    <Text style={styles.nextPrayerLabel}>
+                      {isRtl ? ((translations as any)[upcoming?.name.toLowerCase() || ''] || upcoming?.name) : upcoming?.name} in {upcoming?.remainingTime}
+                    </Text>
+                  </>
+                )}
               </View>
-
-              {/* BOTTOM TIMELINE */}
-              <View style={styles.prayerTimeline}>
-                {PRAYER_KEYS.map((name) => {
-                  const key = name.toLowerCase();
-                  const time = timings[name];
-                  const isActive = upcoming.currentActive === name;
-                  const displayName = isRtl ? ((translations as any)[key] || name) : name;
-
-                  return (
-                    <View key={key} style={styles.timelineCol}>
-                      <Text style={[styles.tlName, isActive && styles.tlNameActive]}>
-                        {displayName}
-                      </Text>
-                      <Text style={[styles.tlTime, isActive && styles.tlTimeActive]}>
-                        {time}
-                      </Text>
-                      <View style={styles.tlDotWrap}>
-                        {isActive && <View style={styles.tlDot} />}
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-
             </View>
           </ImageBackground>
         )}
+      </View>
+
+      {/* ── VERTICAL PRAYER TIMES ── */}
+      <View style={styles.sectionContainer}>
+        <Text style={[styles.sectionTitle, { color: currentTheme.text }, isRtl && typography.alignRtl]}>
+          {isRtl ? 'نماز کے اوقات' : 'Prayer Times'}
+        </Text>
+        <View style={styles.verticalPrayerList}>
+          {((prayerLoading && !timings) || refreshing) ? (
+            <View style={{ padding: spacing.md, gap: spacing.md }}>
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View>
+                    <Skeleton width={60} height={16} style={{ marginBottom: 4 }} />
+                    <Skeleton width={40} height={12} />
+                  </View>
+                  <Skeleton width={60} height={16} />
+                </View>
+              ))}
+            </View>
+          ) : (
+            timings && upcoming && PRAYER_KEYS.map((name) => {
+              const key = name.toLowerCase();
+              const time = timings[name];
+              if (!time) return null; // In case Sunrise isn't returned
+
+              // Only highlight the 'next' prayer or active prayer depending on logic
+              const isActive = upcoming.name === name;
+              const displayName = name === 'Sunrise' ? 'Shuruq' : (isRtl ? ((translations as any)[key] || name) : name);
+
+              // Map English subtitles
+              const subtitles: Record<string, string> = {
+                'fajr': 'Dawn',
+                'sunrise': 'Sunrise',
+                'dhuhr': 'Noon',
+                'asr': 'Afternoon',
+                'maghrib': 'Sunset',
+                'isha': 'Night',
+              };
+              const subtitle = subtitles[key];
+
+              const icons: Record<string, any> = {
+                'fajr': require('../../../assets/Prayer_Time_Icons/fajr.webp'),
+                'sunrise': require('../../../assets/Prayer_Time_Icons/shuruq.webp'),
+                'dhuhr': require('../../../assets/Prayer_Time_Icons/dhuhr.webp'),
+                'asr': require('../../../assets/Prayer_Time_Icons/asr.webp'),
+                'maghrib': require('../../../assets/Prayer_Time_Icons/maghrib.webp'),
+                'isha': require('../../../assets/Prayer_Time_Icons/isha.webp'),
+              };
+              const iconSource = icons[key];
+
+              return (
+                <View key={key} style={[styles.verticalPrayerRow, isActive && styles.verticalPrayerRowActive]}>
+                  <View style={styles.prayerRowLeft}>
+                    {iconSource && <Image source={iconSource} style={styles.prayerRowIcon} resizeMode="contain" />}
+                    <View>
+                      <Text style={[styles.verticalPrayerName, isActive && styles.verticalPrayerNameActive]}>
+                        {displayName}
+                      </Text>
+                      <Text style={[styles.verticalPrayerSubtitle, isActive && styles.verticalPrayerSubtitleActive]}>
+                        {subtitle}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.prayerRowRight}>
+                    <Text style={[styles.verticalPrayerTime, isActive && styles.verticalPrayerTimeActive]}>
+                      {time}
+                    </Text>
+                    {/* <View style={[styles.prayerCheckIcon, isActive && styles.prayerCheckIconActive]}>
+                      {isActive && <MapPin size={10} color="#ffffff" />}
+                    </View> */}
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </View>
       </View>
 
       {/* ── 3. ANNOUNCEMENTS SECTION ── */}
@@ -354,16 +489,19 @@ export const HomeScreen: React.FC = () => {
           {isRtl ? 'اعلانات' : 'Updates'}
         </Text>
 
-        {annLoading && announcementList.length === 0 ? (
-          <View style={[styles.emptyCard, { backgroundColor: currentTheme.card, borderColor: currentTheme.border }]}>
-            <ActivityIndicator size="small" color={colors.primary} />
+        {((annLoading && announcementList.length === 0) || refreshing) ? (
+          <View style={styles.announcementsListContainer}>
+            <View style={[styles.announcementCard, { backgroundColor: currentTheme.card, borderColor: currentTheme.border }]}>
+              <View style={[styles.announcementHeader, isRtl && styles.rowReverse]}>
+                <Skeleton width={120} height={16} />
+                <Skeleton width={60} height={12} />
+              </View>
+              <Skeleton width="100%" height={14} style={{ marginBottom: spacing.xs }} />
+              <Skeleton width="80%" height={14} style={{ marginBottom: spacing.md }} />
+            </View>
           </View>
         ) : announcementList.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.announcementsCarousel}
-          >
+          <View style={styles.announcementsListContainer}>
             {announcementList.map((ann) => {
               const dateLabel = ann.event_date
                 ? new Date(ann.event_date).toLocaleDateString(isRtl ? 'ur-PK' : 'en-US', { day: 'numeric', month: 'short' })
@@ -377,42 +515,35 @@ export const HomeScreen: React.FC = () => {
                   ]}
                 >
                   <View style={[styles.announcementHeader, isRtl && styles.rowReverse]}>
-                    <Text style={[styles.announcementMasjid, { color: colors.primary }]}>
-                      🕌 {ann.mosque_name || 'Masjid'}
+                    <Text style={[styles.announcementTitle, { color: currentTheme.text, flex: 1 }, isRtl && typography.alignRtl]} numberOfLines={1}>
+                      {ann.title}
                     </Text>
-                    <Text style={[styles.announcementDate, { color: currentTheme.textMuted }]}>
+                    <Text style={[styles.announcementDateTop, { color: currentTheme.textMuted }]}>
                       {dateLabel}
                     </Text>
                   </View>
 
                   <Text
-                    numberOfLines={1}
-                    style={[styles.announcementTitle, { color: currentTheme.text }, isRtl && typography.alignRtl]}
-                  >
-                    {ann.title}
-                  </Text>
-
-                  <Text
-                    numberOfLines={2}
                     style={[styles.announcementContent, { color: currentTheme.textMuted }, isRtl && typography.alignRtl]}
                   >
                     {ann.description}
                   </Text>
 
-                  <View style={[styles.announcementFooter, isRtl && styles.rowReverse]}>
-                    <TouchableOpacity
-                      style={[styles.readMoreBtn, { borderColor: colors.primaryBorder }]}
-                      onPress={() => setSelectedAnnouncement(ann)}
-                    >
-                      <Text style={styles.readMoreText}>
-                        {isRtl ? 'مزید پڑھیں' : 'Read More'}
-                      </Text>
-                    </TouchableOpacity>
+                  <View style={styles.announcementFooterDetails}>
+                    <Text style={[styles.announcementMasjid, { color: colors.primary }]}>
+                      {ann.mosque_name || 'Masjid'}
+                    </Text>
+                    <Text style={[styles.announcementDateTime, { color: currentTheme.textMuted }]}>
+                      {ann.event_date
+                        ? new Date(ann.event_date).toLocaleDateString(isRtl ? 'ur-PK' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+                        : new Date(ann.created_at).toLocaleDateString(isRtl ? 'ur-PK' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {ann.event_time && ` at ${ann.event_time}`}
+                    </Text>
                   </View>
                 </View>
               );
             })}
-          </ScrollView>
+          </View>
         ) : (
           <View style={[styles.emptyCard, { backgroundColor: currentTheme.card, borderColor: currentTheme.border }]}>
             <Text style={[styles.emptyText, { color: currentTheme.textMuted }]}>
@@ -428,9 +559,14 @@ export const HomeScreen: React.FC = () => {
           {isRtl ? 'آج کی حدیث' : 'Daily Hadees'}
         </Text>
 
-        {hadithLoading && !dailyHadith ? (
-          <View style={[styles.emptyCard, { backgroundColor: currentTheme.card, borderColor: currentTheme.border }]}>
-            <ActivityIndicator size="small" color={colors.primary} />
+        {((hadithLoading && !dailyHadith) || refreshing) ? (
+          <View style={[styles.hadithCard, { backgroundColor: currentTheme.card, borderColor: currentTheme.border }]}>
+            <Skeleton width="90%" height={26} style={{ alignSelf: 'center', marginBottom: spacing.sm }} />
+            <Skeleton width="70%" height={26} style={{ alignSelf: 'center', marginBottom: spacing.md }} />
+            <View style={[styles.cardDivider, { backgroundColor: currentTheme.border }]} />
+            <Skeleton width="100%" height={14} style={{ marginBottom: spacing.xs }} />
+            <Skeleton width="100%" height={14} style={{ marginBottom: spacing.xs }} />
+            <Skeleton width="80%" height={14} style={{ marginBottom: spacing.sm }} />
           </View>
         ) : dailyHadith ? (
           <View style={[styles.hadithCard, { backgroundColor: currentTheme.card, borderColor: currentTheme.border }]}>
@@ -482,51 +618,53 @@ export const HomeScreen: React.FC = () => {
       <View style={styles.bottomSpacer} />
 
       {/* ── ANNOUNCEMENT READ MORE MODAL ── */}
-      {selectedAnnouncement && (
-        <Modal
-          animationType="fade"
-          transparent={true}
-          visible={!!selectedAnnouncement}
-          onRequestClose={() => setSelectedAnnouncement(null)}
-        >
-          <View style={styles.modalBackdrop}>
-            <View style={[styles.modalCard, { backgroundColor: currentTheme.surface }]}>
-              <Text style={[styles.modalMasjidRef, { color: colors.primary }]}>
-                🕌 {selectedAnnouncement.mosque_name || 'Masjid'}
-              </Text>
-
-              <Text style={[styles.modalTitle, { color: currentTheme.text }]}>
-                {selectedAnnouncement.title}
-              </Text>
-
-              <Text style={[styles.modalDate, { color: currentTheme.textMuted }]}>
-                {selectedAnnouncement.event_date
-                  ? new Date(selectedAnnouncement.event_date).toLocaleDateString(isRtl ? 'ur-PK' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-                  : new Date(selectedAnnouncement.created_at).toLocaleDateString(isRtl ? 'ur-PK' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
-                {selectedAnnouncement.event_time && ` · ${selectedAnnouncement.event_time}`}
-              </Text>
-
-              <ScrollView style={styles.modalContentScroll}>
-                <Text style={[styles.modalBodyText, { color: currentTheme.text }]}>
-                  {selectedAnnouncement.description}
+      {
+        selectedAnnouncement && (
+          <Modal
+            animationType="fade"
+            transparent={true}
+            visible={!!selectedAnnouncement}
+            onRequestClose={() => setSelectedAnnouncement(null)}
+          >
+            <View style={styles.modalBackdrop}>
+              <View style={[styles.modalCard, { backgroundColor: currentTheme.surface }]}>
+                <Text style={[styles.modalMasjidRef, { color: colors.primary }]}>
+                  🕌 {selectedAnnouncement.mosque_name || 'Masjid'}
                 </Text>
-              </ScrollView>
 
-              <View style={styles.modalFooter}>
-                <TouchableOpacity
-                  style={[styles.modalCloseBtn, { borderColor: currentTheme.border }]}
-                  onPress={() => setSelectedAnnouncement(null)}
-                >
-                  <Text style={[styles.modalCloseText, { color: currentTheme.text }]}>
-                    {isRtl ? 'بند کریں' : 'Close'}
+                <Text style={[styles.modalTitle, { color: currentTheme.text }]}>
+                  {selectedAnnouncement.title}
+                </Text>
+
+                <Text style={[styles.modalDate, { color: currentTheme.textMuted }]}>
+                  {selectedAnnouncement.event_date
+                    ? new Date(selectedAnnouncement.event_date).toLocaleDateString(isRtl ? 'ur-PK' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+                    : new Date(selectedAnnouncement.created_at).toLocaleDateString(isRtl ? 'ur-PK' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  {selectedAnnouncement.event_time && ` · ${selectedAnnouncement.event_time}`}
+                </Text>
+
+                <ScrollView style={styles.modalContentScroll}>
+                  <Text style={[styles.modalBodyText, { color: currentTheme.text }]}>
+                    {selectedAnnouncement.description}
                   </Text>
-                </TouchableOpacity>
+                </ScrollView>
+
+                <View style={styles.modalFooter}>
+                  <TouchableOpacity
+                    style={[styles.modalCloseBtn, { borderColor: currentTheme.border }]}
+                    onPress={() => setSelectedAnnouncement(null)}
+                  >
+                    <Text style={[styles.modalCloseText, { color: currentTheme.text }]}>
+                      {isRtl ? 'بند کریں' : 'Close'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-          </View>
-        </Modal>
-      )}
-    </ScrollView>
+          </Modal>
+        )
+      }
+    </ScrollView >
   );
 };
 
@@ -687,7 +825,7 @@ const styles = StyleSheet.create({
   locationChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(255, 255, 255, 0.79)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.35)',
     paddingVertical: 4,
@@ -701,23 +839,23 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.semibold,
   },
   prayerCenterBlock: {
-    marginTop: 2,
+    marginTop: 10,
     marginBottom: 2,
     flexDirection: 'column',
     alignItems: 'baseline',
-    gap: 10,
+    gap: 2,
   },
   prayerNameLarge: {
     color: '#ffffff',
     fontSize: typography.sizes.xxl,
     fontWeight: typography.weights.bold,
-    letterSpacing: -0.5,
+    letterSpacing: 0,
   },
   prayerTimeLarge: {
     color: 'rgba(255,255,255,0.85)',
-    fontSize: typography.sizes.xxl,
-    fontWeight: typography.weights.regular,
-    letterSpacing: -0.5,
+    fontSize: typography.sizes.xl,
+    fontWeight: typography.weights.semibold,
+    letterSpacing: 0,
   },
   countdownPill: {
     flexDirection: 'row',
@@ -737,50 +875,88 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xs + 1,
     fontWeight: typography.weights.semibold,
   },
-  prayerTimeline: {
+  currentPrayerLabel: {
+    color: '#ffffff',
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.medium,
+    marginBottom: 4,
+    opacity: 0.9,
+  },
+  nextPrayerLabel: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: typography.sizes.xs + 1,
+    fontWeight: typography.weights.medium,
+    marginTop: 2,
+  },
+  verticalPrayerList: {
+    marginHorizontal: spacing.sm,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  verticalPrayerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 10,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.xs,
-    paddingHorizontal: spacing.xs,
-    marginTop: spacing.xs,
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: 'rgba(243, 244, 246, 0.7)',
+    borderRadius: 16,
   },
-  timelineCol: {
+  verticalPrayerRowActive: {
+    backgroundColor: 'rgba(161, 213, 201, 0.8)', // teal-ish highlight
+  },
+  prayerRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
-    alignItems: 'center',
+    gap: spacing.md,
   },
-  tlName: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 9,
-    fontWeight: typography.weights.medium,
-    marginBottom: 2,
+  prayerRowIcon: {
+    width: 32,
+    height: 32,
   },
-  tlNameActive: {
-    color: '#ffffff',
+  verticalPrayerName: {
+    fontSize: typography.sizes.sm,
+    color: '#374151',
     fontWeight: typography.weights.bold,
   },
-  tlTime: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 9,
-    fontWeight: typography.weights.medium,
+  verticalPrayerNameActive: {
+    color: colors.primary,
   },
-  tlTimeActive: {
-    color: '#10b981',
+  verticalPrayerSubtitle: {
+    fontSize: typography.sizes.xs - 1,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  verticalPrayerSubtitleActive: {
+    color: colors.primary,
+    opacity: 0.8,
+  },
+  prayerRowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  verticalPrayerTime: {
+    fontSize: typography.sizes.sm,
+    color: '#111827',
     fontWeight: typography.weights.bold,
   },
-  tlDotWrap: {
-    height: 6,
-    alignItems: 'center',
+  verticalPrayerTimeActive: {
+    color: colors.primary,
+  },
+  prayerCheckIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#a1a1aa',
     justifyContent: 'center',
-    marginTop: 3,
+    alignItems: 'center',
   },
-  tlDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#FF5757',
+  prayerCheckIconActive: {
+    backgroundColor: '#f97316', // orange check mark
+    borderColor: '#f97316',
   },
   sectionContainer: {
     paddingTop: spacing.md,
@@ -791,12 +967,11 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
     marginBottom: spacing.sm,
   },
-  announcementsCarousel: {
-    paddingRight: spacing.lg,
+  announcementsListContainer: {
     gap: spacing.md,
   },
   announcementCard: {
-    width: SCREEN_WIDTH * 0.8,
+    width: '100%',
     borderRadius: spacing.borderRadiusLg,
     borderWidth: 1,
     padding: spacing.md,
@@ -811,30 +986,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  announcementMasjid: {
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.bold,
-  },
-  announcementDate: {
-    fontSize: typography.sizes.xs,
-  },
-  announcementTitle: {
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold,
     marginBottom: spacing.xs,
   },
-  announcementContent: {
-    fontSize: typography.sizes.xs,
-    lineHeight: 16,
-    marginBottom: spacing.md,
+  announcementTitle: {
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.bold,
   },
-  announcementFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  announcementDateTop: {
+    fontSize: typography.sizes.xs,
+    marginLeft: spacing.sm,
+  },
+  announcementContent: {
+    fontSize: typography.sizes.sm,
+    lineHeight: 20,
+    marginBottom: spacing.sm,
+  },
+  announcementFooterDetails: {
+    flexDirection: 'column',
     marginTop: spacing.xs,
+    paddingTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+    gap: 4,
+  },
+  announcementMasjid: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+  },
+  announcementDateTime: {
+    fontSize: typography.sizes.xs,
   },
   markReadBadge: {
     flexDirection: 'row',

@@ -1,18 +1,30 @@
 /**
  * Typography configurations for sizes, weights, and RTL alignments.
  */
-import { TextStyle } from 'react-native';
+import { TextStyle, Dimensions, PixelRatio } from 'react-native';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// Base width for scaling (e.g. standard phone width)
+const BASE_WIDTH = 375;
+const scale = SCREEN_WIDTH / BASE_WIDTH;
+
+// Responsive sizing function
+export const responsiveFontSize = (size: number) => {
+  const newSize = size * scale;
+  return Math.round(PixelRatio.roundToNearestPixel(newSize));
+};
 
 export const typography = {
   sizes: {
-    xs: 10,
-    sm: 12,
-    base: 14,
-    md: 16,
-    lg: 18,
-    xl: 20,
-    xxl: 24,
-    huge: 32,
+    xs: responsiveFontSize(12),
+    sm: responsiveFontSize(14),
+    base: responsiveFontSize(16),
+    md: responsiveFontSize(18),
+    lg: responsiveFontSize(20),
+    xl: responsiveFontSize(22),
+    xxl: responsiveFontSize(26),
+    huge: responsiveFontSize(34),
   },
   weights: {
     light: '300' as TextStyle['fontWeight'],

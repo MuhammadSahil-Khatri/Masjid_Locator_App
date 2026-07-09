@@ -24,11 +24,12 @@ const to12Hour = (time24: string): string => {
 };
 
 /** Reverse geocode coordinates to city name using Nominatim */
-export const reverseGeocode = async (lat: number, lng: number): Promise<string> => {
+export const reverseGeocode = async (lat: number, lng: number, language: string = 'en'): Promise<string> => {
   try {
+    const acceptLang = language === 'ur' ? 'ur,en-US;q=0.8' : 'en-US,en;q=0.8';
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=en`,
-      { headers: { 'Accept-Language': 'en', 'User-Agent': 'MasjidLocatorApp/1.0' } }
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=${acceptLang}`,
+      { headers: { 'Accept-Language': acceptLang, 'User-Agent': 'MasjidLocatorApp/1.0' } }
     );
     if (!res.ok) throw new Error('Geocode failed');
     const geo = await res.json();
@@ -63,7 +64,8 @@ export interface PrayerTimesResult {
 export const fetchPrayerTimes = async (
   lat: number,
   lng: number,
-  method = 2
+  method = 2,
+  language = 'en'
 ): Promise<PrayerTimesResult> => {
   const url = `${BASE_URL}/timings?latitude=${lat}&longitude=${lng}&method=${method}`;
 
@@ -83,6 +85,7 @@ export const fetchPrayerTimes = async (
   // Parse and convert to 12-hour AM/PM format
   const parsedTimings: ParsedPrayerTimes = {
     Fajr: to12Hour(stripTz(timings.Fajr)),
+    Sunrise: to12Hour(stripTz(timings.Sunrise)),
     Dhuhr: to12Hour(stripTz(timings.Dhuhr)),
     Asr: to12Hour(stripTz(timings.Asr)),
     Maghrib: to12Hour(stripTz(timings.Maghrib)),
@@ -96,7 +99,7 @@ export const fetchPrayerTimes = async (
   const gregorianDate = `${date.gregorian.weekday.en}, ${date.gregorian.day} ${date.gregorian.month.en} ${date.gregorian.year}`;
 
   // City: use reverse geocoding for accurate current location city name
-  const city = await reverseGeocode(lat, lng);
+  const city = await reverseGeocode(lat, lng, language);
 
   return { timings: parsedTimings, hijriDate, gregorianDate, city };
 };

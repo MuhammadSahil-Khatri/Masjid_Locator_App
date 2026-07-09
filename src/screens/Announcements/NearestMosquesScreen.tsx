@@ -124,7 +124,6 @@ export const NearestMosquesScreen: React.FC = () => {
           </Text>
         </View>
       )}
-      <View style={styles.bottomSpacer} />
     </View>
   );
 };
@@ -237,9 +236,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: spacing.md,
     lineHeight: 20,
-  },
-  bottomSpacer: {
-    height: 80,
   },
 });
 export default NearestMosquesScreen;

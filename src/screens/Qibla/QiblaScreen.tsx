@@ -8,9 +8,10 @@ import {
   Dimensions,
 } from 'react-native';
 import { Text } from '../../components/ui/Text';
-import { RefreshCw, AlertTriangle } from 'lucide-react-native';
+import { RefreshCw, AlertTriangle, ChevronLeft } from 'lucide-react-native';
 import { colors, spacing, typography } from '../../theme';
 import { useQibla } from '../../hooks/useQibla';
+import { useNavigation } from '../../navigation/NavigationContext';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const COMPASS_SIZE = Math.min(SCREEN_WIDTH, SCREEN_HEIGHT) * 0.95;
@@ -30,6 +31,8 @@ export const QiblaScreen: React.FC = () => {
     error,
     refetch,
   } = useQibla();
+
+  const { goBack } = useNavigation();
 
   const theme = colors.light;
 
@@ -118,9 +121,15 @@ export const QiblaScreen: React.FC = () => {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text }]}>Qibla Direction</Text>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity onPress={() => goBack()} style={styles.backButton}>
+            <ChevronLeft color={theme.text} size={28} />
+          </TouchableOpacity>
+          <Text style={[styles.title, { color: theme.text }]}>Qibla Direction</Text>
+          <View style={styles.headerSpacer} />
+        </View>
         <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-          Direction towards the Holy Kaaba{city ? ` • ${city}` : ''}
+          Direction towards the Holy Kaaba
         </Text>
       </View>
 
@@ -169,8 +178,26 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   header: {
+    width: '100%',
     alignItems: 'center',
     marginTop: spacing.md,
+    paddingHorizontal: spacing.md,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  backButton: {
+    padding: spacing.xs,
+    backgroundColor: colors.primaryLight,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerSpacer: {
+    width: 28 + spacing.xs * 2,
   },
   title: {
     fontSize: typography.sizes.xxl,

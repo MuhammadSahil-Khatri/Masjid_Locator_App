@@ -30,7 +30,7 @@ export interface UpcomingPrayer {
 }
 
 const PRAYER_KEYS: Array<keyof ParsedPrayerTimes> = [
-  'Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha',
+  'Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha',
 ];
 
 const computeUpcoming = (
@@ -39,11 +39,13 @@ const computeUpcoming = (
 ): UpcomingPrayer => {
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-  const prayers = PRAYER_KEYS.map(name => ({
-    name,
-    time: timings[name],
-    minutes: timeToMinutes(timings[name]),
-  }));
+  const prayers = PRAYER_KEYS
+    .filter(name => !!timings[name])
+    .map(name => ({
+      name,
+      time: timings[name] as string,
+      minutes: timeToMinutes(timings[name] as string),
+    }));
 
   let upcoming = prayers.find(p => p.minutes > currentMinutes);
   let isNextDay = false;
@@ -86,7 +88,7 @@ export interface UsePrayerTimesReturn {
   refetch: () => void;
 }
 
-export const usePrayerTimes = (): UsePrayerTimesReturn => {
+export const usePrayerTimes = (language: string = 'en'): UsePrayerTimesReturn => {
   const { location, loading: locationLoading, errorMsg: locationError } = useUserLocation();
 
   // Load from cache initially
@@ -121,12 +123,12 @@ export const usePrayerTimes = (): UsePrayerTimesReturn => {
     try {
       setError(null);
       if (force) {
-        const fresh = await fetchPrayerTimes(lat, lng);
+        const fresh = await fetchPrayerTimes(lat, lng, 2, language);
         CacheService.setPrayerTimes(fresh.city, fresh);
         setData(fresh);
       } else {
         // Detect city first
-        const detectedCity = await reverseGeocode(lat, lng);
+        const detectedCity = await reverseGeocode(lat, lng, language);
         if (detectedCity) {
           const cached = CacheService.getPrayerTimes(detectedCity);
           if (cached) {
@@ -138,7 +140,7 @@ export const usePrayerTimes = (): UsePrayerTimesReturn => {
         }
         
         // Fetch if city/date mismatch or geocoding empty
-        const fresh = await fetchPrayerTimes(lat, lng);
+        const fresh = await fetchPrayerTimes(lat, lng, 2, language);
         const finalCity = fresh.city || detectedCity || 'Karachi';
         CacheService.setPrayerTimes(finalCity, { ...fresh, city: finalCity });
         setData({ ...fresh, city: finalCity });
@@ -155,7 +157,7 @@ export const usePrayerTimes = (): UsePrayerTimesReturn => {
   // Effect to trigger fetch when location resolves or changes
   useEffect(() => {
     if (location) {
-      reverseGeocode(location.lat, location.lng).then(detectedCity => {
+      reverseGeocode(location.lat, location.lng, language).then(detectedCity => {
         const city = detectedCity || 'Karachi';
 
         // 1. If session is already warmed, use in-memory data and don't query

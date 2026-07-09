@@ -158,6 +158,7 @@ export interface AlAdhanTimingsResponse {
 
 export interface ParsedPrayerTimes {
   Fajr: string;
+  Sunrise?: string;
   Dhuhr: string;
   Asr: string;
   Maghrib: string;

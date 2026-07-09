@@ -41,7 +41,7 @@ export const AnnouncementsScreen: React.FC = () => {
       >
         <View style={[styles.announcementHeader, isRtl && styles.rowReverse]}>
           <Text style={[styles.announcementMasjid, { color: colors.primary }]}>
-            🕌 {ann.masjidName}
+            {ann.masjidName}
           </Text>
           <Text style={[styles.announcementDate, { color: currentTheme.textMuted }]}>
             {ann.date}

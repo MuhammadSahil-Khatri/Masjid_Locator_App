@@ -21,6 +21,7 @@ const NEARBY_MOSQUES_KEY = 'nearby_mosques_cache';
 const ANNOUNCEMENTS_KEY = 'announcements_cache';
 const HADITH_KEY = 'hadith_cache';
 const ALL_MOSQUES_KEY = 'all_mosques_cache';
+const CITY_NAME_KEY = 'gps_city_name';
 // Bump this whenever the prayer times format changes to auto-purge old cache
 const CACHE_VERSION = '2'; // v2: 12-hour AM/PM format
 
@@ -33,6 +34,7 @@ const ALL_KEYS = [
   ANNOUNCEMENTS_KEY,
   HADITH_KEY,
   ALL_MOSQUES_KEY,
+  CITY_NAME_KEY,
 ];
 
 // ── In-memory sync cache (populated at hydration time) ─────────────────────
@@ -153,6 +155,16 @@ export const storageService = {
     const raw = syncGet(LOCATION_KEY);
     if (!raw) return null;
     try { return JSON.parse(raw); } catch { return null; }
+  },
+
+  // ── GPS City Name ─────────────────────────────────────────────────────────
+
+  saveGpsCity(city: string) {
+    syncSet(CITY_NAME_KEY, city);
+  },
+
+  getGpsCity(): string | null {
+    return syncGet(CITY_NAME_KEY) || null;
   },
 
   // ── Prayer Times ──────────────────────────────────────────────────────────
