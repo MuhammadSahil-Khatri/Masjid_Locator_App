@@ -18,7 +18,7 @@ import {
   Linking,
   Modal,
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import { Map as MapLibreMap, Camera, GeoJSONSource, Layer, Images, Marker, type CameraRef } from '@maplibre/maplibre-react-native';
 import {
   Search,
   SlidersHorizontal,
@@ -43,17 +43,32 @@ import { useSearchMosques } from '../../hooks/useSearchMosques';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-const customMapStyle = [
-  {
-    featureType: 'poi',
-    elementType: 'labels',
-    stylers: [{ visibility: 'off' }],
+const osmStyle = {
+  version: 8 as 8,
+  sources: {
+    'osm-raster-tiles': {
+      type: 'raster' as const,
+      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      attribution: '© OpenStreetMap contributors',
+    },
   },
-];
+  layers: [
+    {
+      id: 'osm-raster-layer',
+      type: 'raster' as const,
+      source: 'osm-raster-tiles',
+      minzoom: 0,
+      maxzoom: 19,
+    },
+  ],
+};
+
+const DEFAULT_ZOOM = 12.5;
+const MOSQUE_ZOOM = 16;
+const USER_ZOOM = 14.5;
 
 const DEFAULT_REGION_DELTA = { latitudeDelta: 0.04, longitudeDelta: 0.04 };
-const MOSQUE_ZOOM_DELTA = { latitudeDelta: 0.005, longitudeDelta: 0.005 };
-const USER_ZOOM_DELTA = { latitudeDelta: 0.02, longitudeDelta: 0.02 };
 
 interface FilterState {
   cities: string[];
@@ -71,60 +86,7 @@ const UserLocationMarker = memo(() => (
   </View>
 ));
 
-// ─── MasjidMarker ──────────────────────────────────────────────────────────────
-interface MasjidMarkerProps {
-  id: string;
-  latitude: number;
-  longitude: number;
-  isSelected: boolean;
-  onPress: (id: string) => void;
-}
-
-const MasjidMarker = memo(
-  ({ id, latitude, longitude, isSelected, onPress }: MasjidMarkerProps) => {
-    // Dynamic tracksViewChanges state for performance & Android rendering correctness
-    const [tracksView, setTracksView] = useState(true);
-
-    useEffect(() => {
-      const timer = setTimeout(() => setTracksView(false), 500);
-      return () => clearTimeout(timer);
-    }, []);
-
-    const coordinate = useMemo(
-      () => ({ latitude, longitude }),
-      [latitude, longitude]
-    );
-
-    const handlePress = useCallback(() => {
-      onPress(id);
-    }, [id, onPress]);
-
-    return (
-      <Marker
-        coordinate={coordinate}
-        onPress={handlePress}
-        zIndex={isSelected ? 10 : 1}
-        tracksViewChanges={tracksView}
-      >
-        <View style={styles.mosqueMarkerContainer}>
-          <View
-            style={[
-              styles.mosqueMarker,
-              isSelected ? styles.mosqueMarkerSelected : styles.mosqueMarkerNormal,
-            ]}
-          >
-            <Text style={styles.mosqueMarkerEmoji}>🕌</Text>
-          </View>
-        </View>
-      </Marker>
-    );
-  },
-  (prev, next) =>
-    prev.isSelected === next.isSelected &&
-    prev.id === next.id &&
-    prev.latitude === next.latitude &&
-    prev.longitude === next.longitude
-);
+// MasjidMarker deleted - Optimized marker rendering implemented via GeoJSONSource + Layer type="symbol"
 
 // ─── MosqueBottomSheet ─────────────────────────────────────────────────────────
 interface MosqueBottomSheetProps {
@@ -198,7 +160,7 @@ export const SearchScreen: React.FC = () => {
   const theme = colors.light;
   const { location, loading: locationLoading, refreshLocation } = useUserLocation();
   const { params } = useNavigation();
-  const mapRef = useRef<MapView | null>(null);
+  const cameraRef = useRef<CameraRef | null>(null);
 
   const locationRef = useRef(location);
   useEffect(() => { locationRef.current = location; }, [location]);
@@ -222,13 +184,12 @@ export const SearchScreen: React.FC = () => {
         setSelectedMosque(mosque);
         setBottomSheetVisible(true);
         setTimeout(() => {
-          mapRef.current?.animateToRegion(
+          cameraRef.current?.flyTo(
             {
-              latitude: mosque.latitude,
-              longitude: mosque.longitude,
-              ...MOSQUE_ZOOM_DELTA,
-            },
-            600
+              center: [mosque.longitude, mosque.latitude],
+              zoom: MOSQUE_ZOOM,
+              duration: 600,
+            }
           );
         }, 100);
       }
@@ -249,14 +210,13 @@ export const SearchScreen: React.FC = () => {
 
   // ── Center map on user's GPS location whenever it resolves/updates ────────────
   useEffect(() => {
-    if (location && mapRef.current) {
-      mapRef.current.animateToRegion(
+    if (location && cameraRef.current) {
+      cameraRef.current.flyTo(
         {
-          latitude: location.lat,
-          longitude: location.lng,
-          ...USER_ZOOM_DELTA,
-        },
-        600
+          center: [location.lng, location.lat],
+          zoom: USER_ZOOM,
+          duration: 600,
+        }
       );
     }
   }, [location?.lat, location?.lng]);
@@ -300,6 +260,29 @@ export const SearchScreen: React.FC = () => {
   const handleClearSearch = useCallback(() => setSearchText(''), []);
   const handleRetryFetch = useCallback(() => refetch(), [refetch]);
 
+  const geojson = useMemo(() => {
+    return {
+      type: 'FeatureCollection' as const,
+      features: filteredMosques.map((mosque) => {
+        const isSelected = selectedMosque?.id === mosque.id;
+        const name = mosque.name;
+        return {
+          type: 'Feature' as const,
+          id: mosque.id,
+          geometry: {
+            type: 'Point' as const,
+            coordinates: [mosque.longitude, mosque.latitude],
+          },
+          properties: {
+            id: mosque.id,
+            name: `🕌  ${name}`,
+            iconImage: isSelected ? 'search_marker_selected' : 'search_marker_normal',
+          },
+        };
+      }),
+    };
+  }, [filteredMosques, selectedMosque]);
+
   const handleMarkerPress = useCallback((mosqueId: string) => {
     console.time('[PERF] markerPress→sheetOpen');
     const mosque = mosques.find((m) => m.id === mosqueId);
@@ -310,37 +293,42 @@ export const SearchScreen: React.FC = () => {
       setTimeout(() => {
         setSelectedMosque(mosque);
         setBottomSheetVisible(true);
-        mapRef.current?.animateToRegion(
+        cameraRef.current?.flyTo(
           {
-            latitude: mosque.latitude,
-            longitude: mosque.longitude,
-            ...MOSQUE_ZOOM_DELTA,
-          },
-          400
+            center: [mosque.longitude, mosque.latitude],
+            zoom: MOSQUE_ZOOM,
+            duration: 400,
+          }
         );
       }, 100);
     } else {
       setSelectedMosque(mosque);
       setBottomSheetVisible(true);
-      mapRef.current?.animateToRegion(
+      cameraRef.current?.flyTo(
         {
-          latitude: mosque.latitude,
-          longitude: mosque.longitude,
-          ...MOSQUE_ZOOM_DELTA,
-        },
-        400
+          center: [mosque.longitude, mosque.latitude],
+          zoom: MOSQUE_ZOOM,
+          duration: 400,
+        }
       );
     }
     console.timeEnd('[PERF] markerPress→sheetOpen');
   }, [mosques, selectedMosque]);
 
+  const handleGeojsonPress = useCallback((event: any) => {
+    const feature = event.nativeEvent.features[0];
+    if (feature && feature.properties) {
+      const pressedId = feature.properties.id;
+      handleMarkerPress(pressedId);
+    }
+  }, [handleMarkerPress]);
+
   const handleRecenter = useCallback(() => {
     refreshLocation();
     const loc = locationRef.current;
-    if (loc && mapRef.current) {
-      mapRef.current.animateToRegion(
-        { latitude: loc.lat, longitude: loc.lng, ...USER_ZOOM_DELTA },
-        400
+    if (loc && cameraRef.current) {
+      cameraRef.current.flyTo(
+        { center: [loc.lng, loc.lat], zoom: USER_ZOOM, duration: 400 }
       );
     }
   }, [refreshLocation]);
@@ -484,36 +472,58 @@ export const SearchScreen: React.FC = () => {
       {/* ── Map Block (Permanently Mounted) ── */}
       <View style={styles.mapBlock}>
         {initialRegion ? (
-          <MapView
-            ref={mapRef}
+          <MapLibreMap
             style={StyleSheet.absoluteFillObject}
-            customMapStyle={customMapStyle}
-            initialRegion={initialRegion}
-            showsUserLocation={false}
-            showsMyLocationButton={false}
-            showsBuildings={false}
-            showsTraffic={false}
-            showsIndoors={false}
+            mapStyle={osmStyle}
           >
+            <Camera
+              ref={cameraRef}
+              initialViewState={{
+                center: [location!.lng, location!.lat],
+                zoom: DEFAULT_ZOOM,
+              }}
+            />
+
+            <Images
+              images={{
+                search_marker_normal: require('../../../assets/search_marker_normal.png'),
+                search_marker_selected: require('../../../assets/search_marker_selected.png'),
+              }}
+            />
+
             {/* User location marker */}
             {userCoordinate && (
-              <Marker coordinate={userCoordinate} tracksViewChanges={true}>
+              <Marker
+                id="userLocation"
+                lngLat={[userCoordinate.longitude, userCoordinate.latitude]}
+              >
                 <UserLocationMarker />
               </Marker>
             )}
 
-            {/* Mosque markers rendered only after loading finishes and no error */}
-            {!loading && !error && filteredMosques.map((mosque) => (
-              <MasjidMarker
-                key={mosque.id}
-                id={mosque.id}
-                latitude={mosque.latitude}
-                longitude={mosque.longitude}
-                isSelected={selectedMosque?.id === mosque.id}
-                onPress={handleMarkerPress}
-              />
-            ))}
-          </MapView>
+            {/* Mosque markers Layer */}
+            {!loading && !error && (
+              <GeoJSONSource
+                id="mosquesSource"
+                data={geojson}
+                onPress={handleGeojsonPress}
+              >
+                <Layer
+                  id="mosquesLayer"
+                  type="symbol"
+                  layout={{
+                    'icon-image': ['get', 'iconImage'],
+                    'icon-size': 1.0,
+                    'text-field': '🕌',
+                    'text-size': 12,
+                    'text-anchor': 'center',
+                    'text-allow-overlap': true,
+                    'icon-allow-overlap': true,
+                  }}
+                />
+              </GeoJSONSource>
+            )}
+          </MapLibreMap>
         ) : (
           <View style={[StyleSheet.absoluteFillObject, styles.centered, { backgroundColor: theme.background }]}>
             <ActivityIndicator size="large" color={colors.primary} />

@@ -36,4 +36,4 @@ jobs:
         run: eas whoami
 
       - name: Build Android APK
-        run: eas build --platform android --profile preview --non-interactive
+        run: eas build --platform android --profile preview --non-interactive --verbose

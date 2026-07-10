@@ -5,7 +5,7 @@ import Constants from 'expo-constants';
 
 // Resolve DSN from Expo constants extra or fallback to process.env (for builds using babel-plugin-inline-dotenv)
 const SENTRY_DSN =
-  (Constants?.manifest?.extra?.sentryDsn as string) ||
+  ((Constants?.expoConfig?.extra as Record<string, unknown>)?.sentryDsn as string) ||
   (process.env.SENTRY_DSN as string);
 
 Sentry.init({

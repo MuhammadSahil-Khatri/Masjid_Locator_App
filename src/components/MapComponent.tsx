@@ -11,7 +11,7 @@ import {
   StyleSheet, 
   Platform 
 } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import { Map, Camera, GeoJSONSource, Layer, Images, Marker, type CameraRef } from '@maplibre/maplibre-react-native';
 import Svg, { Circle, Line } from 'react-native-svg';
 import { Navigation, MapPin, Compass, WifiOff, RefreshCw } from 'lucide-react-native';
 import { Masjid, Language } from '../types';
@@ -27,17 +27,26 @@ interface MapComponentProps {
   routeCoordinates?: { latitude: number; longitude: number }[];
 }
 
-const customMapStyle = [
-  {
-    featureType: "poi",
-    elementType: "labels",
-    stylers: [
-      {
-        visibility: "off"
-      }
-    ]
-  }
-];
+const osmStyle = {
+  version: 8 as 8,
+  sources: {
+    'osm-raster-tiles': {
+      type: 'raster' as const,
+      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      attribution: '© OpenStreetMap contributors',
+    },
+  },
+  layers: [
+    {
+      id: 'osm-raster-layer',
+      type: 'raster' as const,
+      source: 'osm-raster-tiles',
+      minzoom: 0,
+      maxzoom: 19,
+    },
+  ],
+};
 
 const RADAR_ANGLES = [45, 135, 230, 310];
 const RADAR_RADII = [35, 65, 85, 105];
@@ -53,40 +62,103 @@ export default function MapComponent({
   routeCoordinates,
 }: MapComponentProps) {
   const [usingOfflineRadar, setUsingOfflineRadar] = useState(false);
-  const mapRef = useRef<MapView | null>(null);
+  const cameraRef = useRef<CameraRef | null>(null);
+
+  const getBounds = (coords: { latitude: number; longitude: number }[]): [number, number, number, number] => {
+    const lats = coords.map((c) => c.latitude);
+    const lngs = coords.map((c) => c.longitude);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+    return [minLng, minLat, maxLng, maxLat];
+  };
 
   // Auto pan to selected masjid & route coordinates
   useEffect(() => {
-    if (usingOfflineRadar || !selectedMasjid || !mapRef.current) return;
+    if (usingOfflineRadar || !selectedMasjid || !cameraRef.current) return;
     
     if (routeCoordinates && routeCoordinates.length > 0) {
-      mapRef.current.fitToCoordinates(
-        routeCoordinates,
+      const bounds = getBounds(routeCoordinates);
+      cameraRef.current.fitBounds(
+        bounds,
         {
-          edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
-          animated: true,
+          padding: { top: 80, right: 80, bottom: 80, left: 80 },
+          duration: 1000,
         }
       );
     } else if (userLocation && userLocation.lat && userLocation.lng) {
-      mapRef.current.fitToCoordinates(
-        [
-          { latitude: userLocation.lat, longitude: userLocation.lng },
-          { latitude: selectedMasjid.lat, longitude: selectedMasjid.lng }
-        ],
+      const bounds = getBounds([
+        { latitude: userLocation.lat, longitude: userLocation.lng },
+        { latitude: selectedMasjid.lat, longitude: selectedMasjid.lng }
+      ]);
+      cameraRef.current.fitBounds(
+        bounds,
         {
-          edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
-          animated: true,
+          padding: { top: 80, right: 80, bottom: 80, left: 80 },
+          duration: 1000,
         }
       );
     } else {
-      mapRef.current.animateToRegion({
-        latitude: selectedMasjid.lat,
-        longitude: selectedMasjid.lng,
-        latitudeDelta: 0.02,
-        longitudeDelta: 0.02,
-      }, 1000);
+      cameraRef.current.flyTo({
+        center: [selectedMasjid.lng, selectedMasjid.lat],
+        zoom: 14.5,
+        duration: 1000,
+      });
     }
   }, [selectedMasjid, usingOfflineRadar, userLocation, routeCoordinates]);
+
+  const geojson = React.useMemo(() => {
+    return {
+      type: 'FeatureCollection' as const,
+      features: masjids.map((masjid) => {
+        const isSelected = selectedMasjid?.id === masjid.id;
+        const name = language === 'ur' ? masjid.nameUr : masjid.nameEn;
+        return {
+          type: 'Feature' as const,
+          id: masjid.id,
+          geometry: {
+            type: 'Point' as const,
+            coordinates: [masjid.lng, masjid.lat],
+          },
+          properties: {
+            id: masjid.id,
+            name: `🕌  ${name}`,
+            iconImage: isSelected ? 'marker_selected' : 'marker_normal',
+            textColor: isSelected ? '#f59e0b' : '#ffffff',
+          },
+        };
+      }),
+    };
+  }, [masjids, selectedMasjid, language]);
+
+  const routeGeojson = React.useMemo(() => {
+    if (!routeCoordinates || routeCoordinates.length === 0) return null;
+    return {
+      type: 'FeatureCollection' as const,
+      features: [
+        {
+          type: 'Feature' as const,
+          geometry: {
+            type: 'LineString' as const,
+            coordinates: routeCoordinates.map((c) => [c.longitude, c.latitude]),
+          },
+          properties: {},
+        },
+      ],
+    };
+  }, [routeCoordinates]);
+
+  const handleMarkerPress = (event: any) => {
+    const feature = event.nativeEvent.features[0];
+    if (feature && feature.properties) {
+      const pressedId = feature.properties.id;
+      const clickedMasjid = masjids.find((m) => m.id === pressedId);
+      if (clickedMasjid) {
+        onSelectMasjid(clickedMasjid);
+      }
+    }
+  };
 
   const handleToggleRadar = () => {
     setUsingOfflineRadar(!usingOfflineRadar);
@@ -103,57 +175,79 @@ export default function MapComponent({
 
       {/* Main Map Viewport */}
       {!usingOfflineRadar ? (
-        <MapView
-          ref={mapRef}
+        <Map
           style={styles.map}
-          customMapStyle={customMapStyle}
-          initialRegion={{
-            latitude: userLocation.lat,
-            longitude: userLocation.lng,
-            latitudeDelta: 0.04,
-            longitudeDelta: 0.04,
-          }}
+          mapStyle={osmStyle}
         >
+          <Camera
+            ref={cameraRef}
+            initialViewState={{
+              center: [userLocation.lng, userLocation.lat],
+              zoom: 12.5,
+            }}
+          />
+
+          <Images
+            images={{
+              marker_normal: require('../../assets/marker_normal.png'),
+              marker_selected: require('../../assets/marker_selected.png'),
+            }}
+          />
+
           {/* User Location Marker */}
-          <Marker 
-            coordinate={{ latitude: userLocation.lat, longitude: userLocation.lng }}
-            title="Your Location"
-          >
-            <View style={styles.userMarker}>
-              <View style={styles.userMarkerPulse} />
-              <View style={styles.userMarkerCore} />
-            </View>
-          </Marker>
-
-          {/* Masjid Pins */}
-          {masjids.map((masjid) => {
-            const isSelected = selectedMasjid?.id === masjid.id;
-            return (
-              <Marker
-                key={masjid.id}
-                coordinate={{ latitude: masjid.lat, longitude: masjid.lng }}
-                onPress={() => onSelectMasjid(masjid)}
-              >
-                <View style={[styles.masjidMarker, isSelected ? styles.masjidMarkerSelected : styles.masjidMarkerNormal]}>
-                  <Text style={styles.masjidMarkerEmoji}>🕌</Text>
-                  <Text style={[styles.masjidMarkerText, isSelected ? styles.masjidMarkerTextSelected : null]} numberOfLines={1}>
-                    {language === 'ur' ? masjid.nameUr : masjid.nameEn}
-                  </Text>
-                </View>
-              </Marker>
-            );
-          })}
-
-          {/* Real Route Polyline */}
-          {routeCoordinates && routeCoordinates.length > 0 && (
-            <Polyline
-              coordinates={routeCoordinates}
-              strokeColor="#3b82f6"
-              strokeWidth={4}
-            />
+          {userLocation && userLocation.lat && userLocation.lng && (
+            <Marker 
+              id="userLocation"
+              lngLat={[userLocation.lng, userLocation.lat]}
+            >
+              <View style={styles.userMarker}>
+                <View style={styles.userMarkerPulse} />
+                <View style={styles.userMarkerCore} />
+              </View>
+            </Marker>
           )}
 
-        </MapView>
+          {/* Masjid Pins Layer */}
+          <GeoJSONSource 
+            id="masjidsSource" 
+            data={geojson} 
+            onPress={handleMarkerPress}
+          >
+            <Layer
+              id="masjidsLayer"
+              type="symbol"
+              layout={{
+                'icon-image': ['get', 'iconImage'],
+                'icon-size': 1.0,
+                'icon-text-fit': 'both',
+                'icon-text-fit-padding': [6, 10, 6, 10],
+                'text-field': ['get', 'name'],
+                'text-size': 10,
+                'text-anchor': 'center',
+                'text-allow-overlap': true,
+                'icon-allow-overlap': true,
+              }}
+              paint={{
+                'text-color': ['get', 'textColor'],
+              }}
+            />
+          </GeoJSONSource>
+
+          {/* Real Route Polyline */}
+          {routeGeojson && (
+            <GeoJSONSource id="routeSource" data={routeGeojson}>
+              <Layer
+                id="routeLayer"
+                type="line"
+                paint={{
+                  'line-color': '#3b82f6',
+                  'line-width': 4,
+                }}
+              />
+            </GeoJSONSource>
+          )}
+
+        </Map>
       ) : (
         /* OFFLINE VECTOR RADAR (Using react-native-svg for vectors) */
         <View style={styles.radarContainer}>
@@ -255,13 +349,12 @@ export default function MapComponent({
           style={styles.currentLocationBtn}
           onPress={() => {
             if (onCurrentLocationPress) onCurrentLocationPress();
-            if (userLocation && mapRef.current) {
-               mapRef.current.animateToRegion({
-                 latitude: userLocation.lat,
-                 longitude: userLocation.lng,
-                 latitudeDelta: 0.02,
-                 longitudeDelta: 0.02,
-               }, 1000);
+            if (userLocation && cameraRef.current) {
+               cameraRef.current.flyTo({
+                 center: [userLocation.lng, userLocation.lat],
+                 zoom: 14.5,
+                 duration: 1000,
+               });
             }
           }}
         >
