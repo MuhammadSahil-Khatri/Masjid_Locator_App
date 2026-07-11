@@ -48,14 +48,6 @@ export default {
       "expo-asset",
       "expo-font",
       "@react-native-community/datetimepicker",
-      [
-        "@sentry/react-native/expo",
-        {
-          url: "https://sentry.io/",
-          project: "react-native",
-          organization: "sahil-khatri",
-        },
-      ],
     ],
 
     extra: {
