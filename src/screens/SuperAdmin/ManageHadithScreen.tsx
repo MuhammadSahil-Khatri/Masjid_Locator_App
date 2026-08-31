@@ -377,7 +377,7 @@ export const ManageHadithScreen: React.FC = () => {
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <BookOpen size={48} color={colors.peach} />
+              <BookOpen size={48} color={colors.primary} />
               <Text style={styles.emptyText}>
                 {searchTerm || hasActiveFilters
                   ? 'No hadith match your search or filters.'

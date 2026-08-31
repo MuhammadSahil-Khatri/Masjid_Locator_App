@@ -108,7 +108,7 @@ export const AdminPanel: React.FC = () => {
     const visibleOptions = options.filter(o => o.visible);
 
     return (
-        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.offWhite }]} edges={['top']}>
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.white }]} edges={['top']}>
             <Animated.View style={styles.container} entering={FadeIn.duration(400)}>
                 <SectionHeader title="Admin Panel" />
 

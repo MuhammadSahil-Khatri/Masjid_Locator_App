@@ -7,19 +7,24 @@ export type MainTabParamList = {
   Home: undefined;
   Hadees: undefined;
   Search: undefined;
-  Announcements: undefined;
+  Announcement: undefined;
+  Masjids: undefined;
   Favorites: undefined;
   Profile: undefined;
   Settings: undefined;
   Qibla: undefined;
+  PrayerTimes: undefined;
 };
 
 export type AppScreen = 
   | keyof MainTabParamList 
+  | 'Announcements'
   | 'Auth' 
   | 'MosqueDetails' 
+  | 'PrayerTimes'
   | 'Splash' 
   | 'Welcome'
+  | 'CategoryAnnouncements'
   | 'SuperAdminPanel'
   | 'ManageMosques'
   | 'ManageAdmins'
@@ -28,7 +33,9 @@ export type AppScreen =
   | 'ManageAnnouncements'
   | 'ManageWorshipers'
   | 'AdminPanel'
-  | 'AssignedMosque';
+  | 'AssignedMosque'
+  | 'ChangePassword'
+  | 'EditProfile';
 
 export interface NavigationProps {
   currentScreen: AppScreen;

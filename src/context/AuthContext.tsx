@@ -79,7 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(null);
         setProfile(null);
       }
-      
+
       setAuthLoading(false);
     });
 
@@ -98,7 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const signUp = useCallback(async (email: string, password: string, metadata: { name: string; phone: string; cnic: string }) => {
+  const signUp = useCallback(async (email: string, password: string, metadata: { name: string; phone: string; }) => {
     setActionLoading(true);
     try {
       const data = await authService.signUp(email, password, metadata);
@@ -112,7 +112,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return await authService.fetchCurrentUserProfile(userId);
   }, []);
 
-  const updateProfile = useCallback(async (userId: string, updates: { name?: string; phone?: string; cnic?: string }) => {
+  const updateProfile = useCallback(async (userId: string, updates: { name?: string; phone?: string; }) => {
     setActionLoading(true);
     try {
       const data = await authService.updateProfile(userId, updates);
@@ -123,7 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const updateUserMetadata = useCallback(async (metadata: { name?: string; phone?: string; cnic?: string }) => {
+  const updateUserMetadata = useCallback(async (metadata: { name?: string; phone?: string; }) => {
     setActionLoading(true);
     try {
       const data = await authService.updateUserMetadata(metadata);

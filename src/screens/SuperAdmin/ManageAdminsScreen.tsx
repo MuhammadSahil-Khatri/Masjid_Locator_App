@@ -132,8 +132,7 @@ export const ManageAdminsScreen: React.FC = () => {
         (a) =>
           a.name?.toLowerCase().includes(q) ||
           a.email?.toLowerCase().includes(q) ||
-          a.phone?.toLowerCase().includes(q) ||
-          a.cnic?.toLowerCase().includes(q)
+          a.phone?.toLowerCase().includes(q)
       );
     }
     return result;
@@ -337,7 +336,7 @@ export const ManageAdminsScreen: React.FC = () => {
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Users size={48} color={colors.peach} />
+              <Users size={48} color={colors.primary} />
               <Text style={styles.emptyText}>
                 {searchTerm
                   ? 'No results match your search.'
@@ -525,10 +524,6 @@ const AdminCard: React.FC<AdminCardProps> = ({
         {item.email ? (
           <InfoRow icon={<Mail size={13} color={colors.primary} />} label={item.email} />
         ) : null}
-        <InfoRow
-          icon={<CreditCard size={13} color={colors.primary} />}
-          label={`CNIC: ${item.cnic || 'N/A'}`}
-        />
         <InfoRow
           icon={<Phone size={13} color={colors.primary} />}
           label={`Phone: ${item.phone || 'N/A'}`}

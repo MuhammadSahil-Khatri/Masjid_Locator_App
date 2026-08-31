@@ -28,8 +28,8 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
-  // The 4 main-tab screens (other than Home) that should navigate to Home on back press
-  const MAIN_TAB_SCREENS: AppScreen[] = ['Hadees', 'Search', 'Announcements', 'Profile'];
+  // The main-tab screens (other than Home) that should navigate to Home on back press
+  const MAIN_TAB_SCREENS: string[] = ['Hadees', 'Search', 'Announcement', 'Announcements', 'Masjids', 'Profile', 'Settings'];
 
   useEffect(() => {
     const handleBackPress = () => {

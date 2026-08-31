@@ -36,14 +36,14 @@ export const Input: React.FC<InputProps> = ({
   hideLabel = false,
   keyboardType = 'default',
 }) => {
-  const currentTheme = isDark ? colors.dark : colors.light;
+  const currentTheme = colors.light;
   const isUnderline = variant === 'underline';
 
   return (
     <View style={[styles.container, style]}>
       {label && !hideLabel && (
         <Text style={[
-          styles.label, 
+          styles.label,
           { color: currentTheme.textMuted },
           isRtl && typography.alignRtl
         ]}>

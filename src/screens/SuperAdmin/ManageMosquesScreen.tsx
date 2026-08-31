@@ -662,7 +662,7 @@ export const ManageMosquesScreen: React.FC = () => {
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Building2 size={48} color={colors.peach} />
+              <Building2 size={48} color={colors.primary} />
               <Text style={styles.emptyText}>
                 {searchTerm || hasActiveFilters
                   ? 'No results match your search or filters.'

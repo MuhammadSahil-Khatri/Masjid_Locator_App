@@ -94,7 +94,7 @@ export const ManagementCard: React.FC<ManagementCardProps> = ({
         const isSuper = type === 'super_admin';
         return (
           <View style={styles.cardInfoRow}>
-            <View style={[styles.avatar, { backgroundColor: isSuper ? colors.brown : colors.peach }]}>
+            <View style={[styles.avatar, { backgroundColor: isSuper ? colors.brown : colors.primary }]}>
               <Text style={styles.avatarText} weight="bold">
                 {getInitials(item.name)}
               </Text>
@@ -253,7 +253,7 @@ export const ManagementCard: React.FC<ManagementCardProps> = ({
               </Text>
             )}
             <Text style={[styles.descText, { color: themeColors.textMuted }]} numberOfLines={1}>
-              CNIC: {item.cnic || 'N/A'} • Phone: {item.phone || 'N/A'}
+              Phone: {item.phone || 'N/A'}
             </Text>
             {item.created_at && (
               <Text style={[styles.dateText, { color: themeColors.textMuted }]}>

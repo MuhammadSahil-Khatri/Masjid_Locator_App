@@ -1,19 +1,21 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Home, BookOpenText, MapPin, Bell, User, Newspaper, Layers } from 'lucide-react-native';
 import { useApp } from '../context/AppContext';
-import { colors, spacing, typography } from '../theme';
+import { colors } from '../theme';
 import { useNavigation } from './NavigationContext';
+import { useSystemBars, getScreenBgColor } from '../hooks/useSystemBars';
 import { HomeScreen } from '../screens/Home/HomeScreen';
-import { HadeesScreen } from '../screens/Hadees/HadeesScreen';
+import { AnnouncementsScreen } from '../screens/Announcements/AnnouncementsScreen';
+import { CategoryAnnouncementsScreen } from '../screens/Announcements/CategoryAnnouncementsScreen';
 import { SearchScreen } from '../screens/Search/SearchScreen';
-import { NearestMosquesScreen } from '../screens/Announcements/NearestMosquesScreen';
-import { ProfileScreen } from '../screens/Profile/ProfileScreen';
+import { NearestMosquesScreen } from '../screens/Masjids/NearestMosquesScreen';
 import { SettingsScreen } from '../screens/Settings/SettingsScreen';
-import { MosqueDetailsScreen } from '../screens/MosqueDetails/MosqueDetailsScreen';
+import { ChangePasswordScreen } from '../screens/Settings/ChangePasswordScreen';
+import { EditProfileScreen } from '../screens/Settings/EditProfileScreen';
+import { PrayerTimesScreen } from '../screens/PrayerTimes/PrayerTimesScreen';
 import { QiblaScreen } from '../screens/Qibla/QiblaScreen';
-import { FavoritesScreen } from '../screens/Favorites/FavoritesScreen';
 import { storageService } from '../services/storageService';
+import { HadeesScreen } from '../screens/Hadees/HadeesScreen';
 
 // Super Admin Imports
 import { SuperAdminPanel } from '../screens/SuperAdmin/SuperAdminPanel';
@@ -25,11 +27,17 @@ import { ManageAnnouncementsScreen } from '../screens/SuperAdmin/ManageAnnouncem
 import { ManageWorshipersScreen } from '../screens/SuperAdmin/ManageWorshipersScreen';
 import { AdminPanel } from '../screens/SuperAdmin/AdminPanel.tsx';
 import { AssignedMosqueScreen } from '../screens/SuperAdmin/AssignedMosqueScreen';
+import { LinearGradient } from 'expo-linear-gradient';
+import { HomeIcon, AnnouncementIcon, MapIcon, MasjidIcon, ProfileIcon } from './NavbarIcons';
 
 export const MainNavigator: React.FC = () => {
   const { currentScreen, navigate } = useNavigation();
   const { highContrast: isDark, isRtl, translations } = useApp();
-  const currentTheme = isDark ? colors.dark : colors.light;
+  const currentTheme = colors.light;
+
+  // Synchronize status bar and Android navigation bar with the active screen background
+  const activeBgColor = getScreenBgColor(currentScreen, isDark);
+  useSystemBars(activeBgColor);
 
   // Hydrate storageService at app start
   React.useEffect(() => {
@@ -43,20 +51,21 @@ export const MainNavigator: React.FC = () => {
         return <HomeScreen />;
       case 'Hadees':
         return <HadeesScreen />;
+      case 'Announcement':
+      case 'Announcements':
+        return <AnnouncementsScreen />;
+      case 'CategoryAnnouncements':
+        return <CategoryAnnouncementsScreen />;
       case 'Search':
         return <SearchScreen />;
-      case 'Announcements':
+      case 'Masjids':
         return <NearestMosquesScreen />;
-      case 'Profile':
-        return <ProfileScreen />;
       case 'Settings':
         return <SettingsScreen />;
-      case 'MosqueDetails':
-        return <MosqueDetailsScreen />;
+      case 'PrayerTimes':
+        return <PrayerTimesScreen />;
       case 'Qibla':
         return <QiblaScreen />;
-      case 'Favorites':
-        return <FavoritesScreen />;
       case 'SuperAdminPanel':
         return <SuperAdminPanel />;
       case 'ManageMosques':
@@ -75,19 +84,47 @@ export const MainNavigator: React.FC = () => {
         return <AdminPanel />;
       case 'AssignedMosque':
         return <AssignedMosqueScreen />;
+      case 'ChangePassword':
+        return <ChangePasswordScreen />;
+      case 'EditProfile':
+        return <EditProfileScreen />;
       default:
         return <HomeScreen />;
     }
   };
 
   const navItems = [
-    { key: 'Home' as const, label: isRtl ? 'ہوم' : 'Home', icon: Home },
-    { key: 'Hadees' as const, label: isRtl ? 'اپ ڈیٹس' : 'Updates', icon: Newspaper },
-    { key: 'Search' as const, label: isRtl ? 'نقشہ' : 'Map', icon: MapPin },
-    { key: 'Announcements' as const, label: isRtl ? 'مساجد' : 'Mosjids', icon: Layers },
-    { key: 'Profile' as const, label: isRtl ? 'ترتیبات' : 'Settings', icon: User },
+    {
+      key: 'Home' as const,
+      label: isRtl ? 'ہوم' : 'Home',
+      Icon: HomeIcon,
+      iconSize: 20,
+    },
+    {
+      key: 'Announcement' as const,
+      label: isRtl ? 'اعلانات' : 'Announcement',
+      Icon: AnnouncementIcon,
+      iconSize: 22,
+    },
+    {
+      key: 'Search' as const,
+      label: isRtl ? 'نقشہ' : 'Map',
+      Icon: MapIcon,
+      iconSize: 20,
+    },
+    {
+      key: 'Masjids' as const,
+      label: isRtl ? 'مساجد' : 'Masjid',
+      Icon: MasjidIcon,
+      iconSize: 20,
+    },
+    {
+      key: 'Settings' as const,
+      label: isRtl ? 'ترتیبات' : 'Setting',
+      Icon: ProfileIcon,
+      iconSize: 20,
+    },
   ];
-
 
   const showBottomBar = ![
     'SuperAdminPanel',
@@ -108,37 +145,53 @@ export const MainNavigator: React.FC = () => {
         {renderScreen()}
       </View>
 
-      {/* Bottom Nav Bar (at least 44px touch targets) */}
+      {/* Bottom Nav Bar */}
       {showBottomBar && (
         <View style={[
           styles.bottomBar,
           {
-            backgroundColor: colors.light.background,
-            borderTopColor: colors.light.navBorder
+            backgroundColor: currentTheme.navBg,
+            borderTopColor: '#0081A0',
           },
-          isRtl && styles.rowReverse
         ]}>
           {navItems.map((item) => {
-            const isActive = currentScreen === item.key;
+            const isActive =
+              currentScreen === item.key ||
+              (item.key === 'Announcement' && currentScreen === 'CategoryAnnouncements');
+            const iconColor = isActive ? '#FFFFFF' : '#1D3B6D';
+
+            if (isActive) {
+              return (
+                <TouchableOpacity
+                  key={item.key}
+                  style={styles.tabBtnActive}
+                  onPress={() => navigate(item.key)}
+                  activeOpacity={0.85}
+                >
+                  <LinearGradient
+                    colors={colors.gradients.cyan as [string, string]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.activeGradient}
+                  >
+                    <item.Icon size={item.iconSize} color={iconColor} isActive={true} />
+                    <Text style={styles.tabLabelActive} numberOfLines={1}>
+                      {item.label}
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              );
+            }
 
             return (
               <TouchableOpacity
                 key={item.key}
                 style={styles.tabBtn}
                 onPress={() => navigate(item.key)}
-                activeOpacity={0.8}
+                activeOpacity={0.7}
               >
-                <item.icon
-                  size={22}
-                  color={isActive ? colors.primary : colors.light.textMuted}
-                />
-                <Text
-                  style={[
-                    styles.tabLabel,
-                    { color: isActive ? colors.primary : colors.light.textMuted }
-                  ]}
-                  numberOfLines={1}
-                >
+                <item.Icon size={item.iconSize} color={iconColor} isActive={false} />
+                <Text style={[styles.tabLabel, { color: '#1D3B6D' }]} numberOfLines={1}>
                   {item.label}
                 </Text>
               </TouchableOpacity>
@@ -159,28 +212,51 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   bottomBar: {
-    height: 60,
-    borderTopWidth: 1,
+    height: 74,
+    borderTopWidth: 2,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    paddingHorizontal: 4,
+    elevation: 12,
+    shadowColor: '#0081A0',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
   },
   tabBtn: {
     flex: 1,
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.xs,
+    gap: 4,
+  },
+  tabBtnActive: {
+    flex: 1,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeGradient: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 25,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    gap: 4,
+    minWidth: 68,
   },
   tabLabel: {
-    fontSize: 9,
-    fontWeight: 'bold',
-    marginTop: 3,
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
+    letterSpacing: 0.1,
+  },
+  tabLabelActive: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: 0.1,
   },
   rowReverse: {
     flexDirection: 'row-reverse',

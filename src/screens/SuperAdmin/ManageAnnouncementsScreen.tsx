@@ -504,7 +504,7 @@ export const ManageAnnouncementsScreen: React.FC = () => {
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Bell size={48} color={colors.peach} />
+              <Bell size={48} color={colors.primary} />
               <Text style={styles.emptyText}>
                 {searchTerm || hasActiveFilters
                   ? 'No announcements match your search or filters.'

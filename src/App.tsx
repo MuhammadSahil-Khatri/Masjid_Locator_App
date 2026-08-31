@@ -5,7 +5,6 @@
 
 import React from 'react';
 import {
-  StatusBar,
   StyleSheet,
   View
 } from 'react-native';
@@ -38,9 +37,11 @@ import { colors, spacing, typography } from './theme';
 const queryClient = new QueryClient();
 
 function AppMain() {
+  const { highContrast: isDark } = useApp();
+  const safeAreaBg = colors.light.background;
+
   return (
-    <SafeAreaView style={[styles.safeArea, styles.lightBg]}>
-      <StatusBar barStyle="dark-content" backgroundColor={styles.lightBg.backgroundColor} />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: safeAreaBg }]}>
       <View style={styles.container}>
         <RootNavigator />
       </View>

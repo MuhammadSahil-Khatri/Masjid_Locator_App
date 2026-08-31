@@ -4,626 +4,485 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Share,
-  Clipboard,
-  Modal,
+  ImageBackground,
+  Platform,
+  StatusBar,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path, Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { Text } from '../../components/ui/Text';
-import { Copy, Share2, BookOpen, Quote, Bell, AlertCircle, ArrowLeft, RefreshCw } from 'lucide-react-native';
+import { colors } from '../../theme';
+import { useNavigation } from '../../navigation/NavigationContext';
 import { useApp } from '../../context/AppContext';
-import { colors, spacing, typography } from '../../theme';
 import { hadithService, Hadith } from '../../services/hadithService';
-import { announcementService, Announcement } from '../../services/announcementService';
-import { CacheService } from '../../services/cacheService';
+import { typography } from '../../theme/typography';
 
-export const HadeesScreen: React.FC = () => {
-  const {
-    highContrast: isDark,
-    isRtl,
-    translations,
-    triggerToast,
-  } = useApp();
+// ─── Icons ───────────────────────────────────────────────────────────────────
+const BackArrowIcon = ({ color = '#1D3B6D', size = 14 }: { color?: string; size?: number }) => (
+  <Svg width={size} height={size * (21 / 13)} viewBox="0 0 13 21" fill="none">
+    <Path d="M12 20L1 10.5L12 1" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
 
-  const currentTheme = isDark ? colors.dark : colors.light;
-  const [activeTab, setActiveTab] = useState<'hadees' | 'announcements'>('hadees');
-  const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
+const TranslateIcon = ({ color = '#03BECD', size = 15 }: { color?: string; size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M3 5H21M9 3V5M11.5 13L9.5 11M20.5 21L15.5 11L10.5 21M12.5 17H18.5"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path
+      d="M5 5C5.5 9.5 8 12 12 14"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <Path
+      d="M9 5C9 7 7.5 9.5 5 11"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+  </Svg>
+);
 
-  // ── Hadith State ──
-  const [hadithList, setHadithList] = useState<Hadith[]>(() => {
-    const cached = CacheService.getHadith(true);
-    return cached || [];
-  });
-  const [hadithLoading, setHadithLoading] = useState(() => {
-    if (CacheService.isHadithWarmed()) return false;
-    const cached = CacheService.getHadith(true);
-    return !cached || cached.length === 0;
-  });
-  const [hadithError, setHadithError] = useState<string | null>(null);
+const DividerSvg = () => (
+  <Svg width="100%" height={29} viewBox="0 0 377 29" style={{ alignSelf: 'center', marginVertical: 4 }}>
+    <Path
+      d="M188.302 20.588C188.199 19.9813 187.928 19.328 187.49 18.628C187.051 17.9187 186.426 17.2607 185.614 16.654C184.811 16.0473 184.008 15.66 183.206 15.492V14.904C183.999 14.7173 184.76 14.372 185.488 13.868C186.225 13.3547 186.841 12.7387 187.336 12.02C187.84 11.2827 188.162 10.5547 188.302 9.836H188.89C188.974 10.3027 189.142 10.7833 189.394 11.278C189.646 11.7633 189.968 12.23 190.36 12.678C190.761 13.1167 191.209 13.5133 191.704 13.868C192.441 14.3907 193.192 14.736 193.958 14.904V15.492C193.444 15.5947 192.912 15.8047 192.362 16.122C191.82 16.4393 191.316 16.8173 190.85 17.256C190.383 17.6853 190 18.138 189.702 18.614C189.263 19.314 188.992 19.972 188.89 20.588H188.302Z"
+      fill="#C79A5A"
+    />
+    <Defs>
+      <LinearGradient id="lg0" x1="30" y1="14.5" x2="170.492" y2="14.5" gradientUnits="userSpaceOnUse">
+        <Stop stopColor="#C79A5A" stopOpacity="0" />
+        <Stop offset="0.5" stopColor="#C79A5A" stopOpacity="0.333" />
+        <Stop offset="1" stopColor="#C79A5A" stopOpacity="0" />
+      </LinearGradient>
+      <LinearGradient id="lg1" x1="348" y1="14.5" x2="207.492" y2="14.5" gradientUnits="userSpaceOnUse">
+        <Stop stopColor="#C79A5A" stopOpacity="0" />
+        <Stop offset="0.5" stopColor="#C79A5A" stopOpacity="0.333" />
+        <Stop offset="1" stopColor="#C79A5A" stopOpacity="0" />
+      </LinearGradient>
+    </Defs>
+    <Path d="M30 14.497H170.492" stroke="url(#lg0)" strokeWidth="0.994" />
+    <Path d="M207.492 14.497H348" stroke="url(#lg1)" strokeWidth="0.994" />
+  </Svg>
+);
 
-  // ── Announcements State ──
-  const [announcementList, setAnnouncementList] = useState<Announcement[]>(() => {
-    const cached = CacheService.getAnnouncements(true);
-    return cached || [];
-  });
-  const [annLoading, setAnnLoading] = useState(() => {
-    if (CacheService.isAnnouncementsWarmed()) return false;
-    const cached = CacheService.getAnnouncements(true);
-    return !cached || cached.length === 0;
-  });
-  const [annError, setAnnError] = useState<string | null>(null);
+// ─── Hadith Card ──────────────────────────────────────────────────────────────
+interface HadithCardProps {
+  hadith: Hadith;
+  isRtl: boolean;
+}
 
-  const [refreshing, setRefreshing] = useState(false);
-
-  // ── Fetch Functions ──
-  const loadHadith = useCallback(async (force = false) => {
-    if (!force && CacheService.isHadithWarmed()) {
-      return;
-    }
-
-    const hasCache = (CacheService.getHadith(true) || []).length > 0;
-    const isExpired = CacheService.isHadithExpired();
-
-    if (!force && hasCache && !isExpired) {
-      const cached = CacheService.getHadith(true);
-      if (cached) {
-        CacheService.setHadith(cached);
-      }
-      return;
-    }
-
-    try {
-      if (!hasCache) {
-        setHadithLoading(true);
-      }
-      setHadithError(null);
-      const data = await hadithService.fetchPublicHadith();
-      CacheService.setHadith(data);
-      setHadithList(data);
-    } catch (e: any) {
-      console.warn('[HadeesScreen] Hadith fetch failed:', e);
-      if (!hasCache) {
-        setHadithError(e?.message || 'Failed to load hadith');
-      }
-    } finally {
-      setHadithLoading(false);
-    }
-  }, []);
-
-  const loadAnnouncements = useCallback(async (force = false) => {
-    if (!force && CacheService.isAnnouncementsWarmed()) {
-      return;
-    }
-
-    const hasCache = (CacheService.getAnnouncements(true) || []).length > 0;
-    const isExpired = CacheService.isAnnouncementsExpired();
-
-    if (!force && hasCache && !isExpired) {
-      const cached = CacheService.getAnnouncements(true);
-      if (cached) {
-        CacheService.setAnnouncements(cached);
-      }
-      return;
-    }
-
-    try {
-      if (!hasCache) {
-        setAnnLoading(true);
-      }
-      setAnnError(null);
-      const data = await announcementService.fetchPublicAnnouncements();
-      CacheService.setAnnouncements(data);
-      setAnnouncementList(data);
-    } catch (e: any) {
-      console.warn('[HadeesScreen] Announcements fetch failed:', e);
-      if (!hasCache) {
-        setAnnError(e?.message || 'Failed to load announcements');
-      }
-    } finally {
-      setAnnLoading(false);
-    }
-  }, []);
+const HadithCard = ({ hadith, isRtl }: HadithCardProps) => {
+  const [showEnglish, setShowEnglish] = useState(!isRtl);
 
   useEffect(() => {
-    loadHadith();
-    loadAnnouncements();
-  }, [loadHadith, loadAnnouncements]);
+    setShowEnglish(!isRtl);
+  }, [isRtl]);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await Promise.all([loadHadith(true), loadAnnouncements(true)]);
-    setRefreshing(false);
-  }, [loadHadith, loadAnnouncements]);
+  const formattedDate = hadith.created_at
+    ? new Date(hadith.created_at).toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    })
+    : '';
 
-  // ── Hadith Actions ──
-  const handleShareHadees = async (text: string, ref: string) => {
-    try {
-      await Share.share({ message: `"${text}"\n\nReference: ${ref}` });
-    } catch {
-      triggerToast('Error sharing Hadees');
-    }
-  };
-
-  const handleCopyHadees = (textAr: string, textEn: string, ref: string) => {
-    Clipboard.setString(`${textAr}\n\n${textEn}\n\nReference: ${ref}`);
-    triggerToast(translations.copiedText || 'Copied to clipboard!');
-  };
-
-  // ── Render Hadith Card ──
-  const renderHadithCard = (item: Hadith) => (
-    <View
-      key={item.id}
-      style={[
-        styles.hadithCard,
-        {
-          backgroundColor: currentTheme.card,
-          borderColor: currentTheme.border,
-          borderWidth: 1,
-        },
-      ]}
-    >
-      <View style={[styles.hadithHeader, isRtl && styles.rowReverse]}>
-        <Quote size={18} color={colors.primary} />
-        <Text style={[styles.hadithRefLabel, { color: currentTheme.textMuted }]}>
-          {item.reference}
-        </Text>
-      </View>
-
-      <Text style={styles.arabicHadith}>{item.arabic_text}</Text>
-      <View style={[styles.cardDivider, { backgroundColor: currentTheme.border }]} />
-      <Text style={[styles.translationHadith, { color: currentTheme.text }, isRtl && typography.alignRtl]}>
-        {isRtl ? item.urdu_translation : item.english_translation}
-      </Text>
-
-      <Text style={[styles.hadithRef, { color: currentTheme.textMuted }, isRtl && typography.alignRtl]}>
-        📌 {translations.reference || 'Reference'}: {item.reference}
-      </Text>
-
-      <View style={[styles.hadithActionsRow, isRtl && styles.rowReverse]}>
-        <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: colors.primaryLight }]}
-          onPress={() => handleCopyHadees(item.arabic_text, isRtl ? item.urdu_translation : item.english_translation, item.reference)}
-        >
-          <Copy size={14} color={colors.primary} />
-          <Text style={[styles.actionBtnText, { color: colors.primary }]}>
-            {isRtl ? 'کاپی' : 'Copy'}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: colors.primaryLight }]}
-          onPress={() => handleShareHadees(isRtl ? item.urdu_translation : item.english_translation, item.reference)}
-        >
-          <Share2 size={14} color={colors.primary} />
-          <Text style={[styles.actionBtnText, { color: colors.primary }]}>
-            {isRtl ? 'شیئر' : 'Share'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  // ── Render Announcement Card ──
-  const renderAnnouncementCard = (ann: Announcement) => {
-    const dateLabel = ann.event_date
-      ? new Date(ann.event_date).toLocaleDateString(isRtl ? 'ur-PK' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })
-      : new Date(ann.created_at).toLocaleDateString(isRtl ? 'ur-PK' : 'en-US', { day: 'numeric', month: 'short' });
-
-    return (
-      <View
-        key={ann.id}
-        style={[
-          styles.announcementCard,
-          {
-            backgroundColor: currentTheme.card,
-            borderColor: currentTheme.border,
-          },
-        ]}
-      >
-        <View style={[styles.announcementHeader, isRtl && styles.rowReverse]}>
-          <Text style={[styles.announcementMasjid, { color: colors.primary }]}>
-            🕌 {ann.mosque_name || 'Masjid'}
-          </Text>
-          <Text style={[styles.announcementDate, { color: currentTheme.textMuted }]}>
-            {dateLabel}
-          </Text>
-        </View>
-
-        {ann.category_name && (
-          <View style={styles.categoryBadge}>
-            <Text style={styles.categoryBadgeText}>{ann.category_name}</Text>
-          </View>
-        )}
-
-        <Text
-          numberOfLines={2}
-          style={[styles.announcementTitle, { color: currentTheme.text }, isRtl && typography.alignRtl]}
-        >
-          {ann.title}
-        </Text>
-
-        <Text
-          numberOfLines={3}
-          style={[styles.announcementContent, { color: currentTheme.textMuted }, isRtl && typography.alignRtl]}
-        >
-          {ann.description}
-        </Text>
-
-        <View style={[styles.announcementFooter, isRtl && styles.rowReverse]}>
-          <TouchableOpacity
-            style={[styles.readMoreBtn, { borderColor: colors.primaryBorder }]}
-            onPress={() => setSelectedAnnouncement(ann)}
-          >
-            <Text style={styles.readMoreText}>
-              {isRtl ? 'مزید پڑھیں' : 'Read Details'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
+  const translationText = showEnglish
+    ? (hadith.english_translation || hadith.urdu_translation)
+    : (hadith.urdu_translation || hadith.english_translation);
 
   return (
-    <View style={[styles.container, { backgroundColor: currentTheme.background }]}>
-      {/* ── Segmented Tab Header ── */}
-      <View style={[styles.tabBar, { backgroundColor: currentTheme.card, borderBottomColor: currentTheme.border }]}>
-        <TouchableOpacity
-          style={[styles.tabItem, activeTab === 'hadees' && styles.activeTabItem]}
-          onPress={() => setActiveTab('hadees')}
-        >
-          <BookOpen size={18} color={activeTab === 'hadees' ? colors.primary : currentTheme.textMuted} />
-          <Text style={[styles.tabText, { color: activeTab === 'hadees' ? colors.primary : currentTheme.textMuted }]}>
-            {isRtl ? 'احادیث' : 'Hadees'}
-          </Text>
-        </TouchableOpacity>
+    <View style={styles.hadithCard}>
+      {/* Arabic Text */}
+      <Text style={styles.arabicText}>
+        {hadith.arabic_text}
+      </Text>
 
-        <TouchableOpacity
-          style={[styles.tabItem, activeTab === 'announcements' && styles.activeTabItem]}
-          onPress={() => setActiveTab('announcements')}
-        >
-          <Bell size={18} color={activeTab === 'announcements' ? colors.primary : currentTheme.textMuted} />
-          <Text style={[styles.tabText, { color: activeTab === 'announcements' ? colors.primary : currentTheme.textMuted }]}>
-            {isRtl ? 'اعلانات' : 'Announcements'}
-          </Text>
-        </TouchableOpacity>
+      <DividerSvg />
+
+      {/* Urdu / English Translation */}
+      <Text style={[showEnglish ? styles.translationTextEnglish : styles.translationTextUrdu, isRtl && styles.textRtl]}>
+        {translationText}
+      </Text>
+
+
+      <View style={styles.lineBreaker} />
+      {/* Footer Row */}
+      <View style={[styles.cardFooter, isRtl && styles.rowReverse]}>
+        {/* Date + Reference */}
+        <View style={[styles.footerLeft, isRtl && styles.rowReverse]}>
+          {formattedDate ? (
+            <Text style={styles.footerDate}>{formattedDate}</Text>
+          ) : null}
+          {hadith.reference ? (
+            <Text style={styles.footerReference}>{hadith.reference}</Text>
+          ) : null}
+        </View>
+
+        {/* Actions */}
+        {(!!hadith.english_translation || !!hadith.urdu_translation) && (
+          <View style={[styles.footerActions, isRtl && styles.alignRight]}>
+            {/* Translate Toggle */}
+            <TouchableOpacity
+              style={styles.translateBtn}
+              onPress={() => setShowEnglish((prev) => !prev)}
+              activeOpacity={0.7}
+              accessibilityLabel={showEnglish ? 'Show Urdu' : 'Translate to English'}
+            >
+              <Text style={[styles.translateBtnText, showEnglish && styles.translateBtnActive]}>
+                {showEnglish ? 'اردو میں ترجمہ' : '> translate into English'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
-
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
-      >
-
-        {/* ── HADEES TAB ── */}
-        {activeTab === 'hadees' && (
-          <View>
-            {hadithLoading && hadithList.length === 0 ? (
-              <View style={styles.centeredState}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={[styles.stateText, { color: currentTheme.textMuted }]}>
-                  {isRtl ? 'احادیث لوڈ ہو رہی ہیں…' : 'Loading hadith…'}
-                </Text>
-              </View>
-            ) : hadithError ? (
-              <View style={[styles.errorCard, { backgroundColor: currentTheme.card, borderColor: currentTheme.border }]}>
-                <AlertCircle size={36} color={colors.danger} />
-                <Text style={[styles.stateText, { color: colors.danger }]}>{hadithError}</Text>
-                <TouchableOpacity style={[styles.retryBtn, { backgroundColor: colors.primaryLight }]} onPress={() => loadHadith(true)}>
-                  <RefreshCw size={14} color={colors.primary} />
-                  <Text style={[styles.retryBtnText, { color: colors.primary }]}>Retry</Text>
-                </TouchableOpacity>
-              </View>
-            ) : hadithList.length === 0 ? (
-              <View style={[styles.emptyCard, { backgroundColor: currentTheme.card, borderColor: currentTheme.border }]}>
-                <BookOpen size={48} color={currentTheme.textMuted} style={styles.emptyIcon} />
-                <Text style={[styles.emptyText, { color: currentTheme.textMuted }]}>
-                  {isRtl ? 'کوئی حدیث دستیاب نہیں' : 'No hadith available'}
-                </Text>
-              </View>
-            ) : (
-              hadithList.map((item) => (
-                <View key={item.id} style={{ marginBottom: spacing.md }}>
-                  {renderHadithCard(item)}
-                </View>
-              ))
-            )}
-          </View>
-        )}
-
-        {/* ── ANNOUNCEMENTS TAB ── */}
-        {activeTab === 'announcements' && (
-          <View>
-            {annLoading && announcementList.length === 0 ? (
-              <View style={styles.centeredState}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={[styles.stateText, { color: currentTheme.textMuted }]}>
-                  {isRtl ? 'اعلانات لوڈ ہو رہے ہیں…' : 'Loading announcements…'}
-                </Text>
-              </View>
-            ) : annError ? (
-              <View style={[styles.errorCard, { backgroundColor: currentTheme.card, borderColor: currentTheme.border }]}>
-                <AlertCircle size={36} color={colors.danger} />
-                <Text style={[styles.stateText, { color: colors.danger }]}>{annError}</Text>
-                <TouchableOpacity style={[styles.retryBtn, { backgroundColor: colors.primaryLight }]} onPress={() => loadAnnouncements(true)}>
-                  <RefreshCw size={14} color={colors.primary} />
-                  <Text style={[styles.retryBtnText, { color: colors.primary }]}>Retry</Text>
-                </TouchableOpacity>
-              </View>
-            ) : announcementList.length === 0 ? (
-              <View style={[styles.emptyCard, { backgroundColor: currentTheme.card, borderColor: currentTheme.border }]}>
-                <Bell size={48} color={currentTheme.textMuted} style={styles.emptyIcon} />
-                <Text style={[styles.emptyText, { color: currentTheme.textMuted }]}>
-                  {isRtl ? 'اس وقت کوئی اعلانات دستیاب نہیں ہیں۔' : 'No announcements available at this time.'}
-                </Text>
-              </View>
-            ) : (
-              announcementList.map((ann) => renderAnnouncementCard(ann))
-            )}
-          </View>
-        )}
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
-
-      {/* ── Announcement Detail Modal ── */}
-      {selectedAnnouncement && (
-        <Modal
-          animationType="slide"
-          transparent
-          visible={!!selectedAnnouncement}
-          onRequestClose={() => setSelectedAnnouncement(null)}
-        >
-          <View style={styles.modalBackdrop}>
-            <View style={[styles.modalCard, { backgroundColor: currentTheme.surface }]}>
-              <View style={[styles.modalHeader, isRtl && styles.rowReverse]}>
-                <TouchableOpacity onPress={() => setSelectedAnnouncement(null)}>
-                  <ArrowLeft size={24} color={currentTheme.text} />
-                </TouchableOpacity>
-                <Text style={[styles.modalHeaderTitle, { color: currentTheme.text }]}>
-                  {isRtl ? 'اعلان کی تفصیل' : 'Announcement Detail'}
-                </Text>
-                <View style={{ width: 24 }} />
-              </View>
-
-              <ScrollView style={styles.modalScrollContent}>
-                <Text style={[styles.modalMasjid, { color: colors.primary }]}>
-                  🕌 {selectedAnnouncement.mosque_name || 'Masjid'}
-                </Text>
-
-                {selectedAnnouncement.category_name && (
-                  <View style={[styles.categoryBadge, { marginBottom: spacing.sm }]}>
-                    <Text style={styles.categoryBadgeText}>{selectedAnnouncement.category_name}</Text>
-                  </View>
-                )}
-
-                {selectedAnnouncement.event_date && (
-                  <Text style={[styles.modalDate, { color: currentTheme.textMuted }]}>
-                    📅 {isRtl ? 'تاریخ:' : 'Date:'}{' '}
-                    {new Date(selectedAnnouncement.event_date).toLocaleDateString(isRtl ? 'ur-PK' : 'en-US', {
-                      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-                    })}
-                    {selectedAnnouncement.event_time && ` · ${selectedAnnouncement.event_time}`}
-                  </Text>
-                )}
-
-                <View style={[styles.cardDivider, { backgroundColor: currentTheme.border }]} />
-
-                <Text style={[styles.modalTitleText, { color: currentTheme.text }, isRtl && typography.alignRtl]}>
-                  {selectedAnnouncement.title}
-                </Text>
-
-                <Text style={[styles.modalBodyText, { color: currentTheme.text }, isRtl && typography.alignRtl]}>
-                  {selectedAnnouncement.description}
-                </Text>
-              </ScrollView>
-
-              <View style={styles.modalFooter}>
-                <TouchableOpacity
-                  style={[styles.closeBtn, { borderColor: currentTheme.border }]}
-                  onPress={() => setSelectedAnnouncement(null)}
-                >
-                  <Text style={[styles.closeBtnText, { color: currentTheme.text }]}>
-                    {isRtl ? 'بند کریں' : 'Close'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
     </View>
   );
 };
 
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+export const HadeesScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
+  const { goBack } = useNavigation();
+  const { isRtl, triggerToast } = useApp();
 
+  const [hadiths, setHadiths] = useState<Hadith[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    setError(null);
+    try {
+      const data = await hadithService.fetchPublicHadith();
+      setHadiths(data);
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to load Ahadees';
+      setError(msg);
+      triggerToast(msg);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [triggerToast]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchData(true);
+  }, [fetchData]);
+
+  return (
+    <ImageBackground
+      source={require('../../../assets/background_image_vertical.png')}
+      style={styles.container}
+      imageStyle={styles.backgroundImageStyle}
+      resizeMode="stretch"
+    >
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
+      {/* ── Floating Pill Header ── */}
+      <View style={[styles.headerWrapper, { paddingTop: Math.max(insets.top - 20, 16) }]}>
+        <View style={styles.pillContainer}>
+          <TouchableOpacity
+            style={styles.pillActionBtn}
+            activeOpacity={0.7}
+            onPress={goBack}
+            accessibilityLabel="Go Back"
+          >
+            <BackArrowIcon size={14} color="#1D3B6D" />
+          </TouchableOpacity>
+
+          <Text style={styles.pillTitle}>{isRtl ? 'احادیث' : 'Ahadees'}</Text>
+
+          <View style={styles.pillActionPlaceholder} />
+        </View>
+      </View>
+
+      {/* ── Main White Rounded Container ── */}
+      <View style={styles.mainContainer}>
+        {loading ? (
+          <View style={styles.centeredState}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.stateText}>{isRtl ? 'لوڈ ہو رہا ہے...' : 'Loading Ahadees...'}</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.centeredState}>
+            <Text style={styles.errorText}>⚠️</Text>
+            <Text style={styles.stateText}>{error}</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => fetchData()} activeOpacity={0.8}>
+              <Text style={styles.retryBtnText}>{isRtl ? 'دوبارہ کوشش کریں' : 'Retry'}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : hadiths.length === 0 ? (
+          <View style={styles.centeredState}>
+            <Text style={styles.errorText}>📖</Text>
+            <Text style={styles.stateText}>{isRtl ? 'کوئی حدیث دستیاب نہیں' : 'No Ahadees available'}</Text>
+          </View>
+        ) : (
+          <ScrollView
+            style={styles.scrollList}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: Math.max(insets.bottom, 20) + 80 },
+            ]}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[colors.primary]}
+                tintColor={colors.primary}
+              />
+            }
+          >
+            {hadiths.map((hadith, index) => (
+              <HadithCard
+                key={hadith.id || index}
+                hadith={hadith}
+                isRtl={isRtl}
+              />
+            ))}
+          </ScrollView>
+        )}
+      </View>
+    </ImageBackground>
+  );
+};
+
+export default HadeesScreen;
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  tabBar: {
-    flexDirection: 'row',
-    height: 50,
-    borderBottomWidth: 1,
-  },
-  tabItem: {
+  container: {
     flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  backgroundImageStyle: {
+    width: '100%',
+    height: '100%',
+  },
+
+  // ── Header ──
+  headerWrapper: {
+    paddingBottom: 12,
+  },
+  pillContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  activeTabItem: { borderBottomColor: colors.primary },
-  tabText: { fontSize: typography.sizes.sm, fontWeight: 'bold' },
-  scrollContent: { padding: spacing.md },
-  sectionTitle: {
-    fontSize: typography.sizes.sm + 1,
-    fontWeight: typography.weights.bold,
-    marginBottom: spacing.sm,
-  },
-  hadithCard: {
-    borderRadius: spacing.borderRadiusLg,
-    borderWidth: 1,
-    padding: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  hadithHeader: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  hadithRefLabel: { fontSize: typography.sizes.xs, fontWeight: '600', flex: 1, textAlign: 'right', marginLeft: spacing.sm },
-  arabicHadith: {
-    fontSize: typography.sizes.base,
-    fontWeight: '500',
-    color: colors.primary,
-    textAlign: 'center',
-    lineHeight: 28,
-    marginVertical: spacing.sm,
-  },
-  cardDivider: { height: 1, marginVertical: spacing.sm, opacity: 0.12 },
-  translationHadith: {
-    fontSize: typography.sizes.xs + 1,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: spacing.sm,
-  },
-  hadithRef: { fontSize: typography.sizes.xs - 1, fontStyle: 'italic', marginBottom: spacing.sm },
-  hadithActionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: spacing.sm,
-    marginTop: spacing.xs,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: spacing.borderRadiusRound,
-  },
-  actionBtnText: { fontSize: typography.sizes.xs, fontWeight: typography.weights.bold },
-  announcementCard: {
-    borderRadius: spacing.borderRadiusLg,
-    borderWidth: 1,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  announcementHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  announcementMasjid: { fontSize: typography.sizes.xs, fontWeight: typography.weights.bold },
-  announcementDate: { fontSize: typography.sizes.xs - 1 },
-  categoryBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.primaryLight,
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    marginBottom: spacing.xs,
-  },
-  categoryBadgeText: { color: colors.primary, fontSize: 9, fontWeight: 'bold' },
-  announcementTitle: {
-    fontSize: typography.sizes.sm + 1,
-    fontWeight: typography.weights.bold,
-    marginBottom: spacing.xs,
-  },
-  announcementContent: {
-    fontSize: typography.sizes.xs + 1,
-    lineHeight: 18,
-    marginBottom: spacing.sm,
-  },
-  announcementFooter: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-  },
-  readMoreBtn: {
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: spacing.borderRadiusRound,
-    borderWidth: 1,
-  },
-  readMoreText: { color: colors.primary, fontSize: typography.sizes.xs, fontWeight: typography.weights.bold },
-  centeredState: { alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.xl, gap: spacing.md },
-  stateText: { fontSize: typography.sizes.sm, textAlign: 'center' },
-  errorCard: {
-    borderRadius: spacing.borderRadiusLg,
-    borderWidth: 1,
-    padding: spacing.xl,
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-  },
-  retryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 7,
-    paddingHorizontal: 16,
-    borderRadius: spacing.borderRadiusRound,
-  },
-  retryBtnText: { fontSize: typography.sizes.xs, fontWeight: 'bold' },
-  emptyCard: {
-    borderRadius: spacing.borderRadiusLg,
-    borderWidth: 1,
-    padding: spacing.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.xl,
-  },
-  emptyIcon: { marginBottom: spacing.md },
-  emptyText: { fontSize: typography.sizes.sm, textAlign: 'center' },
-  // Modal
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalCard: { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%', paddingBottom: spacing.lg },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(148, 163, 184, 0.15)',
-  },
-  modalHeaderTitle: { fontSize: typography.sizes.md, fontWeight: typography.weights.bold },
-  modalScrollContent: { padding: spacing.lg },
-  modalMasjid: { fontSize: typography.sizes.sm, fontWeight: typography.weights.bold, marginBottom: 4 },
-  modalDate: { fontSize: typography.sizes.xs, marginBottom: spacing.sm },
-  modalTitleText: {
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.bold,
-    marginBottom: spacing.md,
-    lineHeight: 24,
-  },
-  modalBodyText: { fontSize: typography.sizes.sm + 1, lineHeight: 22, marginBottom: spacing.xl },
-  modalFooter: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-    marginTop: spacing.md,
-  },
-  closeBtn: {
-    flex: 1,
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 50,
     height: 48,
     borderRadius: 24,
-    borderWidth: 1,
+    paddingHorizontal: 16,
+    marginTop: 8,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+      android: { elevation: 3 },
+      default: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+    }),
+  },
+  pillActionBtn: {
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  closeBtnText: { fontWeight: 'bold' },
-  rowReverse: { flexDirection: 'row-reverse' },
-  bottomSpacer: { height: 80 },
+  pillActionPlaceholder: {
+    width: 32,
+    height: 32,
+  },
+  pillTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1D3B6D',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
+
+  // ── Main Container ──
+  mainContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF1f',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    overflow: 'hidden',
+    marginTop: 6,
+    marginHorizontal: 6,
+    // paddingTop: 10
+  },
+  scrollList: { flex: 1 },
+  scrollContent: {
+    paddingHorizontal: 14,
+    paddingTop: 18,
+    gap: 14,
+  },
+
+  // ── Hadith Card ──
+  hadithCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    // borderWidth: 1.5,
+    // borderColor: '#88E2EB',
+    paddingHorizontal: 22,
+    paddingTop: 20,
+    paddingBottom: 14,
+    ...Platform.select({
+      ios: { shadowColor: '#03BECD', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8 },
+      android: { elevation: 2 },
+      default: { shadowColor: '#03BECD', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8 },
+    }),
+  },
+  arabicText: {
+    fontSize: 25,
+    fontWeight: '700',
+    color: '#1D3B6D',
+    textAlign: 'right',
+    lineHeight: 38,
+    letterSpacing: 0.3,
+    fontFamily: Platform.OS === 'android' ? "serif" : 'Georgia',
+  },
+  dotDivider: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 5,
+    marginVertical: 12,
+  },
+  dot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#03BECD',
+  },
+  translationTextUrdu: {
+    paddingLeft: 40,
+    fontSize: 18,
+    color: '#3A4A6B',
+    lineHeight: 34,
+    textAlign: 'right',
+    fontWeight: 'bold',
+  },
+  translationTextEnglish: {
+    paddingRight: 12,
+    paddingLeft: 10,
+    fontSize: 18,
+    color: '#3A4A6B',
+    lineHeight: 34,
+    textAlign: 'left',
+    fontWeight: '500',
+  },
+  textRtl: {
+    textAlign: 'right',
+  },
+
+  lineBreaker: {
+    height: 0.4,
+    backgroundColor: colors.gray,
+    width: "100%",
+    alignSelf: 'center',
+    marginTop: 15,
+
+  },
+
+  // ── Card Footer ──
+  cardFooter: {
+    flexDirection: 'column',
+    // alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginTop: 2,
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 4
+  },
+  footerLeft: {
+    flex: 1,
+    gap: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    height: 25,
+    width: "100%",
+  },
+  footerDate: {
+    fontSize: 11,
+    color: '#8C9199',
+    fontWeight: '500',
+  },
+  footerReference: {
+    fontSize: 10,
+    color: colors.gray,
+    fontWeight: '600',
+    // letterSpacing: 0.2,
+  },
+  footerActions: {
+    // flexDirection: 'row',
+    // alignItems: 'center',
+    // gap: 10,
+  },
+  translateBtn: {
+    // flexDirection: 'row',
+    // alignItems: 'center',
+    // gap: 4,
+  },
+  translateBtnText: {
+    fontSize: 11,
+    color: '#03BECD',
+    fontWeight: '600',
+  },
+  translateBtnActive: {
+    // color: '#1D3B6D',
+  },
+  bookmarkBtn: {
+    padding: 4,
+  },
+
+  // ── States ──
+  centeredState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingHorizontal: 32,
+  },
+  errorText: {
+    fontSize: 40,
+  },
+  stateText: {
+    fontSize: 14,
+    color: '#8C9199',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  retryBtn: {
+    marginTop: 8,
+    paddingHorizontal: 28,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: '#03BECD',
+  },
+  retryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  rowReverse: {
+    flexDirection: 'row-reverse',
+  },
+  alignRight: {
+    alignItems: 'flex-end',
+  },
 });

@@ -22,7 +22,7 @@ export const Header: React.FC<HeaderProps> = ({
   isRtl = false,
   style,
 }) => {
-  const currentTheme = isDark ? colors.dark : colors.light;
+  const currentTheme = colors.light;
   const { goBack } = useNavigation();
 
   return (

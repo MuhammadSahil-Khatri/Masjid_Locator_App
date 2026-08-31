@@ -108,7 +108,6 @@ export const ManageWorshipersScreen: React.FC = () => {
         (w) =>
           w.name?.toLowerCase().includes(q) ||
           w.email?.toLowerCase().includes(q) ||
-          w.cnic?.toLowerCase().includes(q) ||
           w.phone?.toLowerCase().includes(q)
       );
     }
@@ -234,7 +233,7 @@ export const ManageWorshipersScreen: React.FC = () => {
         <Search size={16} color={colors.light.textMuted} style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search by name, email, CNIC, phone..."
+          placeholder="Search by name, email, phone..."
           placeholderTextColor={colors.light.textMuted}
           value={searchTerm}
           onChangeText={setSearchTerm}
@@ -296,7 +295,7 @@ export const ManageWorshipersScreen: React.FC = () => {
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Users size={48} color={colors.peach} />
+              <Users size={48} color={colors.primary} />
               <Text style={styles.emptyText}>
                 {searchTerm || filter !== 'all'
                   ? 'No results match your search or filter.'
@@ -449,10 +448,6 @@ const WorshiperCard: React.FC<WorshiperCardProps> = ({
         {item.email ? (
           <InfoRow icon={<Mail size={13} color={colors.primary} />} label={item.email} />
         ) : null}
-        <InfoRow
-          icon={<CreditCard size={13} color={colors.primary} />}
-          label={`CNIC: ${item.cnic || 'N/A'}`}
-        />
         <InfoRow
           icon={<Phone size={13} color={colors.primary} />}
           label={`Phone: ${item.phone || 'N/A'}`}

@@ -1,7 +1,7 @@
-import { supabase } from '../lib/supabase';
-import { User, Session } from '@supabase/supabase-js';
-import { profileService } from './profileService';
-import { Profile } from '../types';
+import { supabase } from "../lib/supabase";
+import { User, Session } from "@supabase/supabase-js";
+import { profileService } from "./profileService";
+import { Profile } from "../types";
 
 export const authService = {
   async login(email: string, password: string) {
@@ -13,7 +13,11 @@ export const authService = {
     return data;
   },
 
-  async signUp(email: string, password: string, metadata: { name: string; phone: string; cnic: string }) {
+  async signUp(
+    email: string,
+    password: string,
+    metadata: { name: string; phone: string },
+  ) {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -22,7 +26,6 @@ export const authService = {
           name: metadata.name,
           phone: metadata.phone,
           phone_number: metadata.phone,
-          cnic: metadata.cnic,
         },
       },
     });
@@ -35,8 +38,7 @@ export const authService = {
           name: metadata.name,
           email: email,
           phone: metadata.phone,
-          cnic: metadata.cnic,
-          role: 'worshipper',
+          role: "worshipper",
           is_blocked: false,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -44,14 +46,19 @@ export const authService = {
       } catch (profileError: any) {
         // Prevent the app from continuing in a partially created authenticated state
         await supabase.auth.signOut();
-        console.error('Failed to create user profile during signUp:', profileError);
-        throw new Error(`Profile creation failed: ${profileError?.message || 'Please try again.'}`);
+        console.error(
+          "Failed to create user profile during signUp:",
+          profileError,
+        );
+        throw new Error(
+          `Profile creation failed: ${profileError?.message || "Please try again."}`,
+        );
       }
     }
     return data;
   },
 
-  async createProfile(profile: Omit<Profile, 'created_at' | 'updated_at'>) {
+  async createProfile(profile: Omit<Profile, "created_at" | "updated_at">) {
     return await profileService.createProfile(profile);
   },
 
@@ -59,11 +66,14 @@ export const authService = {
     return await profileService.fetchCurrentUserProfile(userId);
   },
 
-  async updateProfile(userId: string, updates: { name?: string; phone?: string; cnic?: string }) {
+  async updateProfile(
+    userId: string,
+    updates: { name?: string; phone?: string },
+  ) {
     return await profileService.updateProfile(userId, updates);
   },
 
-  async updateUserMetadata(metadata: { name?: string; phone?: string; cnic?: string }) {
+  async updateUserMetadata(metadata: { name?: string; phone?: string }) {
     // 1. Update Auth Metadata
     const { data, error } = await supabase.auth.updateUser({
       data: {
@@ -78,8 +88,7 @@ export const authService = {
       const updates: any = {};
       if (metadata.name !== undefined) updates.name = metadata.name;
       if (metadata.phone !== undefined) updates.phone = metadata.phone;
-      if (metadata.cnic !== undefined) updates.cnic = metadata.cnic;
-      
+
       if (Object.keys(updates).length > 0) {
         await profileService.updateProfile(data.user.id, updates);
       }
@@ -94,6 +103,23 @@ export const authService = {
 
   async forgotPassword(email: string) {
     const { data, error } = await supabase.auth.resetPasswordForEmail(email);
+    if (error) throw error;
+    return data;
+  },
+
+  async verifyPassword(email: string, password: string) {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async updatePassword(newPassword: string) {
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
     if (error) throw error;
     return data;
   },

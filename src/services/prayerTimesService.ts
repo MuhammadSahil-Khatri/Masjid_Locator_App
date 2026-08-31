@@ -55,19 +55,32 @@ export interface PrayerTimesResult {
   city: string;
 }
 
+const formatAlAdhanDate = (d: Date): string => {
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+};
+
 /**
- * Fetch prayer times for the given coordinates.
+ * Fetch prayer times for the given coordinates and optional date.
  * @param lat  Latitude
  * @param lng  Longitude
  * @param method  AlAdhan calculation method (default 2 = ISNA)
+ * @param language Language code
+ * @param date Optional specific Date object
+ * @param cityOverride Optional pre-resolved city name to skip reverse geocoding
  */
 export const fetchPrayerTimes = async (
   lat: number,
   lng: number,
   method = 2,
-  language = 'en'
+  language = 'en',
+  date?: Date,
+  cityOverride?: string
 ): Promise<PrayerTimesResult> => {
-  const url = `${BASE_URL}/timings?latitude=${lat}&longitude=${lng}&method=${method}`;
+  const endpoint = date ? `${BASE_URL}/timings/${formatAlAdhanDate(date)}` : `${BASE_URL}/timings`;
+  const url = `${endpoint}?latitude=${lat}&longitude=${lng}&method=${method}`;
 
   const response = await fetch(url);
   if (!response.ok) {
@@ -80,7 +93,7 @@ export const fetchPrayerTimes = async (
     throw new Error(`AlAdhan returned unexpected response: ${json.status}`);
   }
 
-  const { timings, date } = json.data;
+  const { timings, date: apiDate } = json.data;
 
   // Parse and convert to 12-hour AM/PM format
   const parsedTimings: ParsedPrayerTimes = {
@@ -93,13 +106,13 @@ export const fetchPrayerTimes = async (
   };
 
   // Hijri date: "5 Muharram 1447 AH"
-  const hijriDate = `${date.hijri.day} ${date.hijri.month.en} ${date.hijri.year} AH`;
+  const hijriDate = `${apiDate.hijri.day} ${apiDate.hijri.month.en} ${apiDate.hijri.year} AH`;
 
   // Gregorian: "Saturday, 27 June 2026"
-  const gregorianDate = `${date.gregorian.weekday.en}, ${date.gregorian.day} ${date.gregorian.month.en} ${date.gregorian.year}`;
+  const gregorianDate = `${apiDate.gregorian.weekday.en}, ${apiDate.gregorian.day} ${apiDate.gregorian.month.en} ${apiDate.gregorian.year}`;
 
-  // City: use reverse geocoding for accurate current location city name
-  const city = await reverseGeocode(lat, lng, language);
+  // City: use cityOverride if provided, otherwise reverse geocoding for accurate current location city name
+  const city = cityOverride !== undefined ? cityOverride : await reverseGeocode(lat, lng, language);
 
   return { timings: parsedTimings, hijriDate, gregorianDate, city };
 };

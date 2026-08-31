@@ -43,7 +43,7 @@ export function useSearchMosques(
       fetchingRef.current = true;
 
       try {
-        if (mosques.length === 0) {
+        if (force || mosques.length === 0) {
           setLoading(true);
         }
         setError(null);

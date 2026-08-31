@@ -24,20 +24,33 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Magnetometer } from 'expo-sensors';
 import { getDistance } from 'geolib';
 import { useUserLocation } from './useUserLocation';
-import { fetchQiblaBearing } from '../services/prayerTimesService';
+import { fetchQiblaBearing, reverseGeocode } from '../services/prayerTimesService';
 import { storageService } from '../services/storageService';
 
+const KAABA_LAT = 21.4225;
+const KAABA_LON = 39.8262;
+
+/** Great-circle Qibla bearing calculation (offline fallback) */
+const calculateQiblaAngle = (lat: number, lng: number): number => {
+  const phiK = (KAABA_LAT * Math.PI) / 180;
+  const lambdaK = (KAABA_LON * Math.PI) / 180;
+  const phi = (lat * Math.PI) / 180;
+  const lambda = (lng * Math.PI) / 180;
+  const psi =
+    (180 / Math.PI) *
+    Math.atan2(
+      Math.sin(lambdaK - lambda),
+      Math.cos(phi) * Math.tan(phiK) - Math.sin(phi) * Math.cos(lambdaK - lambda)
+    );
+  return (psi + 360) % 360;
+};
+
 export interface UseQiblaReturn {
-  /** Qibla bearing from North in degrees (0–360), fetched from AlAdhan API */
+  /** Qibla bearing from North in degrees (0–360) */
   qiblaBearing: number | null;
-  /**
-   * Current compass heading from North in degrees.
-   */
+  /** Current compass heading from North in degrees */
   compassHeading: number;
-  /**
-   * Rotation to apply to the compass image so the Qibla arrow points correctly.
-   * qiblaRotation = qiblaBearing - compassHeading
-   */
+  /** Rotation to apply to the compass image */
   qiblaRotation: number;
   city: string;
   loading: boolean;
@@ -45,24 +58,29 @@ export interface UseQiblaReturn {
   refetch: () => void;
 }
 
-export const useQibla = (): UseQiblaReturn => {
+export const useQibla = (language: string = 'en'): UseQiblaReturn => {
   const { location, errorMsg: locationError } = useUserLocation();
 
-  // Load from MMKV initially
+  // Load cached data initially
   const cachedQibla = storageService.getCachedQibla();
+  const cachedPrayerTimes = storageService.getCachedPrayerTimes();
+  const initialCity = cachedQibla?.city || cachedPrayerTimes?.city || (language === 'ur' ? 'کراچی' : 'Karachi');
 
-  const [qiblaBearing, setQiblaBearing] = useState<number | null>(cachedQibla?.bearing ?? null);
+  const [qiblaBearing, setQiblaBearing] = useState<number | null>(() => {
+    if (cachedQibla?.bearing) return cachedQibla.bearing;
+    if (location) return calculateQiblaAngle(location.lat, location.lng);
+    return null;
+  });
   const [compassHeading, setCompassHeading] = useState<number>(0);
-  const [city, setCity] = useState<string>(cachedQibla?.city ?? 'Locating…');
+  const [city, setCity] = useState<string>(initialCity);
   const [error, setError] = useState<string | null>(null);
 
   const lastFetchedCoords = useRef<{ lat: number; lng: number } | null>(storageService.getCachedLocation());
 
-  // Subscribe to Magnetometer sensor on mount (when Qibla Screen opens)
+  // Subscribe to Magnetometer sensor on mount
   useEffect(() => {
     let subscription: any = null;
 
-    // Filter states for smoothing magnetometer jitter
     let lastX = 0;
     let lastY = 0;
     let hasRawReading = false;
@@ -104,32 +122,45 @@ export const useQibla = (): UseQiblaReturn => {
     if (!location) return;
     setError(null);
     try {
-      const bearing = await fetchQiblaBearing(location.lat, location.lng);
-      setQiblaBearing(bearing);
+      // Calculate instant bearing locally first
+      const localBearing = calculateQiblaAngle(location.lat, location.lng);
+      setQiblaBearing(localBearing);
 
-      // Derive city from coordinates using AlAdhan timezone metadata
-      const tzRes = await fetch(
-        `https://api.aladhan.com/v1/timings?latitude=${location.lat}&longitude=${location.lng}&method=2`
-      );
-      let fetchedCity = '';
-      if (tzRes.ok) {
-        const tzJson = await tzRes.json();
-        const tz: string = tzJson?.data?.meta?.timezone ?? '';
-        const parts = tz.split('/');
-        fetchedCity = parts[parts.length - 1].replace(/_/g, ' ');
-        setCity(fetchedCity);
-      } else {
-        fetchedCity = 'Detected Location';
-        setCity(fetchedCity);
+      // Attempt to reverse geocode city accurately
+      let detectedCity = await reverseGeocode(location.lat, location.lng, language);
+
+      if (!detectedCity) {
+        // Fallback to timezone derivation
+        const tzRes = await fetch(
+          `https://api.aladhan.com/v1/timings?latitude=${location.lat}&longitude=${location.lng}&method=2`
+        );
+        if (tzRes.ok) {
+          const tzJson = await tzRes.json();
+          const tz: string = tzJson?.data?.meta?.timezone ?? '';
+          const parts = tz.split('/');
+          detectedCity = parts[parts.length - 1].replace(/_/g, ' ');
+        }
       }
 
-      // Cache results
-      storageService.saveQibla({ bearing, city: fetchedCity });
+      const finalCity = detectedCity || (language === 'ur' ? 'کراچی' : 'Karachi');
+      setCity(finalCity);
+
+      // Fetch precise bearing from API
+      try {
+        const preciseBearing = await fetchQiblaBearing(location.lat, location.lng);
+        if (preciseBearing !== null) {
+          setQiblaBearing(preciseBearing);
+          storageService.saveQibla({ bearing: preciseBearing, city: finalCity });
+        }
+      } catch {
+        storageService.saveQibla({ bearing: localBearing, city: finalCity });
+      }
+
       lastFetchedCoords.current = location;
     } catch (err: any) {
       setError(err?.message ?? 'Failed to calculate Qibla direction');
     }
-  }, [location?.lat, location?.lng]);
+  }, [location, language]);
 
   useEffect(() => {
     if (locationError) {
@@ -139,16 +170,21 @@ export const useQibla = (): UseQiblaReturn => {
 
     if (location) {
       const currentCachedQibla = storageService.getCachedQibla();
-      const shouldFetch = !currentCachedQibla || !lastFetchedCoords.current || getDistance(
-        { latitude: lastFetchedCoords.current.lat, longitude: lastFetchedCoords.current.lng },
-        { latitude: location.lat, longitude: location.lng }
-      ) > 1000; // Refetch if moved > 1km
+      const shouldFetch =
+        !currentCachedQibla ||
+        !lastFetchedCoords.current ||
+        getDistance(
+          { latitude: lastFetchedCoords.current.lat, longitude: lastFetchedCoords.current.lng },
+          { latitude: location.lat, longitude: location.lng }
+        ) > 1000;
 
       if (shouldFetch) {
         load();
+      } else if (!qiblaBearing) {
+        setQiblaBearing(calculateQiblaAngle(location.lat, location.lng));
       }
     }
-  }, [location, locationError, load]);
+  }, [location, locationError, load, qiblaBearing]);
 
   const qiblaRotation =
     qiblaBearing !== null ? qiblaBearing - compassHeading : 0;
@@ -158,7 +194,7 @@ export const useQibla = (): UseQiblaReturn => {
     compassHeading,
     qiblaRotation,
     city,
-    loading: false, // Cache-first: never block UI with full-screen spinner
+    loading: false,
     error,
     refetch: load,
   };

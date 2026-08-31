@@ -64,4 +64,3 @@ export const typography = {
     writingDirection: 'ltr' as const,
   },
 };
-

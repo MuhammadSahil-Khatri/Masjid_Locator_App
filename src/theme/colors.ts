@@ -1,65 +1,95 @@
 /**
  * Brand colors and themes for Masjid Locator App
+ *
+ * Updated UI palette
+ * Light theme only
  */
+
 export const colors = {
-  // Brand / Semantic
-  primary: '#F68B35', // Primary Orange
-  primaryLight: 'rgba(246, 139, 53, 0.10)',
-  primaryBorder: 'rgba(246, 139, 53, 0.30)',
+  // ─────────────────────────────────────────────
+  // Brand / Semantic Colors
+  // ─────────────────────────────────────────────
 
-  secondary: '#E97A24', // Secondary Orange
-  secondaryLight: 'rgba(233, 122, 36, 0.10)',
-  secondaryBorder: 'rgba(233, 122, 36, 0.30)',
+  primary: "#03BECD", // Main Cyan
+  primaryLight: "rgba(3, 190, 205, 0.10)",
+  primaryBorder: "rgba(3, 190, 205, 0.30)",
 
-  warning: '#F68B35',
-  warningLight: 'rgba(246, 139, 53, 0.10)',
-  warningBorder: 'rgba(246, 139, 53, 0.30)',
+  secondary: "#0088A5", // Deep Cyan / Teal
+  secondaryLight: "rgba(0, 136, 165, 0.10)",
+  secondaryBorder: "rgba(0, 136, 165, 0.30)",
 
-  danger: '#ef4444',
-  dangerLight: 'rgba(239, 68, 68, 0.10)',
+  warning: "#FDC700", // Yellow
+  warningLight: "rgba(253, 199, 0, 0.10)",
+  warningBorder: "rgba(253, 199, 0, 0.30)",
 
-  success: '#22c55e',
+  danger: "#E44848", // Red
 
-  // Additional Brand Colors
-  beige: '#EDCFB9',
-  peach: '#E2B196',
-  cream: '#F8EBD7',
-  offWhite: '#faf8efff',
-  brown: '#894F35',
+  dangerLight: "rgba(228, 72, 72, 0.10)",
 
-  // Light Theme
-  light: {
-    background: '#FAF8EF', // Off White
-    card: '#F8EBD7', // Cream
-    surface: '#FFFFFF',
+  success: "#0F6B73", // Teal Green
 
-    text: '#1E1E1E', // Text Dark
-    textMuted: '#8E8E8E', // Text Gray
+  // ─────────────────────────────────────────────
+  // Brand Palette
+  // ─────────────────────────────────────────────
 
-    border: '#E2B196', // Peach Tint
+  red: "#E44848",
+  pink: "#EB9F9F",
 
-    input: '#FFFFFF',
-    inputBorder: '#EDCFB9',
+  lightBlue: "#D0F3F9",
 
-    navBg: '#FAF8EF',
-    navBorder: '#EDCFB9',
+  cyan: "#03BECD",
+  teal: "#0088A5",
+
+  darkBlue: "#1D3B6D",
+  darkTeal: "#0F6B73",
+
+  white: "#FAFEFF",
+
+  turquoise: "#21C3C6",
+
+  yellow: "#FDC700",
+
+  grayBlue: "#9AAAB8",
+  gray: "#8C9199",
+
+  brown: "#877551",
+  tan: "#CB9E67",
+
+  paleBlue: "#A9C7DB",
+
+  // ─────────────────────────────────────────────
+  // Gradients
+  // ─────────────────────────────────────────────
+
+  gradients: {
+    primary: ["#1BA3B1", "#0F6B73", "#1D3B6D"],
+    secondary: ["#0F6B73", "#1D3B6D"],
+    cyan: ["#0081A0", "#03BECD"],
   },
 
-  // Dark Theme (Warm Dark Variant)
-  dark: {
-    background: '#1E1E1E',
-    card: '#2A2A2A',
-    surface: '#353535',
+  // ─────────────────────────────────────────────
+  // Light Theme
+  // ─────────────────────────────────────────────
 
-    text: '#FAF8EF',
-    textMuted: '#D0D0D0',
+  light: {
+    // Main backgrounds
+    background: "#FAFEFF",
+    card: "#D0F3F9",
+    surface: "#FFFFFF",
 
-    border: '#894F35',
+    // Text
+    text: "#1D3B6D",
+    textMuted: "#8C9199",
 
-    input: '#2A2A2A',
-    inputBorder: '#894F35',
+    // Borders
+    border: "#9AAAB8",
 
-    navBg: '#1E1E1E',
-    navBorder: '#894F35',
+    // Inputs
+    input: "#FFFFFF",
+    inputBorder: "#A9C7DB",
+
+    // Navigation
+    navBg: "#FAFEFF",
+    navBorder: "#A9C7DB",
   },
 };

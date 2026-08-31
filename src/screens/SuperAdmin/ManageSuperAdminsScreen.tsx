@@ -320,7 +320,7 @@ export const ManageSuperAdminsScreen: React.FC = () => {
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Users size={48} color={colors.peach} />
+              <Users size={48} color={colors.primary} />
               <Text style={styles.emptyText}>
                 {searchTerm
                   ? 'No results match your search.'
@@ -523,10 +523,6 @@ const SuperAdminCard: React.FC<SuperAdminCardProps> = ({
             label="Super Admin (You)"
           />
         )}
-        <InfoRow
-          icon={<CreditCard size={13} color={colors.primary} />}
-          label={`CNIC: ${item.cnic || 'N/A'}`}
-        />
         <InfoRow
           icon={<Phone size={13} color={colors.primary} />}
           label={`Phone: ${item.phone || 'N/A'}`}

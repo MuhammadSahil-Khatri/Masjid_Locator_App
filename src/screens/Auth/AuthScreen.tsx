@@ -74,7 +74,7 @@ export const AuthScreen: React.FC = () => {
   // ── Sign Up form ─────────────────────────────────────────────────────────────
   const signUpForm = useForm<SignUpFormData>({
     resolver: zodResolver(signUpSchema),
-    defaultValues: { name: '', email: '', phone: '', cnic: '', password: '', confirmPassword: '' },
+    defaultValues: { name: '', email: '', phone: '', password: '', confirmPassword: '' },
   });
 
   // ── Forgot Password form ─────────────────────────────────────────────────────
@@ -117,7 +117,6 @@ export const AuthScreen: React.FC = () => {
       await signUp(data.email, data.password, {
         name: data.name,
         phone: data.phone,
-        cnic: data.cnic,
       });
       showSuccess(language === 'ur' ? 'اکاؤنٹ بن گیا!' : 'Account created! Logging in…');
       try {
@@ -314,22 +313,7 @@ export const AuthScreen: React.FC = () => {
                     />
                   )}
                 />
-                <Controller
-                  control={signUpForm.control}
-                  name="cnic"
-                  render={({ field, fieldState }) => (
-                    <FormInput
-                      placeholder={language === 'ur' ? 'قومی شناختی کارڈ نمبر' : 'CNIC Number'}
-                      value={field.value ?? ''}
-                      onChangeText={field.onChange}
-                      onBlur={field.onBlur}
-                      keyboardType="numeric"
-                      leftIcon={<CreditCard size={20} color={theme.textMuted} />}
-                      error={fieldState.error}
-                      style={{ marginBottom: spacing.sm }}
-                    />
-                  )}
-                />
+
                 <Controller
                   control={signUpForm.control}
                   name="password"

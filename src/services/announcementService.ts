@@ -2,26 +2,32 @@ import { supabase } from '../lib/supabase';
 
 export interface Announcement {
   id: string;
-  mosque_id: string;
+  mosque_id: string | null;
   category_id: string;
-  title: string;
-  description: string;
-  event_date: string | null;
-  event_time: string | null;
+  description_en: string;
+  description_ur: string;
   created_by: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;
-  category_name?: string;
-  mosque_name?: string;
-  creator_name?: string;
+  category_name?: string | null;
+  category_name_en?: string | null;
+  category_name_ur?: string | null;
+  mosque_name?: string | null;
+  creator_name?: string | null;
+  title?: string;
+  description?: string;
+  event_date?: string | null;
+  event_time?: string | null;
   is_today?: boolean;
 }
 
 export interface AnnouncementCategory {
   id: string;
-  name: string;
-  created_at: string;
+  name?: string;
+  name_en?: string;
+  name_ur?: string;
+  created_at?: string;
 }
 
 export const announcementService = {
@@ -39,15 +45,19 @@ export const announcementService = {
     }
     if (!announcements || announcements.length === 0) return [];
 
-    // Get category names
+    // Get category info
     const categoryIds = [...new Set(announcements.map(a => a.category_id).filter(Boolean))];
-    let categoryMap: Record<string, string> = {};
+    let categoryMap: Record<string, { name_en: string; name_ur: string; name?: string }> = {};
     if (categoryIds.length > 0) {
       const { data: categories } = await supabase
         .from('announcement_categories')
-        .select('id, name')
+        .select('*')
         .in('id', categoryIds);
-      if (categories) categoryMap = Object.fromEntries(categories.map(c => [c.id, c.name]));
+      if (categories) {
+        categoryMap = Object.fromEntries(
+          categories.map((c: any) => [c.id, { name_en: c.name_en || c.name || '', name_ur: c.name_ur || '', name: c.name || c.name_en || '' }])
+        );
+      }
     }
 
     // Get mosque names
@@ -61,11 +71,133 @@ export const announcementService = {
       if (mosques) mosqueMap = Object.fromEntries(mosques.map(m => [m.id, m.name]));
     }
 
+    // Get creator names
+    const creatorIds = [...new Set(announcements.map(a => a.created_by).filter(Boolean))];
+    let creatorMap: Record<string, string> = {};
+    if (creatorIds.length > 0) {
+      const { data: creators } = await supabase
+        .from('profiles')
+        .select('id, name')
+        .in('id', creatorIds);
+      if (creators) {
+        creatorMap = Object.fromEntries(creators.map(c => [c.id, c.name]));
+      }
+    }
+
+    return announcements.map(a => {
+      const cat = a.category_id ? categoryMap[a.category_id] : null;
+      return {
+        ...a,
+        category_name: cat ? (cat.name_en || cat.name || cat.name_ur) : null,
+        category_name_en: cat ? cat.name_en : null,
+        category_name_ur: cat ? cat.name_ur : null,
+        mosque_name: a.mosque_id ? mosqueMap[a.mosque_id] || null : null,
+        creator_name: a.created_by ? creatorMap[a.created_by] || null : null,
+        title: a.title || (cat ? cat.name_en : 'Announcement'),
+        description: a.description_en || a.description || a.description_ur || '',
+      };
+    });
+  },
+
+  /** Public – fetch active announcements for a specific category. */
+  async fetchAnnouncementsByCategory(categoryId: string): Promise<Announcement[]> {
+    const { data: announcements, error } = await supabase
+      .from('announcements')
+      .select('*')
+      .eq('is_active', true)
+      .eq('category_id', categoryId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching category announcements:', error);
+      throw error;
+    }
+    if (!announcements || announcements.length === 0) return [];
+
+    // Get category info
+    const { data: category } = await supabase
+      .from('announcement_categories')
+      .select('*')
+      .eq('id', categoryId)
+      .maybeSingle();
+
+    // Get mosque names
+    const mosqueIds = [...new Set(announcements.map(a => a.mosque_id).filter(Boolean))];
+    let mosqueMap: Record<string, string> = {};
+    if (mosqueIds.length > 0) {
+      const { data: mosques } = await supabase
+        .from('mosques')
+        .select('id, name')
+        .in('id', mosqueIds);
+      if (mosques) mosqueMap = Object.fromEntries(mosques.map(m => [m.id, m.name]));
+    }
+
+    // Get creator names
+    const creatorIds = [...new Set(announcements.map(a => a.created_by).filter(Boolean))];
+    let creatorMap: Record<string, string> = {};
+    if (creatorIds.length > 0) {
+      const { data: creators } = await supabase
+        .from('profiles')
+        .select('id, name')
+        .in('id', creatorIds);
+      if (creators) {
+        creatorMap = Object.fromEntries(creators.map(c => [c.id, c.name]));
+      }
+    }
+
     return announcements.map(a => ({
       ...a,
-      category_name: a.category_id ? categoryMap[a.category_id] || null : null,
+      category_name: category ? (category.name_en || category.name || category.name_ur) : null,
+      category_name_en: category ? category.name_en : null,
+      category_name_ur: category ? category.name_ur : null,
       mosque_name: a.mosque_id ? mosqueMap[a.mosque_id] || null : null,
+      creator_name: a.created_by ? creatorMap[a.created_by] || null : null,
+      title: a.title || (category ? category.name_en : 'Announcement'),
+      description: a.description_en || a.description || a.description_ur || '',
     }));
+  },
+
+  /** Public – fetch active announcements for a specific mosque. */
+  async fetchAnnouncementsByMosque(mosqueId: string): Promise<Announcement[]> {
+    const { data: announcements, error } = await supabase
+      .from('announcements')
+      .select('*')
+      .eq('is_active', true)
+      .eq('mosque_id', mosqueId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching mosque announcements:', error);
+      throw error;
+    }
+    if (!announcements || announcements.length === 0) return [];
+
+    // Get category info
+    const categoryIds = [...new Set(announcements.map(a => a.category_id).filter(Boolean))];
+    let categoryMap: Record<string, { name_en: string; name_ur: string; name?: string }> = {};
+    if (categoryIds.length > 0) {
+      const { data: categories } = await supabase
+        .from('announcement_categories')
+        .select('*')
+        .in('id', categoryIds);
+      if (categories) {
+        categoryMap = Object.fromEntries(
+          categories.map((c: any) => [c.id, { name_en: c.name_en || c.name || '', name_ur: c.name_ur || '', name: c.name || c.name_en || '' }])
+        );
+      }
+    }
+
+    return announcements.map(a => {
+      const cat = a.category_id ? categoryMap[a.category_id] : null;
+      return {
+        ...a,
+        category_name: cat ? (cat.name_en || cat.name || cat.name_ur) : null,
+        category_name_en: cat ? cat.name_en : null,
+        category_name_ur: cat ? cat.name_ur : null,
+        title: a.title || (cat ? cat.name_en : 'Announcement'),
+        description: a.description_en || a.description || a.description_ur || '',
+      };
+    });
   },
 
   async fetchAllAnnouncements(): Promise<Announcement[]> {
@@ -99,10 +231,12 @@ export const announcementService = {
     if (categoryIds.length > 0) {
       const { data: categories } = await supabase
         .from('announcement_categories')
-        .select('id, name')
+        .select('*')
         .in('id', categoryIds);
       if (categories) {
-        categoryMap = Object.fromEntries(categories.map(c => [c.id, c.name]));
+        categoryMap = Object.fromEntries(
+          categories.map((c: any) => [c.id, c.name_en || c.name || c.name_ur || ''])
+        );
       }
     }
 
@@ -144,7 +278,7 @@ export const announcementService = {
     const { data, error } = await supabase
       .from('announcement_categories')
       .select('*')
-      .order('name', { ascending: true });
+      .order('created_at', { ascending: true });
 
     if (error) {
       console.error('Error fetching categories:', error);

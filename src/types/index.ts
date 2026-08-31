@@ -1,6 +1,6 @@
-export type Language = 'en' | 'ur';
+export type Language = "en" | "ur";
 
-export type UserRole = 'worshipper' | 'admin' | 'super_admin';
+export type UserRole = "worshipper" | "admin" | "super_admin";
 
 export interface UserAccount {
   id?: string;
@@ -11,7 +11,6 @@ export interface UserAccount {
   assignedMasjidId?: string; // Admins can be assigned to a specific masjid
   region?: string; // Selected default region for calculation
   phone?: string;
-  cnic?: string;
   is_blocked?: boolean;
 }
 
@@ -19,17 +18,21 @@ export interface Profile {
   id: string;
   name: string;
   phone?: string;
-  cnic?: string;
-  role: 'worshipper' | 'admin' | 'super_admin';
+  role: "worshipper" | "admin" | "super_admin";
   email?: string;
   is_blocked: boolean;
   created_at?: string;
   updated_at?: string;
 }
 
-export type CalculationMethod = 'MWL' | 'ISNA' | 'UmmAlQura' | 'Karachi' | 'Egypt';
+export type CalculationMethod =
+  | "MWL"
+  | "ISNA"
+  | "UmmAlQura"
+  | "Karachi"
+  | "Egypt";
 
-export type JuristicMethod = 'Standard' | 'Hanafi';
+export type JuristicMethod = "Standard" | "Hanafi";
 
 export interface PrayerTimes {
   fajr: string;
@@ -71,7 +74,7 @@ export interface Announcement {
   contentUr: string;
   date: string;
   isRead: boolean;
-  priority: 'high' | 'normal';
+  priority: "high" | "normal";
 }
 
 export interface Hadees {
@@ -94,8 +97,8 @@ export interface MasjidEvent {
   descriptionUr: string;
   date: string;
   time: string;
-  category: 'iftar' | 'lecture' | 'janaza' | 'general';
-  rsvpStatus: 'going' | 'declined' | 'none';
+  category: "iftar" | "lecture" | "janaza" | "general";
+  rsvpStatus: "going" | "declined" | "none";
   rsvpCount: number;
 }
 
@@ -173,4 +176,3 @@ export interface PrayerTimesState {
   loading: boolean;
   error: string | null;
 }
-

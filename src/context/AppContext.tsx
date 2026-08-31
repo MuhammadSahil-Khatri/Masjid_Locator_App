@@ -1,13 +1,13 @@
 import React, { createContext, useState, useContext, useMemo, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { 
-  Language, 
-  UserRole, 
-  Masjid, 
-  Announcement, 
-  MasjidEvent, 
-  Hadees, 
-  PrayerTimes, 
+import {
+  Language,
+  UserRole,
+  Masjid,
+  Announcement,
+  MasjidEvent,
+  Hadees,
+  PrayerTimes,
   UserAccount,
   CalculationMethod,
   JuristicMethod
@@ -26,7 +26,7 @@ interface AppContextProps {
   setUsers: React.Dispatch<React.SetStateAction<UserAccount[]>>;
   currentUser: UserAccount | null;
   setCurrentUser: React.Dispatch<React.SetStateAction<UserAccount | null>>;
-  
+
   masjids: Masjid[];
   setMasjids: React.Dispatch<React.SetStateAction<Masjid[]>>;
   announcements: Announcement[];
@@ -35,13 +35,13 @@ interface AppContextProps {
   setEvents: React.Dispatch<React.SetStateAction<MasjidEvent[]>>;
   hadeesList: Hadees[];
   setHadeesList: React.Dispatch<React.SetStateAction<Hadees[]>>;
-  
+
   translations: Record<string, string>;
   isRtl: boolean;
-  
+
   toastMessage: string | null;
   triggerToast: (msg: string) => void;
-  
+
   // Simulation Helpers
   handleRsvpToggle: (eventId: string) => void;
   handleAnnounceRead: (announceId: string) => void;
@@ -109,7 +109,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           role: uiRole,
           region: 'Karachi',
           phone: profile.phone,
-          cnic: profile.cnic,
           is_blocked: profile.is_blocked,
         });
         setActiveRole(uiRole);
@@ -117,7 +116,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Set fallback info from auth metadata first if profile is not loaded yet
         const metaName = supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'User';
         const metaPhone = supabaseUser.user_metadata?.phone_number || supabaseUser.user_metadata?.phone || '';
-        const metaCnic = supabaseUser.user_metadata?.cnic || '';
         setCurrentUser({
           id: supabaseUser.id,
           email: supabaseUser.email || '',
@@ -125,7 +123,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           role: 'worshipper',
           region: 'Karachi',
           phone: metaPhone,
-          cnic: metaCnic,
           is_blocked: false,
         });
         setActiveRole('worshipper');
@@ -151,22 +148,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const triggerToast = (msg: string) => {
     const msgLower = msg.toLowerCase();
     if (
-      msgLower.includes('error') || 
-      msgLower.includes('failed') || 
-      msgLower.includes('invalid') || 
-      msgLower.includes('mandatory') || 
-      msgLower.includes('required') || 
-      msgLower.includes('نہیں') || 
+      msgLower.includes('error') ||
+      msgLower.includes('failed') ||
+      msgLower.includes('invalid') ||
+      msgLower.includes('mandatory') ||
+      msgLower.includes('required') ||
+      msgLower.includes('نہیں') ||
       msgLower.includes('غلط')
     ) {
       showError(msg);
     } else if (
-      msgLower.includes('success') || 
-      msgLower.includes('approved') || 
-      msgLower.includes('published') || 
-      msgLower.includes('posted') || 
-      msgLower.includes('submitted') || 
-      msgLower.includes('کامیاب') || 
+      msgLower.includes('success') ||
+      msgLower.includes('approved') ||
+      msgLower.includes('published') ||
+      msgLower.includes('posted') ||
+      msgLower.includes('submitted') ||
+      msgLower.includes('کامیاب') ||
       msgLower.includes('محفوظ')
     ) {
       showSuccess(msg);

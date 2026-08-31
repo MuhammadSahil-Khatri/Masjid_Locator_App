@@ -2,10 +2,10 @@ import React from 'react';
 import { StyleSheet, Pressable, View } from 'react-native';
 import { Text } from './Text';
 import { ChevronRight } from 'lucide-react-native';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
-  withSpring 
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring
 } from 'react-native-reanimated';
 import { colors, spacing, typography } from '../../theme';
 
@@ -28,7 +28,7 @@ export const SettingTile: React.FC<SettingTileProps> = ({
   isRtl = false,
   textColor
 }) => {
-  const currentTheme = isDark ? colors.dark : colors.light;
+  const currentTheme = colors.light;
   const scale = useSharedValue(1);
 
   const rStyle = useAnimatedStyle(() => {
@@ -47,10 +47,10 @@ export const SettingTile: React.FC<SettingTileProps> = ({
       }}
       onPress={onPress}
       style={[
-        styles.container, 
-        { 
+        styles.container,
+        {
           backgroundColor: currentTheme.card,
-          borderColor: currentTheme.border 
+          borderColor: currentTheme.border
         },
         rStyle,
         isRtl && styles.rowReverse
@@ -61,7 +61,7 @@ export const SettingTile: React.FC<SettingTileProps> = ({
       </View>
       <View style={styles.textContainer}>
         <Text style={[
-          styles.title, 
+          styles.title,
           { color: textColor || currentTheme.text },
           isRtl && typography.alignRtl
         ]}>

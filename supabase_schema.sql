@@ -4,7 +4,6 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   name TEXT NOT NULL,
   email TEXT UNIQUE,
   phone TEXT UNIQUE NOT NULL,
-  cnic TEXT UNIQUE NOT NULL,
   role TEXT NOT NULL DEFAULT 'worshipper' CHECK (role IN ('worshipper', 'admin', 'super_admin')),
   is_blocked BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

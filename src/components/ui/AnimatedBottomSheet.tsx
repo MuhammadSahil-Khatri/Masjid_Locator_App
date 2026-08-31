@@ -1,23 +1,21 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Dimensions } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
-  withTiming,
   runOnJS,
 } from 'react-native-reanimated';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { X, ChevronDown } from 'lucide-react-native';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const MAX_TRANSLATE_Y = -SCREEN_HEIGHT + 100;
+const MAX_TRANSLATE_Y = -SCREEN_HEIGHT + 80;
 const SPRING_CONFIG = {
-  damping: 20,
+  damping: 22,
   overshootClamping: true,
   restDisplacementThreshold: 0.1,
   restSpeedThreshold: 0.1,
-  stiffness: 150,
+  stiffness: 160,
 };
 
 interface AnimatedBottomSheetProps {
@@ -32,7 +30,7 @@ export const AnimatedBottomSheet: React.FC<AnimatedBottomSheetProps> = ({
   isVisible,
   onClose,
   children,
-  snapPoint = 340,
+  snapPoint = 560,
   backgroundColor = '#ffffff',
 }) => {
   const translateY = useSharedValue(SCREEN_HEIGHT);
@@ -57,18 +55,13 @@ export const AnimatedBottomSheet: React.FC<AnimatedBottomSheetProps> = ({
     })
     .onUpdate((event) => {
       translateY.value = event.translationY + context.value.y;
-      translateY.value = Math.max(translateY.value, MAX_TRANSLATE_Y); // prevent dragging too far up
+      translateY.value = Math.max(translateY.value, MAX_TRANSLATE_Y);
     })
     .onEnd(() => {
       if (translateY.value > -snapPoint / 2) {
-        // Dragged down enough, close it
         scrollTo(SCREEN_HEIGHT);
         runOnJS(onClose)();
-      } else if (translateY.value < -snapPoint * 1.2) {
-        // Dragged up enough, expand more if needed (or just return to snapPoint)
-        scrollTo(-snapPoint - 150); // Expanded state
       } else {
-        // Return to default snap point
         scrollTo(-snapPoint);
       }
     });
@@ -80,64 +73,58 @@ export const AnimatedBottomSheet: React.FC<AnimatedBottomSheetProps> = ({
   });
 
   return (
-    <GestureDetector gesture={panGesture}>
-      <Animated.View style={[styles.bottomSheetContainer, rBottomSheetStyle, { backgroundColor }]}>
+    <Animated.View
+      style={[
+        styles.bottomSheetContainer,
+        { height: snapPoint, maxHeight: snapPoint, backgroundColor },
+        rBottomSheetStyle,
+      ]}
+    >
+      <GestureDetector gesture={panGesture}>
         <View style={styles.handleRow}>
-          {/* <TouchableOpacity
-            style={styles.closeBtn}
-            onPress={onClose}
-            accessibilityLabel="Close bottom sheet"
-            activeOpacity={0.7}
-          >
-            <ChevronDown size={20} color="#64748b" />
-          </TouchableOpacity> */}
           <View style={styles.line} />
         </View>
+      </GestureDetector>
+
+      <View style={styles.contentWrapper}>
         {children}
-      </Animated.View>
-    </GestureDetector>
+      </View>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   bottomSheetContainer: {
-    height: SCREEN_HEIGHT,
     width: '100%',
     position: 'absolute',
     top: SCREEN_HEIGHT,
-    borderRadius: 50,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 10,
-    paddingHorizontal: 20,
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 12,
     zIndex: 100,
-  },
-  line: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#cbd5e1',
-    borderRadius: 2,
+    overflow: 'hidden',
   },
   handleRow: {
-    height: 40,
-    flexDirection: 'row',
+    height: 28,
+    width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
+    backgroundColor: 'transparent',
+    zIndex: 10,
+  },
+  line: {
+    width: 50,
+    height: 5,
+    backgroundColor: '#C5D0DC',
+    borderRadius: 10,
+  },
+  contentWrapper: {
+    flex: 1,
     width: '100%',
   },
-  // closeBtn: {
-  //   position: 'absolute',
-  //   backgroundColor: '#86868671',
-  //   top: 6,
-  //   left: 2,
-  //   padding: 8,
-  //   width: 30,
-  //   height: 30,
-  //   borderRadius: 15,
-  //   justifyContent: 'center',
-  //   alignItems: 'center',
-  // },
 });
+
