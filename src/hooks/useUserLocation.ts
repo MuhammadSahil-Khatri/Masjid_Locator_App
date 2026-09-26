@@ -86,7 +86,7 @@ export function useUserLocation(_defaultLocation?: LocationState) {
 
         // Watch for changes - branching for Web/Native to avoid expo-location Web subscription cleanup bug
         if (Platform.OS === 'web') {
-          const nav = navigator as any;
+          const nav = (globalThis as any).navigator;
           if (nav && nav.geolocation) {
             webWatchId = nav.geolocation.watchPosition(
               (pos: any) => {
@@ -120,7 +120,7 @@ export function useUserLocation(_defaultLocation?: LocationState) {
 
     return () => {
       if (Platform.OS === 'web' && webWatchId !== null) {
-        const nav = navigator as any;
+        const nav = (globalThis as any).navigator;
         if (nav && nav.geolocation) {
           nav.geolocation.clearWatch(webWatchId);
         }

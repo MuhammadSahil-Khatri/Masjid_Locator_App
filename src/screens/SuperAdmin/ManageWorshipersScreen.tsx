@@ -268,7 +268,7 @@ export const ManageWorshipersScreen: React.FC = () => {
         {/* Dismiss menu on outside tap - placed BEFORE FlatList so FlatList renders on top */}
         {openMenuId && (
           <TouchableOpacity
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
             onPress={() => setOpenMenuId(null)}
             activeOpacity={1}
           />

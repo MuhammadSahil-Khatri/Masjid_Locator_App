@@ -360,7 +360,6 @@ export const SearchScreen: React.FC = () => {
 
   // ── Filtered mosque list (Local Search & Filtering) ───────────────────────────
   const filteredMosques = useMemo(() => {
-    console.time('[PERF] filteredMosques');
     let result = mosques;
 
     if (debouncedSearch.trim()) {
@@ -377,7 +376,6 @@ export const SearchScreen: React.FC = () => {
       result = result.filter((m) => m.city && filters.cities.includes(m.city));
     }
 
-    console.timeEnd('[PERF] filteredMosques');
     return result;
   }, [mosques, debouncedSearch, filters]);
 
@@ -386,7 +384,6 @@ export const SearchScreen: React.FC = () => {
   const handleRetryFetch = useCallback(() => refetch(), [refetch]);
 
   const handleMarkerPress = useCallback((mosqueId: string) => {
-    console.time('[PERF] markerPress→sheetOpen');
     const mosque = mosques.find((m) => m.id === mosqueId);
     if (!mosque) return;
 
@@ -416,7 +413,6 @@ export const SearchScreen: React.FC = () => {
         400
       );
     }
-    console.timeEnd('[PERF] markerPress→sheetOpen');
   }, [mosques, selectedMosque]);
 
   const handleRecenter = useCallback(() => {
@@ -527,11 +523,11 @@ export const SearchScreen: React.FC = () => {
     <View style={styles.mainContainer}>
 
       {/* ── Map fills the entire screen ── */}
-      <View style={StyleSheet.absoluteFillObject}>
+      <View style={StyleSheet.absoluteFill}>
         {initialRegion ? (
           <MapView
             ref={mapRef}
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
             customMapStyle={customMapStyle}
             initialRegion={initialRegion}
             showsUserLocation={false}
@@ -561,7 +557,7 @@ export const SearchScreen: React.FC = () => {
             ))}
           </MapView>
         ) : (
-          <View style={[StyleSheet.absoluteFillObject, styles.centered, { backgroundColor: theme.background }]}>
+          <View style={[StyleSheet.absoluteFill, styles.centered, { backgroundColor: theme.background }]}>
             <ActivityIndicator size="large" color={colors.primary} />
             <Text style={[styles.loadingText, { color: theme.textMuted }]}>
               {isRtl ? 'مقام حاصل کیا جا رہا ہے...' : 'Acquiring GPS location...'}
@@ -1341,7 +1337,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(3, 190, 205, 0.35)',
   },
   sheetBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
     zIndex: 50,
   },

@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
 
   // ── Dimmed Backdrop for Bottom Sheet ─────────────────────────────────────────
   sheetBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
     zIndex: 50,
   },

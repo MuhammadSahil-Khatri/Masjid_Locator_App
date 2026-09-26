@@ -1,9 +1,6 @@
 import { useEffect } from "react";
-import { Platform } from "react-native";
-import {
-  setStatusBarStyle,
-  setStatusBarBackgroundColor,
-} from "expo-status-bar";
+import { Platform, StatusBar } from "react-native";
+import { setStatusBarStyle } from "expo-status-bar";
 import * as NavigationBar from "expo-navigation-bar";
 import * as SystemUI from "expo-system-ui";
 import { colors } from "../theme";
@@ -82,10 +79,9 @@ export const getScreenBgColor = (
  * Synchronizes the Status Bar and Android Navigation Bar with the active screen background.
  *
  * Android edge-to-edge (API 35 / Expo SDK 54+):
- *  - NavigationBar.setBackgroundColorAsync() is a no-op and must NOT be called.
- *  - Instead, SystemUI.setBackgroundColorAsync() sets the root background that shows
+ *  - SystemUI.setBackgroundColorAsync() sets the root background that shows
  *    through the transparent system bars.
- *  - NavigationBar.setButtonStyleAsync() still works and controls icon contrast.
+ *  - NavigationBar.setStyle() controls icon contrast.
  */
 export const useSystemBars = (backgroundColor: string) => {
   useEffect(() => {
@@ -93,17 +89,26 @@ export const useSystemBars = (backgroundColor: string) => {
 
     // ── Status Bar (top) ─────────────────────────────────────────────────────
     setStatusBarStyle(isBgDark ? "light" : "dark");
-    // setStatusBarBackgroundColor is respected on Android <15 and is a no-op on edge-to-edge
-    setStatusBarBackgroundColor(backgroundColor, true);
 
     if (Platform.OS === "android") {
+      // ── Status Bar Background (Android fallback) ───────────────────────────
+      try {
+        StatusBar.setBackgroundColor(backgroundColor, true);
+      } catch {
+        // Ignored on edge-to-edge or unsupported environments
+      }
+
       // ── Root background (shows through transparent edge-to-edge system bars) ─
       SystemUI.setBackgroundColorAsync(backgroundColor).catch(() => {});
 
       // ── Navigation bar button contrast (still works in edge-to-edge) ────────
-      NavigationBar.setButtonStyleAsync(isBgDark ? "light" : "dark").catch(
-        () => {},
-      );
+      try {
+        if (typeof NavigationBar.setStyle === "function") {
+          NavigationBar.setStyle(isBgDark ? "light" : "dark");
+        }
+      } catch {
+        // Ignored if navigation bar styling is unavailable
+      }
     }
   }, [backgroundColor]);
 };

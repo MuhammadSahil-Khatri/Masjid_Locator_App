@@ -309,7 +309,7 @@ export const ManageAdminsScreen: React.FC = () => {
         {/* Dismiss menu on outside tap */}
         {openMenuId && (
           <TouchableOpacity
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
             onPress={() => setOpenMenuId(null)}
             activeOpacity={1}
           />
