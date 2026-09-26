@@ -34,12 +34,10 @@ import {
 } from '../../components/icons/HomeActionIcons';
 import { AnnouncementCard } from '../../components/cards/AnnouncementCard';
 import {
-  announcementService,
-} from '../../services/announcementService';
-import {
   ANNOUNCEMENT_CATEGORIES,
   type AnnouncementCategory,
 } from '../Announcements/AnnouncementsScreen';
+import { useAnnouncementCategoriesQuery } from '../../queries/useAnnouncementsQueries';
 
 const PRAYER_LIST = [
   { key: 'Fajr' as const, label: 'Fajr', labelUr: 'فجر', Icon: FajrIcon },
@@ -59,28 +57,24 @@ export const HomeScreen: React.FC = () => {
   const { navigate } = useNavigation();
   const [refreshing, setRefreshing] = useState(false);
 
-  // ── Announcement categories (live from Supabase, fallback to static) ──
-  const [categories, setCategories] = useState<AnnouncementCategory[]>(ANNOUNCEMENT_CATEGORIES);
+  // ── Announcement categories from TanStack Query (offline-persisted) ──
+  const { data: remoteCategories, refetch: refetchCategories } = useAnnouncementCategoriesQuery();
 
-  useEffect(() => {
-    announcementService.fetchCategories()
-      .then((data) => {
-        if (data && data.length > 0) {
-          const merged: AnnouncementCategory[] = data.map((c: any) => {
-            const staticMatch = ANNOUNCEMENT_CATEGORIES.find(
-              (s) => s.id === c.id || s.name_en?.toLowerCase() === (c.name_en || c.name || '').toLowerCase()
-            );
-            return {
-              id: c.id,
-              name_en: c.name_en || c.name || staticMatch?.name_en || '',
-              name_ur: c.name_ur || staticMatch?.name_ur || '',
-            };
-          });
-          setCategories(merged);
-        }
-      })
-      .catch(() => { /* keep static fallback */ });
-  }, []);
+  const categories: AnnouncementCategory[] = useMemo(() => {
+    if (remoteCategories && remoteCategories.length > 0) {
+      return remoteCategories.map((c: any) => {
+        const staticMatch = ANNOUNCEMENT_CATEGORIES.find(
+          (s) => s.id === c.id || s.name_en?.toLowerCase() === (c.name_en || c.name || '').toLowerCase()
+        );
+        return {
+          id: c.id,
+          name_en: c.name_en || c.name || staticMatch?.name_en || '',
+          name_ur: c.name_ur || staticMatch?.name_ur || '',
+        };
+      });
+    }
+    return ANNOUNCEMENT_CATEGORIES;
+  }, [remoteCategories]);
 
   const handleCategoryPress = (category: AnnouncementCategory) => {
     navigate('CategoryAnnouncements', {
@@ -210,7 +204,7 @@ export const HomeScreen: React.FC = () => {
   // First 3 categories for the home section
   const homeCategories = categories.slice(0, 3);
 
-  const actionTileWidth = (screenWidth - 32 - 4 * 10) / 5;
+  const actionTileWidth = (screenWidth - 132) / 4;
 
   // Scale fonts proportionally on larger phones (ref = 375px).
   // Clamped: never shrinks below 1.0, never grows beyond 1.2.
@@ -367,7 +361,7 @@ export const HomeScreen: React.FC = () => {
                         styles.prayerNameText,
                         isActive && styles.activePrayerNameText,
                         { fontSize: Math.round(12 * fontScale) },
-                        isRtl && { fontFamily: undefined },
+                        // isRtl && { fontFamily: undefined },
                       ]}
                     >
                       {displayLabel}
@@ -430,22 +424,35 @@ export const HomeScreen: React.FC = () => {
               <Text style={styles.actionTileLabel}>{isRtl ? 'قبلہ' : 'Qibla'}</Text>
             </View>
 
-            {/* Placeholder Tile 4 */}
+            {/* Madarsa */}
             <View style={styles.actionItemWrapper}>
               <TouchableOpacity
                 style={[styles.actionTile, { width: actionTileWidth, height: actionTileWidth }]}
                 activeOpacity={0.8}
-                onPress={() => navigate('Search')}
-              />
-            </View>
-
-            {/* Placeholder Tile 5 */}
-            <View style={styles.actionItemWrapper}>
-              <TouchableOpacity
-                style={[styles.actionTile, { width: actionTileWidth, height: actionTileWidth }]}
-                activeOpacity={0.8}
-                onPress={() => navigate('Announcements')}
-              />
+                onPress={() => {
+                  const madarsaCategory = categories.find(
+                    (c) => c.id === 'ee65eb1f-037e-464c-a196-4e7bdc008e76' ||
+                      c.name_en?.toLowerCase().includes('madarsa')
+                  );
+                  if (madarsaCategory) {
+                    navigate('CategoryAnnouncements', {
+                      categoryId: madarsaCategory.id,
+                      categoryName: madarsaCategory.name_en,
+                      categoryNameEn: madarsaCategory.name_en,
+                      categoryNameUr: madarsaCategory.name_ur,
+                    });
+                  } else {
+                    navigate('Announcements');
+                  }
+                }}
+              >
+                <Image
+                  source={require('../../../assets/madarsa.webp')}
+                  style={{ width: actionTileWidth * 0.75, height: actionTileWidth * 0.75 }}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+              <Text style={styles.actionTileLabel}>{isRtl ? 'مدرسہ' : 'Madarsa'}</Text>
             </View>
           </View>
 

@@ -1,7 +1,6 @@
 /**
  * FormInput — A react-hook-form compatible Input wrapper.
  * Accepts Controller render props and shows inline field errors.
- * Extends the existing Input component without modifying it.
  */
 import React from 'react';
 import {
@@ -9,7 +8,6 @@ import {
   TextInput,
   StyleSheet,
   ViewStyle,
-  TouchableOpacity,
 } from 'react-native';
 import { Text } from './Text';
 import { FieldError } from 'react-hook-form';
@@ -53,14 +51,15 @@ export const FormInput: React.FC<FormInputProps> = ({
         style={[
           styles.inputWrapper,
           {
-            borderBottomColor: hasError ? '#ef4444' : theme.border,
+            borderColor: hasError ? '#EF4444' : '#CBD5E1',
+            backgroundColor: '#FFFFFF',
           },
         ]}
       >
         {leftIcon && <View style={styles.leftIcon}>{leftIcon}</View>}
         <TextInput
           placeholder={placeholder}
-          placeholderTextColor={theme.textMuted}
+          placeholderTextColor="#9AAAB8"
           value={value}
           onChangeText={onChangeText}
           onBlur={onBlur}
@@ -68,9 +67,9 @@ export const FormInput: React.FC<FormInputProps> = ({
           autoCapitalize={autoCapitalize}
           keyboardType={keyboardType}
           editable={editable}
-          style={[styles.input, { color: theme.text }]}
+          style={[styles.input, { color: '#1D3B6D' }]}
         />
-        {rightIcon}
+        {rightIcon && <View style={styles.rightIcon}>{rightIcon}</View>}
       </View>
       {hasError && (
         <Text style={styles.errorText}>{error.message}</Text>
@@ -82,29 +81,43 @@ export const FormInput: React.FC<FormInputProps> = ({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 44,
-    borderBottomWidth: 1.5,
+    height: 52,
+    borderWidth: 1.2,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
   },
   leftIcon: {
-    marginRight: spacing.md,
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rightIcon: {
+    marginLeft: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
   input: {
     flex: 1,
     height: '100%',
-    fontSize: typography.sizes.md,
+    fontSize: typography.sizes.base - 1,
     padding: 0,
+    fontFamily: typography.fonts.english.regular,
   },
   errorText: {
-    color: '#ef4444',
-    fontSize: 11,
+    color: '#EF4444',
+    fontSize: 12,
     marginTop: 4,
-    marginLeft: 2,
+    marginLeft: 6,
   },
 });
+

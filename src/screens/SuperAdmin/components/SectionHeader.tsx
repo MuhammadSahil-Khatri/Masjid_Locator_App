@@ -1,75 +1,114 @@
 import React from 'react';
-import { StyleSheet, View, TouchableOpacity } from 'react-native';
-import { ArrowLeft } from 'lucide-react-native';
+import { StyleSheet, View, TouchableOpacity, Platform } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '../../../components/ui/Text';
 import { useNavigation } from '../../../navigation/NavigationContext';
-import { colors, spacing, typography } from '../../../theme';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+
+const BackArrowIcon = ({ color = '#1D3B6D', size = 14 }: { color?: string; size?: number }) => (
+  <Svg width={size} height={size * (21 / 13)} viewBox="0 0 13 21" fill="none">
+    <Path d="M12 20L1 10.5L12 1" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
 
 interface SectionHeaderProps {
   title: string;
+  onBack?: () => void;
+  rightElement?: React.ReactNode;
 }
 
-export const SectionHeader: React.FC<SectionHeaderProps> = ({ title }) => {
+export const SectionHeader: React.FC<SectionHeaderProps> = ({ title, onBack, rightElement }) => {
+  const insets = useSafeAreaInsets();
   const { goBack } = useNavigation();
-  const themeColors = colors.light;
-  const backScale = useSharedValue(1);
 
-  const rBackStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ scale: backScale.value }],
-    };
-  });
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+    } else {
+      goBack();
+    }
+  };
 
   return (
-    <View style={[styles.headerContainer, { borderBottomColor: themeColors.border }]}>
-      <Animated.View style={rBackStyle}>
+    <View style={[styles.headerWrapper, { paddingTop: Math.max(insets.top - 20, 16) }]}>
+      <View style={styles.pillContainer}>
         <TouchableOpacity
-          onPressIn={() => {
-            backScale.value = withSpring(0.85);
-          }}
-          onPressOut={() => {
-            backScale.value = withSpring(1);
-          }}
-          onPress={goBack}
-          style={[styles.backButton, { backgroundColor: 'rgba(246, 139, 53, 0.1)' }]}
-          activeOpacity={0.8}
-          accessibilityLabel="Go back"
+          style={styles.pillActionBtn}
+          activeOpacity={0.7}
+          onPress={handleBack}
+          accessibilityLabel="Go Back"
         >
-          <ArrowLeft size={20} color={colors.primary} />
+          <BackArrowIcon size={14} color="#1D3B6D" />
         </TouchableOpacity>
-      </Animated.View>
-      <Text style={[styles.titleText, { color: themeColors.text }]} weight="bold">
-        {title}
-      </Text>
-      <View style={styles.spacer} />
+
+        <Text style={styles.pillTitle} numberOfLines={1}>
+          {title}
+        </Text>
+
+        {rightElement ? (
+          <View style={styles.pillActionBtn}>
+            {rightElement}
+          </View>
+        ) : (
+          <View style={styles.pillActionPlaceholder} />
+        )}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  headerContainer: {
+  headerWrapper: {
+    paddingBottom: 16,
+  },
+  pillContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 50,
+    height: 48,
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    marginTop: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 6,
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+      },
+    }),
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
+  pillActionBtn: {
+    width: 32,
+    height: 32,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  titleText: {
-    fontSize: typography.sizes.lg,
+  pillActionPlaceholder: {
+    width: 32,
+    height: 32,
+  },
+  pillTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1D3B6D',
     textAlign: 'center',
+    letterSpacing: 0.2,
     flex: 1,
   },
-  spacer: {
-    width: 40, // Keeps title centered by balancing back button width
-  },
 });
+
 export default SectionHeader;
+
+

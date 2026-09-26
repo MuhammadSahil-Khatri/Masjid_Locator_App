@@ -29,6 +29,7 @@ import {
   Building2,
 } from 'lucide-react-native';
 import { colors, spacing, typography } from '../../theme';
+import SectionHeader from './components/SectionHeader';
 import { useApp } from '../../context/AppContext';
 import { useNavigation } from '../../navigation/NavigationContext';
 import { profileService } from '../../services/profileService';
@@ -283,18 +284,7 @@ export const ManageAdminsScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={goBack}
-          style={styles.backButton}
-          activeOpacity={0.8}
-          accessibilityLabel="Go back"
-        >
-          <ArrowLeft size={20} color={colors.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Manage Admins</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <SectionHeader title="Manage Admins" />
 
       {/* Search */}
       <View style={styles.searchContainer}>
@@ -656,7 +646,7 @@ const styles = StyleSheet.create({
   // List
   listContent: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: 100,
+    paddingBottom: 150,
     gap: spacing.sm,
   },
 
@@ -779,7 +769,8 @@ const styles = StyleSheet.create({
   addButton: {
     position: 'absolute',
     bottom: 24,
-    alignSelf: 'center',
+    alignSelf: 'flex-end',
+    marginRight: 15,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,

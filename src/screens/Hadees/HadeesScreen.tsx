@@ -17,6 +17,7 @@ import { colors } from '../../theme';
 import { useNavigation } from '../../navigation/NavigationContext';
 import { useApp } from '../../context/AppContext';
 import { hadithService, Hadith } from '../../services/hadithService';
+import { usePublicHadithQuery } from '../../queries/useHadithQueries';
 import { typography } from '../../theme/typography';
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -101,14 +102,18 @@ const HadithCard = ({ hadith, isRtl }: HadithCardProps) => {
   return (
     <View style={styles.hadithCard}>
       {/* Arabic Text */}
-      <Text style={styles.arabicText}>
+      <Text style={styles.arabicText} arabic weight="bold">
         {hadith.arabic_text}
       </Text>
 
       <DividerSvg />
 
       {/* Urdu / English Translation */}
-      <Text style={[showEnglish ? styles.translationTextEnglish : styles.translationTextUrdu, isRtl && styles.textRtl]}>
+      <Text
+        style={[showEnglish ? styles.translationTextEnglish : styles.translationTextUrdu, isRtl && styles.textRtl]}
+        urdu={!showEnglish}
+        weight={showEnglish ? 'medium' : 'bold'}
+      >
         {translationText}
       </Text>
 
@@ -153,35 +158,19 @@ export const HadeesScreen: React.FC = () => {
   const { goBack } = useNavigation();
   const { isRtl, triggerToast } = useApp();
 
-  const [hadiths, setHadiths] = useState<Hadith[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: hadiths = [], isLoading: loading, error: queryError, refetch } = usePublicHadithQuery();
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchData = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    setError(null);
-    try {
-      const data = await hadithService.fetchPublicHadith();
-      setHadiths(data);
-    } catch (err: any) {
-      const msg = err?.message || 'Failed to load Ahadees';
-      setError(msg);
-      triggerToast(msg);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [triggerToast]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const error = queryError ? (queryError as Error).message || 'Failed to load Ahadees' : null;
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchData(true);
-  }, [fetchData]);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
   return (
     <ImageBackground
@@ -221,7 +210,7 @@ export const HadeesScreen: React.FC = () => {
           <View style={styles.centeredState}>
             <Text style={styles.errorText}>⚠️</Text>
             <Text style={styles.stateText}>{error}</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={() => fetchData()} activeOpacity={0.8}>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()} activeOpacity={0.8}>
               <Text style={styles.retryBtnText}>{isRtl ? 'دوبارہ کوشش کریں' : 'Retry'}</Text>
             </TouchableOpacity>
           </View>
@@ -351,9 +340,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1D3B6D',
     textAlign: 'right',
-    lineHeight: 38,
+    lineHeight: 44,
     letterSpacing: 0.3,
-    fontFamily: Platform.OS === 'android' ? "serif" : 'Georgia',
   },
   dotDivider: {
     flexDirection: 'row',

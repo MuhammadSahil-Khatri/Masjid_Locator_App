@@ -1,10 +1,14 @@
 import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { authService } from '../services/auth';
 import { User, Session } from '@supabase/supabase-js';
 import { Profile } from '../types';
 import { CacheService } from '../services/cacheService';
+import { queryClient } from '../lib/queryClient';
+
+const CACHED_PROFILE_KEY = 'user_cached_profile_v1';
 
 interface AuthContextType {
   user: User | null;
@@ -34,43 +38,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const lastUserIdRef = useRef<string | null>(null);
   const fetchingUserIdRef = useRef<string | null>(null);
 
+  // Background fetch for user profile without blocking app startup / splash screen
+  const fetchProfileInBackground = useCallback(async (userId: string) => {
+    if (fetchingUserIdRef.current === userId) return;
+    fetchingUserIdRef.current = userId;
+
+    try {
+      const userProfile = await authService.fetchCurrentUserProfile(userId);
+      if (userProfile) {
+        if (userProfile.is_blocked) {
+          await authService.logout();
+          Alert.alert(
+            'Account Blocked',
+            'Your account has been blocked by the administrator. Please contact support.',
+            [{ text: 'OK' }]
+          );
+          setProfile(null);
+          setUser(null);
+          setSession(null);
+          lastUserIdRef.current = null;
+          await AsyncStorage.removeItem(CACHED_PROFILE_KEY).catch(() => {});
+          return;
+        }
+        setProfile(userProfile);
+        lastUserIdRef.current = userId;
+        await AsyncStorage.setItem(CACHED_PROFILE_KEY, JSON.stringify(userProfile)).catch(() => {});
+      }
+    } catch (err) {
+      // Offline / network failure: keep the cached profile without breaking the UI
+      console.log('[AuthContext] Background profile sync skipped (offline or network error)');
+    } finally {
+      if (fetchingUserIdRef.current === userId) {
+        fetchingUserIdRef.current = null;
+      }
+    }
+  }, []);
+
   useEffect(() => {
-    // Listen for auth state changes (INITIAL_SESSION, SIGNED_IN, SIGNED_OUT, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+    // 1. Try to restore last known profile from local disk storage for instant UI
+    AsyncStorage.getItem(CACHED_PROFILE_KEY)
+      .then((raw) => {
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+              setProfile((prev) => prev || parsed);
+            }
+          } catch {}
+        }
+      })
+      .catch(() => {});
+
+    // 2. Listen for auth state changes (INITIAL_SESSION, SIGNED_IN, SIGNED_OUT, etc.)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
       console.log(`Supabase Auth state changed [${event}]`);
       if (currentSession) {
         const userId = currentSession.user.id;
         setUser(currentSession.user);
         setSession(currentSession);
 
-        // Fetch profile if the user changed and we aren't already fetching it
-        if (userId !== lastUserIdRef.current && userId !== fetchingUserIdRef.current) {
-          fetchingUserIdRef.current = userId;
-          try {
-            const userProfile = await authService.fetchCurrentUserProfile(userId);
-            if (userProfile?.is_blocked) {
-              await authService.logout();
-              Alert.alert(
-                'Account Blocked',
-                'Your account has been blocked by the administrator. Please contact support.',
-                [{ text: 'OK' }]
-              );
-              setProfile(null);
-              setUser(null);
-              setSession(null);
-              lastUserIdRef.current = null;
-              return;
-            }
-            setProfile(userProfile);
-            lastUserIdRef.current = userId;
-          } catch (err) {
-            console.error('Error fetching user profile on auth change:', err);
-            setProfile(null);
-          } finally {
-            if (fetchingUserIdRef.current === userId) {
-              fetchingUserIdRef.current = null;
-            }
-          }
+        // Instantly mark auth as ready so splash screen never waits for network
+        setAuthLoading(false);
+
+        // Fetch fresh profile in the background asynchronously
+        if (userId !== lastUserIdRef.current) {
+          setTimeout(() => {
+            fetchProfileInBackground(userId);
+          }, 0);
         }
       } else {
         lastUserIdRef.current = null;
@@ -78,15 +112,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(null);
         setSession(null);
         setProfile(null);
+        setAuthLoading(false);
       }
-
-      setAuthLoading(false);
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [fetchProfileInBackground]);
 
   const login = useCallback(async (email: string, password: string) => {
     setActionLoading(true);
@@ -147,7 +180,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(null);
       setProfile(null);
       lastUserIdRef.current = null;
+      await AsyncStorage.removeItem(CACHED_PROFILE_KEY).catch(() => {});
       CacheService.clearAllCache();
+      // Clear TanStack Query persistent cache — prevents stale data from leaking to next login
+      queryClient.clear();
     } finally {
       setActionLoading(false);
     }

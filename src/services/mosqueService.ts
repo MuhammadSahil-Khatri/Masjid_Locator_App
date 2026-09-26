@@ -9,10 +9,10 @@ export interface MosqueRow {
   city: string;
   latitude: number;
   longitude: number;
-  description: string | null;
+  description?: string | null;
   image_url: string | null;
   admin_id: string | null;
-  capacity: number | null;
+  capacity?: number | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

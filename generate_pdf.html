@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Masjid Locator App - Screen Overview & Use Cases</title>
+<style>
+  @page {
+    size: A4;
+    margin: 20mm 18mm 20mm 18mm;
+    @bottom-right {
+      content: counter(page);
+    }
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    color: #000000;
+    background-color: #ffffff;
+    line-height: 1.5;
+    font-size: 11pt;
+  }
+
+  /* Document Header */
+  .doc-header {
+    border-bottom: 2px solid #000000;
+    padding-bottom: 12px;
+    margin-bottom: 24px;
+  }
+
+  .doc-title {
+    font-size: 20pt;
+    font-weight: bold;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .doc-subtitle {
+    font-size: 11pt;
+    color: #333333;
+    margin-bottom: 8px;
+  }
+
+  .doc-meta {
+    font-size: 9.5pt;
+    color: #555555;
+  }
+
+  /* Section Headings */
+  .section-heading {
+    font-size: 13pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    border-bottom: 1px solid #000000;
+    padding-bottom: 4px;
+    margin-top: 22px;
+    margin-bottom: 14px;
+    page-break-after: avoid;
+  }
+
+  /* Screen Entry */
+  .screen-entry {
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px dotted #888888;
+    page-break-inside: avoid;
+  }
+
+  .screen-entry:last-child {
+    border-bottom: none;
+  }
+
+  .screen-name {
+    font-size: 12pt;
+    font-weight: bold;
+    margin-bottom: 6px;
+  }
+
+  .field-label {
+    font-weight: bold;
+  }
+
+  .field-group {
+    margin-bottom: 5px;
+    font-size: 10.5pt;
+  }
+
+  ul {
+    margin-left: 20px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+  }
+
+  li {
+    margin-bottom: 3px;
+    font-size: 10pt;
+  }
+
+  .page-break {
+    page-break-before: always;
+  }
+</style>
+</head>
+<body>
+
+  <!-- DOCUMENT HEADER -->
+  <div class="doc-header">
+    <div class="doc-title">Masjid Locator App</div>
+    <div class="doc-subtitle">Screen Guide: Purpose, Features & Use Cases (Non-Technical)</div>
+    <div class="doc-meta">Audience: General Users & Non-Technical Readers | Document Type: Plain Layout Reference</div>
+  </div>
+
+  <!-- SECTION 1 -->
+  <div class="section-heading">1. Onboarding & Account Access</div>
+
+  <div class="screen-entry">
+    <div class="screen-name">1.1 Splash Screen</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> The initial startup screen that launches when the app icon is tapped. It identifies the application and prepares your prayer data.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> Automatic transition screen. A user simply opens the app; the screen checks if they are already logged in and pre-loads the latest prayer times so there is no waiting.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span> App logo, welcome branding, and automated redirection to either the Home screen (if logged in) or the Welcome screen (if logged out).</div>
+  </div>
+
+  <div class="screen-entry">
+    <div class="screen-name">1.2 Welcome Screen</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> Introduces new visitors or logged-out users to the app with a friendly greeting.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> A user who has just installed the app or recently signed out lands here to choose between signing into an existing account or registering as a new member.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span> Brief overview message, "Sign In" button, and "Create Account" button.</div>
+  </div>
+
+  <div class="screen-entry">
+    <div class="screen-name">1.3 Sign In Screen</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> Allows registered worshippers to log in securely to their personal account.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> A returning user enters their login credentials to access personal preferences, bookmarks, or administrative tools.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span>
+      <ul>
+        <li>Email address and password text fields.</li>
+        <li>Show/hide password toggle (eye icon) to prevent typing errors.</li>
+        <li>"Remember Me" option to keep the user signed in on their device.</li>
+        <li>"Forgot Password?" button to initiate password recovery.</li>
+        <li>Tab switcher to switch to the Sign Up screen.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="screen-entry">
+    <div class="screen-name">1.4 Sign Up Screen</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> Allows a new user to create a personal account in seconds.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> A first-time worshipper creates an account so they can receive personalized notifications, submit feedback, and save preferences.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span> Full name input, email input, password and confirm password inputs, and account creation submission button.</div>
+  </div>
+
+  <div class="screen-entry">
+    <div class="screen-name">1.5 Forgot Password Screen</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> Helps users regain access to their account if they forget their password.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> A user cannot remember their login password. They enter their registered email address to receive an official password reset link.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span> Email input field, "Send Reset Link" button, and a return link to go back to the Sign In screen.</div>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- SECTION 2 -->
+  <div class="section-heading">2. Daily Prayer & Companion Suite</div>
+
+  <div class="screen-entry">
+    <div class="screen-name">2.1 Home Screen (Main Dashboard)</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> The primary daily dashboard that displays all essential worship information in one central view.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> A worshipper opens the app throughout the day to check what prayer is currently active, see how much time is left before the next prayer, read the Islamic date, or quickly launch the Qibla compass.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span>
+      <ul>
+        <li>Assalam-o-Alaikum greeting with the user's name.</li>
+        <li>Current Hijri (Islamic lunar) date and Gregorian calendar date.</li>
+        <li>Live ticking digital clock.</li>
+        <li>Next prayer countdown timer (e.g., "Asr in 1h 42m").</li>
+        <li>Language switch button (English / Urdu) located at the top.</li>
+        <li>Horizontal 6-prayer strip (Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha) with the current prayer highlighted.</li>
+        <li>Quick Action buttons: Prayer Times, Daily Hadith, Qibla Compass, and Madarsa Updates.</li>
+        <li>Announcements summary card with a "See All" link.</li>
+        <li>Pull-down gesture to refresh prayer times and news at any moment.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="screen-entry">
+    <div class="screen-name">2.2 Full Prayer Times Screen</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> Provides a complete, multi-day prayer timetable calculated for your exact location.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> A user wants to check exact prayer times for tomorrow, plan their schedule for Friday Jummah, or see fasting start (Fajr) and sunset (Maghrib) times for upcoming days.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span>
+      <ul>
+        <li>Date navigation controls ("Previous Day" and "Next Day" arrows).</li>
+        <li>Detailed timings for all six slots: Fajr, Sunrise, Dhuhr, Asr, Maghrib, and Isha.</li>
+        <li>Indicator highlighting the active prayer and remaining time.</li>
+        <li>Calculation methodology note (e.g., University of Islamic Sciences, Karachi).</li>
+        <li>Functions fully offline using locally saved timetables.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="screen-entry">
+    <div class="screen-name">2.3 Qibla Compass Screen</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> Accurately points to the direction of the Holy Kaaba in Makkah for daily prayers.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> When praying at work, in a hotel room, outdoors, or in a new neighborhood where the direction of Makkah is unknown, a user opens this screen to align their prayer rug correctly.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span>
+      <ul>
+        <li>Rotating 360-degree compass dial.</li>
+        <li>Kaaba pointer needle indicating the true Qibla bearing.</li>
+        <li>Compass heading degree readout (e.g., 264° West).</li>
+        <li>Exact physical distance from your current location to Makkah in kilometers.</li>
+        <li>Sensor calibration indicator (Low, Medium, or High accuracy) with tips to wave the phone in a figure-8 if recalibration is needed.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- SECTION 3 -->
+  <div class="section-heading">3. Mosque Discovery & Navigation</div>
+
+  <div class="screen-entry">
+    <div class="screen-name">3.1 Mosque Search & Interactive Map Screen</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> An interactive geographic map showing all mosques in your vicinity with search and facility filters.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> A worshipper is driving or walking in an unfamiliar area and wants to find mosques within a specific radius (e.g., 2 km or 5 km) that have a women's prayer area, parking, or wheelchair ramps.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span>
+      <ul>
+        <li>Interactive map centered on the user's location with pins for all nearby mosques.</li>
+        <li>Search bar to find mosques by name or locality.</li>
+        <li>Distance radius filter (2 km, 5 km, 10 km, 25 km).</li>
+        <li>Facility filter chips: Wudu Area, Wheelchair Access, Women's Prayer Area, Air Conditioning, Parking, and Janaza Facility.</li>
+        <li>Map View / List View toggle button.</li>
+        <li>Tapping any pin marker opens a bottom preview card with quick mosque information.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="screen-entry">
+    <div class="screen-name">3.2 Nearest Mosques Directory Screen</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> A clear list of nearby mosques organized in ascending order of physical distance.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> A worshipper needs to find the closest mosque quickly for an approaching prayer time without navigating a full map.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span>
+      <ul>
+        <li>List of mosque cards sorted closest to furthest (e.g., 0.3 km, 0.8 km, 1.5 km).</li>
+        <li>Mosque name, neighborhood, and street address.</li>
+        <li>Worshipper capacity indicator (e.g., Capacity: 1,200).</li>
+        <li>Facility badges showing available amenities.</li>
+        <li>"Directions" button to open navigation immediately.</li>
+        <li>"View Details" button to open the full mosque profile.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="screen-entry">
+    <div class="screen-name">3.3 Mosque Profile & Details Screen (Bottom Sheet)</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> A comprehensive profile of a selected mosque, showing its specific congregation times and local notices.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> A user wants to check the exact Jama'at (congregational) times of a specific mosque, get step-by-step driving directions, or share the mosque's location with family members.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span>
+      <ul>
+        <li>Mosque exterior/interior photos, verified address, and capacity.</li>
+        <li>"Directions" button: Launches Google Maps or Apple Maps directly to the mosque entrance.</li>
+        <li>"Share" button: Formats mosque details into a text link to share via WhatsApp or SMS.</li>
+        <li>Prayers Tab: Daily and weekly Jama'at / Iqamah congregation times set by this specific mosque.</li>
+        <li>Announcements Tab: Community events and notices published specifically by this mosque.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- SECTION 4 -->
+  <div class="section-heading">4. Islamic Knowledge & Announcements</div>
+
+  <div class="screen-entry">
+    <div class="screen-name">4.1 Daily Hadith Screen</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> Delivers an authenticated Hadith every day for daily spiritual reflection and learning.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> A worshipper visits this screen daily to read a verified saying of Prophet Muhammad (PBUH), reflect on its practical lessons, and share it with friends and family.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span>
+      <ul>
+        <li>Topic category tag (e.g., Character & Manners, Prayer, Sincerity, Charity).</li>
+        <li>Clear Arabic text in traditional Islamic font.</li>
+        <li>Translation language switch: Toggle between English and Urdu.</li>
+        <li>Authentic reference citation (e.g., Sahih al-Bukhari, Book 2, Hadith 11).</li>
+        <li>Key takeaways and commentary explaining how to apply the Hadith in everyday life.</li>
+        <li>"Copy to Clipboard" button and "Share" button for WhatsApp and social media.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="screen-entry">
+    <div class="screen-name">4.2 Announcements Categories Screen</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> Organizes all local mosque community notices into eight distinct, clear categories.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> A user looking for a specific type of community update (such as Friday Khutbah topics, funeral notices, or Quran classes) taps directly into that topic.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span>
+      Eight selectable category cards:
+      <ul>
+        <li><strong>Funding Programs:</strong> Mosque donations, charity drives, and community welfare funds.</li>
+        <li><strong>Masjid Under Construction:</strong> Building expansions, repairs, and progress updates.</li>
+        <li><strong>Taqreer / Speeches:</strong> Islamic lectures, seminars, and talks by guest scholars.</li>
+        <li><strong>Jummah Khutbah:</strong> Friday sermon topics, guest Khatibs, and shift timings.</li>
+        <li><strong>Daily Programs:</strong> Daily Quran circles, Hadith halaqas, and regular study sessions.</li>
+        <li><strong>Mega Programs:</strong> Annual conferences, Eid gatherings, and Seerah events.</li>
+        <li><strong>Janaza / Funerals:</strong> Funeral prayer timings, deceased information, and burial details.</li>
+        <li><strong>Madarsa Updates:</strong> Student admissions, Hifz completions, and exam schedules.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="screen-entry">
+    <div class="screen-name">4.3 Category Announcements Screen & Notice Detail</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> Displays the feed of notices under a chosen category and provides full details for any notice selected.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> A user taps "Janaza" to see recent funeral announcements or "Taqreer" to see upcoming scholar lectures, then opens a notice to view the event flyer and timings.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span>
+      <ul>
+        <li>List view: Notice headline, organizing mosque, date/time, and preview thumbnail.</li>
+        <li>Full notice view: High-resolution flyer image (zoomable), detailed event description, mosque contact number, and share button.</li>
+        <li>Empty state graphic when there are no active notices in a category.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- SECTION 5 -->
+  <div class="section-heading">5. User Settings & Profile Management</div>
+
+  <div class="screen-entry">
+    <div class="screen-name">5.1 Settings Screen</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> The central account management, language preference, and support hub.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> A worshipper comes here to switch languages between English and Urdu, update their profile, report an issue, or sign out.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span>
+      <ul>
+        <li>Profile summary with avatar photo, name, email, and user role badge.</li>
+        <li>"Log Out" button with confirmation prompt to prevent accidental sign-out.</li>
+        <li>"Edit Profile" and "Change Password" navigation links.</li>
+        <li>Language selector: One-tap toggle between English and Urdu (instantly flips layout to Right-to-Left).</li>
+        <li>Support options: "Send Feedback" form, Privacy Policy, and Terms of Service.</li>
+        <li>Role-protected admin portal links (visible only if the logged-in user is an administrator).</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="screen-entry">
+    <div class="screen-name">5.2 Edit Profile Screen</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> Allows users to maintain and update their personal account details.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> A user changes their phone number, moves to a new city, or wants to update their display name.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span> Profile avatar photo picker (select from phone camera or gallery), display name field, phone number field, city field, and a "Save Changes" button.</div>
+  </div>
+
+  <div class="screen-entry">
+    <div class="screen-name">5.3 Change Password Screen</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> Allows users to update their account password securely.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> A user periodically updates their login password for account security.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span> Current password field, new password field with strength guidance, confirm new password field, password eye visibility toggles, and "Update Password" button.</div>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- SECTION 6 -->
+  <div class="section-heading">6. Mosque Admin Portal (For Mosque Committees & Imams)</div>
+
+  <div class="screen-entry">
+    <div class="screen-name">6.1 Mosque Admin Panel</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> A dedicated portal for authorized mosque committees and Imams to manage their mosque's listing.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> A mosque administrator logs in to update seasonal prayer timings, announce upcoming lectures, or update mosque contact details.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span> Overview of the assigned mosque, quick links to Edit Mosque Details, Update Prayer Schedules, and Create New Announcements.</div>
+  </div>
+
+  <div class="screen-entry">
+    <div class="screen-name">6.2 Assigned Mosque Management Screen</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> The form used to keep mosque details, photos, and amenities up to date.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> The mosque adds a new wheelchair ramp or opens a dedicated sisters' prayer area, so the committee updates these amenities in the app for worshippers.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span> Mosque name, phone number, email, address, capacity count, facility checkboxes (Wudu, Wheelchair, Women's Area, Parking, Air Conditioning, Janaza), photo uploader, and GPS coordinate inputs.</div>
+  </div>
+
+  <!-- SECTION 7 -->
+  <div class="section-heading">7. Super Admin Suite (For Platform Caretakers)</div>
+
+  <div class="screen-entry">
+    <div class="screen-name">7.1 Super Admin Panel</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> Master administration dashboard for global platform management and oversight.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> Platform caretakers review new mosque registrations, assign local admins, and moderate platform content.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span> Seven management module links: Manage Mosques, Manage Admins, Manage Super Admins, Manage Hadith, Manage Announcements, Manage Worshipers, and Mosque Admin Portal.</div>
+  </div>
+
+  <div class="screen-entry">
+    <div class="screen-name">7.2 Manage Mosques Screen</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> Global directory management for all mosques in the system.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> Adding new mosques to the database, editing existing listings, or deleting inactive entries.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span> Searchable mosque list, "+ Add Mosque" button, edit actions, and delete confirmation options.</div>
+  </div>
+
+  <div class="screen-entry">
+    <div class="screen-name">7.3 Manage Admins Screen</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> Role assignment screen to link verified imams or committee members to their specific mosques.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> A new mosque joins the platform; the super administrator assigns the mosque's committee head as its authorized admin.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span> List of current mosque administrators, mosque dropdown assignment selector, and privilege revocation button.</div>
+  </div>
+
+  <div class="screen-entry">
+    <div class="screen-name">7.4 Manage Daily Hadith Screen</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> Content management for scheduling and reviewing the daily Ahadith.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> Preparing upcoming daily Ahadith with verified Arabic text and authentic English and Urdu translations.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span> Calendar list of scheduled Ahadith, input form for Arabic text, English translation, Urdu translation, source book citation, and publication date picker.</div>
+  </div>
+
+  <div class="screen-entry">
+    <div class="screen-name">7.5 Manage Announcements Screen</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> Reviewing, moderating, and publishing community-wide announcements.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> Publishing emergency community notices, Ramadan timetables, or reviewing submissions from local mosques.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span> Filter by status (Active, Expired, Pinned), announcement editor (title, category, targeted mosque or global, flyer upload, expiry date), and "Pin to Home" toggle.</div>
+  </div>
+
+  <div class="screen-entry">
+    <div class="screen-name">7.6 Manage Worshipers Screen</div>
+    <div class="field-group"><span class="field-label">Purpose:</span> User account moderation to ensure a safe, respectful community.</div>
+    <div class="field-group"><span class="field-label">Use Case:</span> Moderating user accounts, resolving reported account issues, or reviewing submitted user feedback.</div>
+    <div class="field-group"><span class="field-label">Data & Actions on Screen:</span> Searchable worshipper accounts list, status tags (Active / Suspended), user block/unblock toggles, and user deletion tools.</div>
+  </div>
+
+</body>
+</html>

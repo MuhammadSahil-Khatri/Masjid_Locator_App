@@ -27,8 +27,10 @@ import {
   Filter,
   Edit3,
   Globe,
+  Calendar,
 } from 'lucide-react-native';
 import { colors, spacing, typography } from '../../theme';
+import SectionHeader from './components/SectionHeader';
 import { useApp } from '../../context/AppContext';
 import { useNavigation } from '../../navigation/NavigationContext';
 import { supabase } from '../../lib/supabase';
@@ -46,6 +48,91 @@ interface FilterState {
   status: 'all' | 'active' | 'inactive';
   sortBy: 'newest' | 'oldest';
 }
+
+// ─── Hadith Card (Consistent with MosqueBottomSheet) ─────────────────────────
+
+interface ManageHadithCardProps {
+  item: Hadith;
+  onPress: () => void;
+}
+
+const ManageHadithCard: React.FC<ManageHadithCardProps> = ({ item, onPress }) => {
+  return (
+    <TouchableOpacity
+      style={styles.sheetCard}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
+      {/* Header Row: Badges */}
+      <View style={styles.sheetCardHeader}>
+        <View style={styles.sheetBadgesLeft}>
+          {item.reference ? (
+            <View style={styles.sheetBadge}>
+              <Text style={styles.sheetBadgeText}>{item.reference}</Text>
+            </View>
+          ) : null}
+        </View>
+        <View
+          style={[
+            styles.badgeActive,
+            {
+              backgroundColor: item.is_active
+                ? 'rgba(34,197,94,0.1)'
+                : 'rgba(142,142,142,0.1)',
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.badgeActiveText,
+              { color: item.is_active ? colors.success : colors.light.textMuted },
+            ]}
+          >
+            {item.is_active ? 'Active' : 'Inactive'}
+          </Text>
+        </View>
+      </View>
+
+      {/* Arabic Text */}
+      {!!item.arabic_text && (
+        <Text
+          style={styles.sheetBodyArabic}
+          numberOfLines={3}
+        >
+          {item.arabic_text}
+        </Text>
+      )}
+
+      {/* English Translation */}
+      {!!item.english_translation && (
+        <Text
+          style={[
+            styles.sheetBodyText,
+            styles.sheetBodyEnglish,
+            !!item.arabic_text && { marginTop: 6 },
+          ]}
+          numberOfLines={3}
+        >
+          {item.english_translation}
+        </Text>
+      )}
+
+      {/* Urdu Translation */}
+      {!!item.urdu_translation && (
+        <Text
+          style={[
+            styles.sheetBodyText,
+            styles.sheetBodyUrdu,
+            (!!item.arabic_text || !!item.english_translation) && { marginTop: 6 },
+          ]}
+          numberOfLines={3}
+        >
+          {item.urdu_translation}
+        </Text>
+      )}
+    </TouchableOpacity>
+  );
+};
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
@@ -79,6 +166,7 @@ export const ManageHadithScreen: React.FC = () => {
   const [formEnglishTranslation, setFormEnglishTranslation] = useState('');
   const [formReference, setFormReference] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
+  const [formCreatedAt, setFormCreatedAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Filter modal
@@ -173,6 +261,7 @@ export const ManageHadithScreen: React.FC = () => {
     setFormEnglishTranslation('');
     setFormReference('');
     setFormIsActive(true);
+    setFormCreatedAt(null);
     setShowModal(true);
   }, []);
 
@@ -184,6 +273,7 @@ export const ManageHadithScreen: React.FC = () => {
     setFormEnglishTranslation(item.english_translation || '');
     setFormReference(item.reference || '');
     setFormIsActive(item.is_active);
+    setFormCreatedAt(item.created_at || null);
     setShowModal(true);
   }, []);
 
@@ -236,6 +326,17 @@ export const ManageHadithScreen: React.FC = () => {
     openEditModal(item);
   }, [openEditModal]);
 
+  const handleDeleteFromModal = useCallback(() => {
+    if (!editId) return;
+    const title = formReference || formEnglishTranslation || formUrduTranslation || 'this hadith';
+    setShowModal(false);
+    setConfirm({
+      visible: true,
+      hadithId: editId,
+      hadithTitle: title,
+    });
+  }, [editId, formReference, formEnglishTranslation, formUrduTranslation]);
+
   const handleDelete = useCallback((item: any) => {
     setConfirm({
       visible: true,
@@ -252,13 +353,14 @@ export const ManageHadithScreen: React.FC = () => {
       await hadithService.deleteHadith(confirm.hadithId);
       triggerToast('Hadith deleted successfully.');
       setConfirm({ visible: false, hadithId: null, hadithTitle: '' });
+      closeModal();
       loadData();
     } catch (err: any) {
       triggerToast(`Error: ${err?.message || 'Failed to delete hadith.'}`);
     } finally {
       setActionLoading(false);
     }
-  }, [confirm.hadithId, triggerToast, loadData]);
+  }, [confirm.hadithId, triggerToast, closeModal, loadData]);
 
   const closeConfirm = useCallback(() => {
     if (actionLoading) return;
@@ -317,18 +419,7 @@ export const ManageHadithScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={goBack}
-          style={styles.backButton}
-          activeOpacity={0.8}
-          accessibilityLabel="Go back"
-        >
-          <ArrowLeft size={20} color={colors.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Manage Hadith</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <SectionHeader title="Manage Hadith" />
 
       {/* Search + Filter */}
       <View style={styles.searchRow}>
@@ -386,50 +477,10 @@ export const ManageHadithScreen: React.FC = () => {
             </View>
           }
           renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.card}
+            <ManageHadithCard
+              item={item}
               onPress={() => openEditModal(item)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardContent}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.cardTitleRow}>
-                    <Edit3 size={14} color={colors.brown} />
-                    <Text style={styles.cardArabicText} numberOfLines={1}>
-                      {item.arabic_text}
-                    </Text>
-                  </View>
-                  <View style={styles.cardBadges}>
-                    <View style={[styles.badgeActive, { backgroundColor: item.is_active ? 'rgba(34,197,94,0.1)' : 'rgba(142,142,142,0.1)' }]}>
-                      <Text style={[styles.badgeActiveText, { color: item.is_active ? colors.success : colors.light.textMuted }]}>
-                        {item.is_active ? 'Active' : 'Inactive'}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-                <Text style={styles.cardEnglishText} numberOfLines={2}>
-                  {item.english_translation}
-                </Text>
-                <View style={styles.cardFooter}>
-                  <View style={styles.cardMetaRow}>
-                    <Globe size={12} color={colors.primary} />
-                    <Text style={styles.cardMetaText}>{item.reference}</Text>
-                  </View>
-                  {item.urdu_translation ? (
-                    <Text style={styles.cardUrduPreview} numberOfLines={1}>
-                      اردو: {item.urdu_translation}
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-              <TouchableOpacity
-                style={styles.cardDeleteBtn}
-                onPress={() => handleDelete(item)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Trash2 size={16} color={colors.danger} />
-              </TouchableOpacity>
-            </TouchableOpacity>
+            />
           )}
         />
       </View>
@@ -527,14 +578,44 @@ export const ManageHadithScreen: React.FC = () => {
                 placeholderTextColor={colors.light.textMuted}
               />
 
+              {/* Date of Creation */}
+              {editMode && formCreatedAt ? (
+                <View style={styles.createdAtContainer}>
+                  <Calendar size={14} color={colors.light.textMuted} />
+                  <Text style={styles.createdAtLabel}>Created:</Text>
+                  <View style={styles.createdAtBadge}>
+                    <Text style={styles.createdAtText}>
+                      {new Date(formCreatedAt).toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+
               {/* Action buttons */}
               <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={[styles.modalActionBtn, styles.cancelBtn]}
-                  onPress={closeModal}
-                >
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
+                {editMode ? (
+                  <TouchableOpacity
+                    style={[styles.modalActionBtn, styles.deleteBtn]}
+                    onPress={handleDeleteFromModal}
+                    activeOpacity={0.7}
+                    disabled={saving}
+                  >
+                    <Trash2 size={16} color={colors.danger} />
+                    <Text style={styles.deleteBtnText}>Delete</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.modalActionBtn, styles.cancelBtn]}
+                    onPress={closeModal}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.cancelBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   style={[styles.modalActionBtn, styles.saveBtn]}
                   onPress={handleSave}
@@ -806,7 +887,7 @@ const styles = StyleSheet.create({
   // List
   listContent: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: 100,
+    paddingBottom: 150,
     gap: spacing.sm,
   },
 
@@ -823,43 +904,56 @@ const styles = StyleSheet.create({
     maxWidth: 240,
   },
 
-  // Card
-  card: {
-    backgroundColor: colors.light.surface,
-    borderRadius: spacing.borderRadiusLg,
-    borderWidth: 1,
-    borderColor: colors.light.border,
-    padding: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
+  // Hadith Card (Consistent with MosqueBottomSheet)
+  sheetCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1.2,
+    borderColor: '#D8F3FA',
+    padding: 14,
+    marginBottom: 10,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+      },
+    }),
   },
-  cardContent: {
-    flex: 1,
-    gap: 6,
-  },
-  cardHeader: {
+  sheetCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  sheetBadgesLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     flexWrap: 'wrap',
-    gap: spacing.xs,
-  },
-  cardTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
     flex: 1,
   },
-  cardArabicText: {
-    fontSize: typography.sizes.base,
-    color: colors.brown,
-    fontWeight: '600',
-    textAlign: 'right',
-    flex: 1,
+  sheetBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#D1F3F9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
-  cardBadges: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  sheetBadgeText: {
+    color: '#153258',
+    fontSize: 11,
+    fontWeight: '700',
   },
   badgeActive: {
     paddingHorizontal: spacing.sm,
@@ -871,42 +965,34 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
   },
-  cardEnglishText: {
-    fontSize: typography.sizes.sm,
-    color: colors.light.text,
-    lineHeight: 20,
-    fontStyle: 'italic',
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginTop: 2,
-  },
-  cardMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  cardMetaText: {
-    fontSize: typography.sizes.xs,
-    color: colors.light.textMuted,
-  },
-  cardUrduPreview: {
-    fontSize: typography.sizes.xs,
-    color: colors.light.textMuted,
+  sheetBodyArabic: {
+    fontSize: 16,
+    lineHeight: 26,
+    color: '#1B365D',
     textAlign: 'right',
+    fontWeight: '600',
   },
-  cardDeleteBtn: {
-    padding: spacing.sm,
-    marginLeft: spacing.sm,
+  sheetBodyText: {
+    color: '#1B365D',
+    letterSpacing: 0.1,
+  },
+  sheetBodyEnglish: {
+    fontSize: 13.5,
+    lineHeight: 20,
+    textAlign: 'left',
+  },
+  sheetBodyUrdu: {
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: 'right',
   },
 
   // Add Button
   addButton: {
     position: 'absolute',
     bottom: 24,
-    alignSelf: 'center',
+    alignSelf: 'flex-end',
+    marginRight: 15,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
@@ -1039,6 +1125,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.light.text,
   },
+  deleteBtn: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  deleteBtnText: {
+    fontSize: typography.sizes.base,
+    fontWeight: '700',
+    color: colors.danger,
+  },
 
   // Filter modal
   filterModalContainer: {
@@ -1145,6 +1241,30 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.base,
     fontWeight: '600',
     color: colors.light.text,
+  },
+
+  // Created At
+  createdAtContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+    paddingTop: spacing.sm,
+  },
+  createdAtLabel: {
+    fontSize: typography.sizes.sm,
+    color: colors.light.textMuted,
+    fontWeight: '600',
+  },
+  createdAtBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  createdAtText: {
+    fontSize: typography.sizes.sm,
+    color: colors.light.text,
+    fontWeight: '600',
   },
 });
 

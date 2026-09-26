@@ -28,6 +28,7 @@ import {
   ShieldCheck,
 } from 'lucide-react-native';
 import { colors, spacing, typography } from '../../theme';
+import SectionHeader from './components/SectionHeader';
 import { useApp } from '../../context/AppContext';
 import { useNavigation } from '../../navigation/NavigationContext';
 import { profileService } from '../../services/profileService';
@@ -267,18 +268,7 @@ export const ManageSuperAdminsScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={goBack}
-          style={styles.backButton}
-          activeOpacity={0.8}
-          accessibilityLabel="Go back"
-        >
-          <ArrowLeft size={20} color={colors.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Manage Super Admins</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <SectionHeader title="Manage Super Admins" />
 
       {/* Search */}
       <View style={styles.searchContainer}>
@@ -466,7 +456,7 @@ const SuperAdminCard: React.FC<SuperAdminCardProps> = ({
     <View
       style={[
         styles.card,
-        isCurrentUser && { backgroundColor: 'rgba(246, 139, 53, 0.08)' },
+        // isCurrentUser && { backgroundColor: 'rgba(246, 139, 53, 0.08)' },
       ]}
     >
       {/* Top row: name + "You" badge + three-dot menu */}
@@ -650,7 +640,7 @@ const styles = StyleSheet.create({
   // List
   listContent: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: 100,
+    paddingBottom: 150,
     gap: spacing.sm,
   },
 
@@ -762,7 +752,8 @@ const styles = StyleSheet.create({
   addButton: {
     position: 'absolute',
     bottom: 24,
-    alignSelf: 'center',
+    alignSelf: 'flex-end',
+    marginRight: 15,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,

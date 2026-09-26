@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Text } from '../ui/Text';
 import { useApp } from '../../context/AppContext';
-import { KhutbahIcon, TaqreerIcon, NextIcon } from '../../screens/Announcements/AnnouncementIcons';
+import { AnnouncementCategoryIcon, NextIcon } from '../../screens/Announcements/AnnouncementIcons';
 
 export interface AnnouncementCardProps {
   id: string;
@@ -37,26 +37,14 @@ export const AnnouncementCard: React.FC<AnnouncementCardProps> = ({
       return customRightContent;
     }
 
-    const lowerId = id.toLowerCase();
-    const lowerTitle = title.toLowerCase();
-
-    if (lowerId.includes('khutbah') || lowerTitle.includes('khutbah')) {
-      return (
-        <View style={styles.rightIconWrapper}>
-          <KhutbahIcon width={76} height={28} />
-        </View>
-      );
-    }
-
-    if (lowerId.includes('taqreer') || lowerTitle.includes('taqreer')) {
-      return (
-        <View style={styles.rightIconWrapper}>
-          <TaqreerIcon width={52} height={46} />
-        </View>
-      );
-    }
-
-    return null;
+    return (
+      <AnnouncementCategoryIcon
+        id={id}
+        title={title}
+        size={50}
+        wrapperStyle={styles.rightIconWrapper}
+      />
+    );
   };
 
   return (

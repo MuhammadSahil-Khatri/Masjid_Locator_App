@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, ScrollView, Pressable, ActivityIndicator } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronRight, Building2, BookOpen, Bell, Shield } from 'lucide-react-native';
+import { StyleSheet, View, ScrollView, Pressable, ActivityIndicator, ImageBackground, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ChevronRight, Building2, BookOpen, Bell, Shield, Sparkles } from 'lucide-react-native';
 import { Text } from '../../components/ui/Text';
 import { useNavigation } from '../../navigation/NavigationContext';
 import { colors, spacing, typography } from '../../theme';
@@ -12,212 +12,268 @@ import { mosqueService } from '../../services/mosqueService';
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface AdminOptionProps {
-    icon: React.ReactNode;
-    title: string;
-    subtitle: string;
-    onPress: () => void;
-    index: number;
+  icon: React.ReactNode;
+  iconBg: string;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+  index: number;
 }
 
-const AdminOptionRow: React.FC<AdminOptionProps> = ({ icon, title, subtitle, onPress, index }) => {
-    const themeColors = colors.light;
-    const scale = useSharedValue(1);
+const AdminOptionRow: React.FC<AdminOptionProps> = ({ icon, iconBg, title, subtitle, onPress, index }) => {
+  const scale = useSharedValue(1);
 
-    const rStyle = useAnimatedStyle(() => {
-        return {
-            transform: [{ scale: scale.value }],
-        };
-    });
+  const rStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: scale.value }],
+    };
+  });
 
-    return (
-        <AnimatedPressable
-            entering={FadeInDown.delay(index * 60).duration(350)}
-            onPressIn={() => {
-                scale.value = withSpring(0.97, { damping: 15, stiffness: 300 });
-            }}
-            onPressOut={() => {
-                scale.value = withSpring(1, { damping: 15, stiffness: 300 });
-            }}
-            onPress={onPress}
-            style={[
-                styles.tileContainer,
-                {
-                    backgroundColor: themeColors.surface,
-                    borderColor: themeColors.border,
-                },
-                rStyle,
-            ]}
-        >
-            <View style={[styles.iconWrapper, { backgroundColor: 'rgba(246, 139, 53, 0.1)' }]}>
-                {icon}
-            </View>
-            <View style={styles.textContainer}>
-                <Text style={[styles.tileTitle, { color: themeColors.text }]} weight="bold">
-                    {title}
-                </Text>
-                <Text style={[styles.tileSubtitle, { color: themeColors.textMuted }]}>
-                    {subtitle}
-                </Text>
-            </View>
-            <ChevronRight size={20} color={themeColors.textMuted} />
-        </AnimatedPressable>
-    );
+  return (
+    <Animated.View entering={FadeInDown.delay(index * 50).duration(300)}>
+      <AnimatedPressable
+        onPressIn={() => {
+          scale.value = withSpring(0.97, { damping: 15, stiffness: 300 });
+        }}
+        onPressOut={() => {
+          scale.value = withSpring(1, { damping: 15, stiffness: 300 });
+        }}
+        onPress={onPress}
+        style={[styles.tileContainer, rStyle]}
+      >
+        <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
+          {icon}
+        </View>
+        <View style={styles.textContainer}>
+          <Text style={styles.tileTitle} weight="bold">
+            {title}
+          </Text>
+          <Text style={styles.tileSubtitle}>
+            {subtitle}
+          </Text>
+        </View>
+        <View style={styles.chevronWrapper}>
+          <ChevronRight size={18} color="#1D3B6D" />
+        </View>
+      </AnimatedPressable>
+    </Animated.View>
+  );
 };
 
 export const AdminPanel: React.FC = () => {
-    const { navigate } = useNavigation();
-    const insets = useSafeAreaInsets();
-    const themeColors = colors.light;
-    const [hasMosque, setHasMosque] = useState<boolean | null>(null);
+  const { navigate } = useNavigation();
+  const insets = useSafeAreaInsets();
+  const [hasMosque, setHasMosque] = useState<boolean | null>(null);
 
-    useEffect(() => {
-        mosqueService.fetchAdminMosque().then((mosque) => {
-            setHasMosque(!!mosque);
-        }).catch(() => {
-            setHasMosque(false);
-        });
-    }, []);
+  useEffect(() => {
+    mosqueService.fetchAdminMosque().then((mosque) => {
+      setHasMosque(!!mosque);
+    }).catch(() => {
+      setHasMosque(false);
+    });
+  }, []);
 
-    const options: { key: string; title: string; subtitle: string; icon: React.ReactNode; route: any; visible: boolean }[] = [
-        {
-            key: 'AssignedMosque',
-            title: 'Assigned Mosque',
-            subtitle: 'View and manage your assigned mosque details',
-            icon: <Building2 size={22} color={colors.primary} />,
-            route: 'AssignedMosque' as const,
-            visible: hasMosque === true,
-        },
-        {
-            key: 'ManageHadith',
-            title: 'Manage Hadith',
-            subtitle: 'Curate, translate, & manage hadith entries',
-            icon: <BookOpen size={22} color={colors.primary} />,
-            route: 'ManageHadith' as const,
-            visible: true,
-        },
-        {
-            key: 'ManageAnnouncements',
-            title: 'Manage Announcements',
-            subtitle: 'Publish community updates and broadcast alerts',
-            icon: <Bell size={22} color={colors.primary} />,
-            route: 'ManageAnnouncements' as const,
-            visible: true,
-        },
-    ];
+  const options = [
+    {
+      key: 'AssignedMosque',
+      title: 'Assigned Mosque',
+      subtitle: 'View and manage your assigned mosque details',
+      icon: <Building2 size={22} color="#F68B35" />,
+      iconBg: 'rgba(246, 139, 53, 0.12)',
+      route: 'AssignedMosque' as const,
+      visible: hasMosque === true,
+    },
+    {
+      key: 'ManageHadith',
+      title: 'Manage Hadith',
+      subtitle: 'Curate, translate, & manage daily hadith entries',
+      icon: <BookOpen size={22} color="#10B981" />,
+      iconBg: 'rgba(16, 185, 129, 0.12)',
+      route: 'ManageHadith' as const,
+      visible: true,
+    },
+    {
+      key: 'ManageAnnouncements',
+      title: 'Manage Announcements',
+      subtitle: 'Publish community updates and broadcast alerts',
+      icon: <Bell size={22} color="#9333EA" />,
+      iconBg: 'rgba(147, 51, 234, 0.12)',
+      route: 'ManageAnnouncements' as const,
+      visible: true,
+    },
+  ];
 
-    const visibleOptions = options.filter(o => o.visible);
+  const visibleOptions = options.filter((o) => o.visible);
 
-    return (
-        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.white }]} edges={['top']}>
-            <Animated.View style={styles.container} entering={FadeIn.duration(400)}>
-                <SectionHeader title="Admin Panel" />
+  return (
+    <ImageBackground
+      source={require('../../../assets/background_image_vertical.png')}
+      style={styles.backgroundImage}
+      resizeMode="cover"
+    >
+      <Animated.View style={styles.container} entering={FadeIn.duration(350)}>
+        <SectionHeader title="Admin Panel" />
 
-                <ScrollView
-                    contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + spacing.xl }]}
-                    showsVerticalScrollIndicator={false}
-                >
-                    {/* Welcome/Banner Section */}
-                    <Animated.View entering={FadeInDown.duration(350).delay(50)} style={[styles.bannerCard, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}>
-                        <Text style={[styles.bannerTitle, { color: themeColors.text }]} weight="bold">
-                            Content Administration
-                        </Text>
-                        <Text style={[styles.bannerSubtitle, { color: themeColors.textMuted }]}>
-                            Manage your assigned mosque, hadith content, and community announcements.
-                        </Text>
-                    </Animated.View>
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 20) + 85 }]}
+          showsVerticalScrollIndicator={false}
+        >
 
-                    {hasMosque === null ? (
-                        <View style={styles.loadingContainer}>
-                            <ActivityIndicator size="large" color={colors.primary} />
-                        </View>
-                    ) : (
-                        <View style={styles.optionsList}>
-                            {visibleOptions.map((opt, index) => (
-                                <AdminOptionRow
-                                    key={opt.key}
-                                    icon={opt.icon}
-                                    title={opt.title}
-                                    subtitle={opt.subtitle}
-                                    index={index}
-                                    onPress={() => navigate(opt.route)}
-                                />
-                            ))}
-                        </View>
-                    )}
-                </ScrollView>
-            </Animated.View>
-        </SafeAreaView>
-    );
+          {hasMosque === null ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : (
+            <View style={styles.optionsList}>
+              {visibleOptions.map((opt, index) => (
+                <AdminOptionRow
+                  key={opt.key}
+                  icon={opt.icon}
+                  iconBg={opt.iconBg}
+                  title={opt.title}
+                  subtitle={opt.subtitle}
+                  index={index}
+                  onPress={() => navigate(opt.route)}
+                />
+              ))}
+            </View>
+          )}
+        </ScrollView>
+      </Animated.View>
+    </ImageBackground>
+  );
 };
 
 const styles = StyleSheet.create({
-    safeArea: {
-        flex: 1,
-    },
-    container: {
-        flex: 1,
-    },
-    scrollContent: {
-        padding: spacing.lg,
-    },
-    bannerCard: {
-        borderRadius: spacing.borderRadiusLg,
-        borderWidth: 1,
-        padding: spacing.lg,
-        marginBottom: spacing.xl,
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xs,
+  },
+  bannerCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(203, 158, 103, 0.25)',
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+    ...Platform.select({
+      ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.03,
-        shadowRadius: 4,
-        elevation: 1.5,
-    },
-    bannerTitle: {
-        fontSize: typography.sizes.md + 1,
-        marginBottom: spacing.xs,
-    },
-    bannerSubtitle: {
-        fontSize: typography.sizes.sm,
-        lineHeight: 18,
-    },
-    loadingContainer: {
-        paddingVertical: spacing.xl * 2,
-        alignItems: 'center',
-    },
-    optionsList: {
-        gap: spacing.md,
-    },
-    tileContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: spacing.md,
-        borderRadius: spacing.borderRadiusLg,
-        borderWidth: 1,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 2,
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+      },
+    }),
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  roleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(203, 158, 103, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  roleBadgeText: {
+    fontSize: 11,
+    color: '#CB9E67',
+    letterSpacing: 0.5,
+  },
+  bannerTitle: {
+    fontSize: typography.sizes.lg,
+    color: '#1D3B6D',
+    marginBottom: 4,
+  },
+  bannerSubtitle: {
+    fontSize: typography.sizes.sm,
+    color: '#6B7280',
+    lineHeight: 20,
+  },
+  loadingContainer: {
+    paddingVertical: spacing.xl * 2,
+    alignItems: 'center',
+  },
+  optionsList: {
+    gap: 12,
+  },
+  tileContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(29, 59, 109, 0.08)',
+    ...Platform.select({
+      ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 6,
+      },
+      android: {
         elevation: 2,
-    },
-    iconWrapper: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: spacing.md,
-    },
-    textContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        marginRight: spacing.sm,
-    },
-    tileTitle: {
-        fontSize: typography.sizes.base + 1,
-        marginBottom: 2,
-    },
-    tileSubtitle: {
-        fontSize: typography.sizes.xs + 1,
-        lineHeight: 16,
-    },
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+      },
+    }),
+  },
+  iconWrapper: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  textContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+  },
+  tileTitle: {
+    fontSize: typography.sizes.base,
+    color: '#1D3B6D',
+    marginBottom: 2,
+  },
+  tileSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    lineHeight: 16,
+  },
+  chevronWrapper: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(29, 59, 109, 0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });
+
 export default AdminPanel;

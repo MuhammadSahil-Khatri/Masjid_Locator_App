@@ -46,9 +46,7 @@ export const AssignedMosqueScreen: React.FC = () => {
     const [editCity, setEditCity] = useState('');
     const [editLatitude, setEditLatitude] = useState('');
     const [editLongitude, setEditLongitude] = useState('');
-    const [editDescription, setEditDescription] = useState('');
     const [editImageUrl, setEditImageUrl] = useState('');
-    const [editCapacity, setEditCapacity] = useState('');
     const [editIsActive, setEditIsActive] = useState(true);
     const [editSelectedTagIds, setEditSelectedTagIds] = useState<string[]>([]);
     const [saving, setSaving] = useState(false);
@@ -69,9 +67,7 @@ export const AssignedMosqueScreen: React.FC = () => {
             setEditCity(data.city || '');
             setEditLatitude(data.latitude?.toString() || '');
             setEditLongitude(data.longitude?.toString() || '');
-            setEditDescription(data.description || '');
             setEditImageUrl(data.image_url || '');
-            setEditCapacity(data.capacity?.toString() || '');
             setEditIsActive(data.is_active);
 
             // Load tags
@@ -128,9 +124,7 @@ export const AssignedMosqueScreen: React.FC = () => {
                 city: editCity,
                 latitude: parseFloat(editLatitude) || 0,
                 longitude: parseFloat(editLongitude) || 0,
-                description: editDescription || null,
                 image_url: editImageUrl || null,
-                capacity: editCapacity ? parseInt(editCapacity, 10) : null,
                 is_active: editIsActive,
             });
 
@@ -143,7 +137,7 @@ export const AssignedMosqueScreen: React.FC = () => {
         } finally {
             setSaving(false);
         }
-    }, [mosque, editName, editAddress, editCity, editLatitude, editLongitude, editDescription, editImageUrl, editCapacity, editIsActive, editSelectedTagIds, triggerToast, loadMosque]);
+    }, [mosque, editName, editAddress, editCity, editLatitude, editLongitude, editImageUrl, editIsActive, editSelectedTagIds, triggerToast, loadMosque]);
 
     const toggleTag = useCallback((tagId: string) => {
         setEditSelectedTagIds((prev) =>
@@ -164,12 +158,14 @@ export const AssignedMosqueScreen: React.FC = () => {
     if (error) {
         return (
             <SafeAreaView style={styles.safeArea} edges={['top']}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={goBack} style={styles.backButton} activeOpacity={0.8}>
-                        <ArrowLeft size={20} color={colors.primary} />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Assigned Mosque</Text>
-                    <View style={styles.headerSpacer} />
+                <View style={styles.headerWrapper}>
+                    <View style={styles.pillContainer}>
+                        <TouchableOpacity onPress={goBack} style={styles.backButton} activeOpacity={0.7} accessibilityLabel="Go back">
+                            <ArrowLeft size={18} color="#1D3B6D" />
+                        </TouchableOpacity>
+                        <Text style={styles.headerTitle}>Assigned Mosque</Text>
+                        <View style={{ width: 34 }} />
+                    </View>
                 </View>
                 <View style={styles.centered}>
                     <WifiOff size={48} color={colors.danger} />
@@ -181,54 +177,57 @@ export const AssignedMosqueScreen: React.FC = () => {
 
     return (
         <SafeAreaView style={styles.safeArea} edges={['top']}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={goBack} style={styles.backButton} activeOpacity={0.8}>
-                    <ArrowLeft size={20} color={colors.primary} />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Assigned Mosque</Text>
-                <TouchableOpacity
-                    style={[styles.saveHeaderBtn, saving && { opacity: 0.6 }]}
-                    onPress={handleSave}
-                    disabled={saving}
-                    activeOpacity={0.7}
-                >
-                    {saving ? (
-                        <ActivityIndicator size="small" color="#ffffff" />
-                    ) : (
-                        <Save size={18} color="#ffffff" />
-                    )}
-                </TouchableOpacity>
+            <View style={styles.headerWrapper}>
+                <View style={styles.pillContainer}>
+                    <TouchableOpacity onPress={goBack} style={styles.backButton} activeOpacity={0.7} accessibilityLabel="Go back">
+                        <ArrowLeft size={18} color="#1D3B6D" />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Assigned Mosque</Text>
+                    <TouchableOpacity
+                        style={[styles.saveHeaderBtn, saving && { opacity: 0.6 }]}
+                        onPress={handleSave}
+                        disabled={saving}
+                        activeOpacity={0.7}
+                    >
+                        {saving ? (
+                            <ActivityIndicator size="small" color="#ffffff" />
+                        ) : (
+                            <Save size={16} color="#ffffff" />
+                        )}
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 {/* Image preview / upload */}
                 {editImageUrl ? (
                     <Image source={{ uri: editImageUrl }} style={styles.bannerImage} resizeMode="cover" />
-                ) : (
-                    <TouchableOpacity
-                        style={styles.uploadArea}
-                        onPress={async () => {
-                            setImageUploading(true);
-                            const url = await pickAndUploadImage();
-                            if (url) setEditImageUrl(url);
-                            setImageUploading(false);
-                        }}
-                        activeOpacity={0.7}
-                    >
-                        {imageUploading ? (
-                            <ActivityIndicator size="large" color={colors.primary} />
-                        ) : (
-                            <>
-                                <Camera size={32} color={colors.primary} />
-                                <Text style={styles.uploadText}>Tap to upload mosque image</Text>
-                            </>
-                        )}
-                    </TouchableOpacity>
-                )}
+                ) : null}
 
-                {/* Active toggle */}
+                <TouchableOpacity
+                    style={styles.uploadArea}
+                    onPress={async () => {
+                        setImageUploading(true);
+                        const url = await pickAndUploadImage();
+                        if (url) setEditImageUrl(url);
+                        setImageUploading(false);
+                    }}
+                    disabled={imageUploading}
+                    activeOpacity={0.7}
+                >
+                    {imageUploading ? (
+                        <ActivityIndicator size="large" color={colors.primary} />
+                    ) : (
+                        <>
+                            <Camera size={28} color={colors.primary} />
+                            <Text style={styles.uploadText}>{editImageUrl ? 'Change Mosque Image' : 'Upload Mosque Image'}</Text>
+                        </>
+                    )}
+                </TouchableOpacity>
+
+                {/* Is Active toggle */}
                 <View style={styles.toggleRow}>
-                    <Text style={styles.fieldLabel}>Active</Text>
+                    <Text style={styles.fieldLabel}>Active Status</Text>
                     <Switch
                         value={editIsActive}
                         onValueChange={setEditIsActive}
@@ -238,7 +237,7 @@ export const AssignedMosqueScreen: React.FC = () => {
                 </View>
 
                 {/* Form fields */}
-                <Text style={styles.fieldLabel}>Name</Text>
+                <Text style={styles.fieldLabel}>Mosque Name</Text>
                 <TextInput style={styles.fieldInput} value={editName} onChangeText={setEditName} placeholderTextColor={colors.light.textMuted} />
 
                 <Text style={styles.fieldLabel}>Address</Text>
@@ -257,20 +256,6 @@ export const AssignedMosqueScreen: React.FC = () => {
                         <TextInput style={styles.fieldInput} value={editLongitude} onChangeText={setEditLongitude} keyboardType="numeric" placeholderTextColor={colors.light.textMuted} />
                     </View>
                 </View>
-
-                <Text style={styles.fieldLabel}>Description</Text>
-                <TextInput
-                    style={[styles.fieldInput, styles.fieldInputMultiline]}
-                    value={editDescription}
-                    onChangeText={setEditDescription}
-                    multiline
-                    numberOfLines={3}
-                    textAlignVertical="top"
-                    placeholderTextColor={colors.light.textMuted}
-                />
-
-                <Text style={styles.fieldLabel}>Capacity</Text>
-                <TextInput style={styles.fieldInput} value={editCapacity} onChangeText={setEditCapacity} keyboardType="numeric" placeholderTextColor={colors.light.textMuted} />
 
                 {/* Tags */}
                 <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>Tags</Text>
@@ -312,7 +297,7 @@ export const AssignedMosqueScreen: React.FC = () => {
                     )}
                 </TouchableOpacity>
 
-                <View style={{ height: 60 }} />
+                <View style={{ height: 40 }} />
             </ScrollView>
         </SafeAreaView>
     );
@@ -324,43 +309,83 @@ const styles = StyleSheet.create({
     errorText: { fontSize: typography.sizes.sm, color: colors.light.textMuted, textAlign: 'center' },
 
     // Header
-    header: {
-        flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.light.border,
+    headerWrapper: {
+        paddingHorizontal: spacing.lg,
+        paddingTop: Platform.OS === 'android' ? spacing.sm : 0,
+        paddingBottom: spacing.sm,
+    },
+    pillContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#FFFFFF',
+        height: 48,
+        borderRadius: 24,
+        paddingHorizontal: 10,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.08,
+                shadowRadius: 6,
+            },
+            android: {
+                elevation: 3,
+            },
+            default: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.08,
+                shadowRadius: 6,
+            },
+        }),
     },
     backButton: {
-        width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center',
-        backgroundColor: 'rgba(246, 139, 53, 0.1)',
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: 'rgba(29, 59, 109, 0.08)',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
-    headerTitle: { fontSize: typography.sizes.lg, fontWeight: '700', color: colors.light.text, textAlign: 'center', flex: 1 },
-    headerSpacer: { width: 40 },
+    headerTitle: {
+        fontSize: typography.sizes.base + 1,
+        color: '#1D3B6D',
+        textAlign: 'center',
+        flex: 1,
+        paddingHorizontal: spacing.xs,
+        fontWeight: 'bold',
+    },
     saveHeaderBtn: {
-        width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center',
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        justifyContent: 'center',
+        alignItems: 'center',
         backgroundColor: colors.primary,
     },
 
     scrollContent: { padding: spacing.lg },
 
     // Image
-    bannerImage: { width: '100%', height: 180, borderRadius: spacing.borderRadiusLg, marginBottom: spacing.md },
+    bannerImage: { width: '100%', height: 180, borderRadius: 16, marginBottom: spacing.md },
     uploadArea: {
-        borderWidth: 2, borderColor: colors.light.inputBorder, borderStyle: 'dashed',
-        borderRadius: spacing.borderRadiusLg, padding: spacing.xl, alignItems: 'center',
-        justifyContent: 'center', backgroundColor: 'rgba(246, 139, 53, 0.04)', minHeight: 140, marginBottom: spacing.md,
+        borderWidth: 1.5, borderColor: 'rgba(246, 139, 53, 0.3)', borderStyle: 'dashed',
+        borderRadius: 16, padding: spacing.xl, alignItems: 'center',
+        justifyContent: 'center', backgroundColor: 'rgba(246, 139, 53, 0.04)', minHeight: 120, marginBottom: spacing.md,
     },
-    uploadText: { fontSize: typography.sizes.base, fontWeight: '600', color: colors.primary, textAlign: 'center', marginTop: spacing.sm },
+    uploadText: { fontSize: typography.sizes.sm, fontWeight: '600', color: colors.primary, textAlign: 'center', marginTop: spacing.sm },
 
     // Toggle
     toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
 
     // Fields
-    fieldLabel: { fontSize: typography.sizes.sm, fontWeight: '600', color: colors.light.text, marginBottom: spacing.xs, marginTop: spacing.sm },
+    fieldLabel: { fontSize: typography.sizes.sm, fontWeight: '600', color: '#1D3B6D', marginBottom: spacing.xs, marginTop: spacing.sm },
     fieldInput: {
-        borderWidth: 1, borderColor: colors.light.inputBorder, borderRadius: spacing.borderRadiusMd,
+        borderWidth: 1, borderColor: 'rgba(29, 59, 109, 0.12)', borderRadius: 14,
         paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: typography.sizes.base,
-        color: colors.light.text, backgroundColor: colors.light.surface,
+        color: colors.light.text, backgroundColor: '#FFFFFF',
     },
-    fieldInputMultiline: { minHeight: 80, textAlignVertical: 'top' },
     row: { flexDirection: 'row', gap: spacing.sm },
     halfField: { flex: 1 },
 
@@ -368,7 +393,7 @@ const styles = StyleSheet.create({
     tagsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md },
     tagChip: {
         paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 20, borderWidth: 1,
-        borderColor: colors.light.border, backgroundColor: colors.light.surface,
+        borderColor: colors.light.border, backgroundColor: '#FFFFFF',
     },
     tagChipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
     tagChipText: { fontSize: typography.sizes.xs, fontWeight: '600', color: colors.light.textMuted },
@@ -378,7 +403,7 @@ const styles = StyleSheet.create({
     // Save
     saveButton: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
-        backgroundColor: colors.primary, paddingVertical: spacing.md, borderRadius: spacing.borderRadiusMd,
+        backgroundColor: colors.primary, paddingVertical: spacing.md, borderRadius: 16,
         marginTop: spacing.lg,
     },
     saveButtonText: { fontSize: typography.sizes.base, fontWeight: '700', color: '#ffffff' },

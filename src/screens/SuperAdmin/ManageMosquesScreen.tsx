@@ -40,10 +40,15 @@ import {
   ChevronDown,
   Camera,
   Mail,
+  ChevronRight,
 } from 'lucide-react-native';
+import Svg, { Path } from 'react-native-svg';
+import { getDistance } from 'geolib';
 import { colors, spacing, typography } from '../../theme';
+import SectionHeader from './components/SectionHeader';
 import { useApp } from '../../context/AppContext';
 import { useNavigation } from '../../navigation/NavigationContext';
+import { useUserLocation } from '../../hooks/useUserLocation';
 import { mosqueService, MosqueWithAdmin, MosqueTag, MosqueRow } from '../../services/mosqueService';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -59,8 +64,6 @@ interface FilterState {
   adminIds: string[];
   tagIds: string[];
   status: 'all' | 'active' | 'inactive';
-  capacityMin: string;
-  capacityMax: string;
   sortBy: 'newest' | 'oldest' | 'a-z' | 'z-a';
 }
 
@@ -69,13 +72,14 @@ interface DetailModalState {
   mosque: MosqueWithAdmin | null;
 }
 
-type AddField = 'name' | 'address' | 'city' | 'latitude' | 'longitude' | 'description' | 'image_url' | 'capacity' | 'google_maps_url';
+type AddField = 'name' | 'address' | 'city' | 'latitude' | 'longitude' | 'image_url' | 'google_maps_url';
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export const ManageMosquesScreen: React.FC = () => {
   const { goBack } = useNavigation();
-  const { triggerToast } = useApp();
+  const { isRtl, triggerToast } = useApp();
+  const { location } = useUserLocation();
 
   // Data state
   const [mosques, setMosques] = useState<MosqueWithAdmin[]>([]);
@@ -109,13 +113,16 @@ export const ManageMosquesScreen: React.FC = () => {
   const [editCity, setEditCity] = useState('');
   const [editLatitude, setEditLatitude] = useState('');
   const [editLongitude, setEditLongitude] = useState('');
-  const [editDescription, setEditDescription] = useState('');
   const [editImageUrl, setEditImageUrl] = useState('');
-  const [editCapacity, setEditCapacity] = useState('');
   const [editIsActive, setEditIsActive] = useState(true);
   const [editSelectedTagIds, setEditSelectedTagIds] = useState<string[]>([]);
   const [editAdminEmail, setEditAdminEmail] = useState('');
   const [editAdminId, setEditAdminId] = useState<string | null>(null);
+  const [editAdminError, setEditAdminError] = useState<string | null>(null);
+  const [editAdminLookingUp, setEditAdminLookingUp] = useState(false);
+  const [editFormError, setEditFormError] = useState<string | null>(null);
+  const [editImageError, setEditImageError] = useState<string | null>(null);
+  const [editImageSuccess, setEditImageSuccess] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
 
   // Add modal
@@ -125,11 +132,14 @@ export const ManageMosquesScreen: React.FC = () => {
   const [addCity, setAddCity] = useState('');
   const [addLatitude, setAddLatitude] = useState('');
   const [addLongitude, setAddLongitude] = useState('');
-  const [addDescription, setAddDescription] = useState('');
   const [addImageUrl, setAddImageUrl] = useState('');
-  const [addCapacity, setAddCapacity] = useState('');
   const [addAdminEmail, setAddAdminEmail] = useState('');
   const [addAdminId, setAddAdminId] = useState<string | null>(null);
+  const [addAdminError, setAddAdminError] = useState<string | null>(null);
+  const [addAdminLookingUp, setAddAdminLookingUp] = useState(false);
+  const [addFormError, setAddFormError] = useState<string | null>(null);
+  const [addImageError, setAddImageError] = useState<string | null>(null);
+  const [addImageSuccess, setAddImageSuccess] = useState<string | null>(null);
   const [addSaving, setAddSaving] = useState(false);
   const [addImageUploading, setAddImageUploading] = useState(false);
   const [editImageUploading, setEditImageUploading] = useState(false);
@@ -137,7 +147,11 @@ export const ManageMosquesScreen: React.FC = () => {
   // Tag creation modal
   const [showTagModal, setShowTagModal] = useState(false);
   const [newTagName, setNewTagName] = useState('');
+  const [tagError, setTagError] = useState<string | null>(null);
   const [tagCreating, setTagCreating] = useState(false);
+
+  // Confirm delete error
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Filter modal
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -146,8 +160,6 @@ export const ManageMosquesScreen: React.FC = () => {
     adminIds: [],
     tagIds: [],
     status: 'all',
-    capacityMin: '',
-    capacityMax: '',
     sortBy: 'newest',
   });
   const [appliedFilters, setAppliedFilters] = useState<FilterState>({
@@ -155,8 +167,6 @@ export const ManageMosquesScreen: React.FC = () => {
     adminIds: [],
     tagIds: [],
     status: 'all',
-    capacityMin: '',
-    capacityMax: '',
     sortBy: 'newest',
   });
 
@@ -231,18 +241,6 @@ export const ManageMosquesScreen: React.FC = () => {
     } else if (appliedFilters.status === 'inactive') {
       result = result.filter((m) => !m.is_active);
     }
-    if (appliedFilters.capacityMin) {
-      const min = parseInt(appliedFilters.capacityMin, 10);
-      if (!isNaN(min)) {
-        result = result.filter((m) => m.capacity !== null && m.capacity >= min);
-      }
-    }
-    if (appliedFilters.capacityMax) {
-      const max = parseInt(appliedFilters.capacityMax, 10);
-      if (!isNaN(max)) {
-        result = result.filter((m) => m.capacity !== null && m.capacity <= max);
-      }
-    }
 
     // Sort
     switch (appliedFilters.sortBy) {
@@ -263,16 +261,33 @@ export const ManageMosquesScreen: React.FC = () => {
     return result;
   }, [mosques, searchTerm, appliedFilters, allTags]);
 
+  const getDistanceText = useCallback(
+    (item: MosqueWithAdmin) => {
+      if (!location || !location.lat || !location.lng || !item.latitude || !item.longitude) {
+        return '';
+      }
+      try {
+        const dist = getDistance(
+          { latitude: location.lat, longitude: location.lng },
+          { latitude: item.latitude, longitude: item.longitude }
+        );
+        return `${(dist / 1000).toFixed(1)}km`;
+      } catch {
+        return '';
+      }
+    },
+    [location]
+  );
+
   // ── Image Picker ─────────────────────────────────────────────────────────
 
-  const pickAndUploadImage = useCallback(async (): Promise<string | null> => {
+  const pickAndUploadImage = useCallback(async (): Promise<{ url: string | null; error: string | null }> => {
     try {
       // Request media library permissions
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
       if (!permissionResult.granted) {
-        triggerToast('Permission to access media library is required.');
-        return null;
+        return { url: null, error: 'Permission to access media library is required.' };
       }
 
       // Launch image picker
@@ -283,19 +298,18 @@ export const ManageMosquesScreen: React.FC = () => {
       });
 
       if (result.canceled || !result.assets || result.assets.length === 0) {
-        return null;
+        return { url: null, error: null };
       }
 
       const selectedUri = result.assets[0].uri;
 
       // Upload to Supabase storage
       const uploadedUrl = await mosqueService.uploadMosqueImage(selectedUri);
-      return uploadedUrl;
+      return { url: uploadedUrl, error: null };
     } catch (err: any) {
-      triggerToast(`Error picking/uploading image: ${err?.message}`);
-      return null;
+      return { url: null, error: err?.message || 'Error picking/uploading image.' };
     }
-  }, [triggerToast]);
+  }, []);
 
   // ── Detail/Edit Modal ────────────────────────────────────────────────────
 
@@ -306,12 +320,14 @@ export const ManageMosquesScreen: React.FC = () => {
     setEditCity(mosque.city || '');
     setEditLatitude(mosque.latitude?.toString() || '');
     setEditLongitude(mosque.longitude?.toString() || '');
-    setEditDescription(mosque.description || '');
     setEditImageUrl(mosque.image_url || '');
-    setEditCapacity(mosque.capacity?.toString() || '');
     setEditIsActive(mosque.is_active);
     setEditAdminId(mosque.admin_id || null);
     setEditAdminEmail(mosque.admin_email || '');
+    setEditAdminError(null);
+    setEditFormError(null);
+    setEditImageError(null);
+    setEditImageSuccess(null);
     // Load tag IDs for this mosque
     mosqueService.getMosqueTagIds(mosque.id).then((ids) => {
       setEditSelectedTagIds(ids);
@@ -322,22 +338,45 @@ export const ManageMosquesScreen: React.FC = () => {
 
   const closeDetailModal = useCallback(() => {
     setDetailModal({ visible: false, mosque: null });
+    setEditAdminError(null);
+    setEditFormError(null);
+    setEditImageError(null);
+    setEditImageSuccess(null);
   }, []);
 
   const handleSaveEdit = useCallback(async () => {
     if (!detailModal.mosque) return;
+
+    if (!editName.trim() || !editAddress.trim() || !editCity.trim()) {
+      setEditFormError('Name, Address, and City are required.');
+      return;
+    }
+
     setEditSaving(true);
+    setEditFormError(null);
 
     try {
+      // Check admin uniqueness
+      if (editAdminId && editAdminId !== detailModal.mosque.admin_id) {
+        const assignedMosque = mosques.find(
+          (m) => m.admin_id === editAdminId && m.id !== detailModal.mosque!.id
+        );
+        const dbMosque = await mosqueService.fetchMosqueByAdminId(editAdminId);
+        const conflicting = (dbMosque && dbMosque.id !== detailModal.mosque!.id) ? dbMosque : assignedMosque;
+        if (conflicting) {
+          setEditFormError(`Selected admin is already assigned to "${conflicting.name}". Admin must be unique.`);
+          setEditSaving(false);
+          return;
+        }
+      }
+
       await mosqueService.updateMosque(detailModal.mosque.id, {
-        name: editName,
-        address: editAddress,
-        city: editCity,
+        name: editName.trim(),
+        address: editAddress.trim(),
+        city: editCity.trim(),
         latitude: parseFloat(editLatitude) || 0,
         longitude: parseFloat(editLongitude) || 0,
-        description: editDescription || null,
         image_url: editImageUrl || null,
-        capacity: editCapacity ? parseInt(editCapacity, 10) : null,
         is_active: editIsActive,
         admin_id: editAdminId || null,
       });
@@ -345,19 +384,20 @@ export const ManageMosquesScreen: React.FC = () => {
       // Update tags
       await mosqueService.updateMosqueTags(detailModal.mosque.id, editSelectedTagIds);
 
-      triggerToast('Mosque updated successfully.');
       closeDetailModal();
+      triggerToast('Mosque updated successfully.');
       // Refresh data
       loadData();
     } catch (err: any) {
-      triggerToast(`Error: ${err?.message || 'Failed to update mosque.'}`);
+      setEditFormError(err?.message || 'Failed to update mosque.');
     } finally {
       setEditSaving(false);
     }
-  }, [detailModal.mosque, editName, editAddress, editCity, editLatitude, editLongitude, editDescription, editImageUrl, editCapacity, editIsActive, editAdminId, editSelectedTagIds, triggerToast, closeDetailModal, loadData]);
+  }, [detailModal.mosque, editName, editAddress, editCity, editLatitude, editLongitude, editImageUrl, editIsActive, editAdminId, editSelectedTagIds, mosques, closeDetailModal, triggerToast, loadData]);
 
   const handleDeleteFromDetail = useCallback(() => {
     if (!detailModal.mosque) return;
+    setDeleteError(null);
     setConfirm({
       visible: true,
       mosqueId: detailModal.mosque.id,
@@ -370,126 +410,181 @@ export const ManageMosquesScreen: React.FC = () => {
   const handleEditAdminEmailLookup = useCallback(async () => {
     const email = editAdminEmail.trim();
     if (!email) {
-      triggerToast('Please enter an admin email.');
+      setEditAdminError('Please enter an admin email.');
+      setEditAdminId(null);
       return;
     }
+    setEditAdminLookingUp(true);
+    setEditAdminError(null);
     try {
       const admin = await mosqueService.findAdminByEmail(email);
+
+      // Check unique admin
+      const assignedMosque = mosques.find(
+        (m) => m.admin_id === admin.id && m.id !== detailModal.mosque?.id
+      );
+      const dbMosque = await mosqueService.fetchMosqueByAdminId(admin.id);
+      const conflicting = (dbMosque && dbMosque.id !== detailModal.mosque?.id) ? dbMosque : assignedMosque;
+      if (conflicting) {
+        setEditAdminError(`Admin "${admin.name}" is already assigned to "${conflicting.name}". Admin must be unique.`);
+        setEditAdminId(null);
+        return;
+      }
+
       setEditAdminId(admin.id);
       setEditAdminEmail(admin.email);
-      triggerToast(`Admin "${admin.name}" assigned.`);
+      setEditAdminError(null);
     } catch (err: any) {
-      triggerToast(`Error: ${err?.message || 'Failed to find admin.'}`);
+      setEditAdminError(err?.message || 'Failed to find admin.');
       setEditAdminId(null);
+    } finally {
+      setEditAdminLookingUp(false);
     }
-  }, [editAdminEmail, triggerToast]);
+  }, [editAdminEmail, mosques, detailModal.mosque]);
 
   // ── Confirm Delete ───────────────────────────────────────────────────────
 
   const closeConfirm = useCallback(() => {
     if (actionLoading) return;
     setConfirm({ visible: false, mosqueId: null, mosqueName: '' });
+    setDeleteError(null);
   }, [actionLoading]);
 
   const handleConfirmDelete = useCallback(async () => {
     if (!confirm.mosqueId) return;
     setActionLoading(true);
+    setDeleteError(null);
 
     try {
       await mosqueService.deleteMosque(confirm.mosqueId);
-      triggerToast('Mosque deleted successfully.');
       closeDetailModal();
       setConfirm({ visible: false, mosqueId: null, mosqueName: '' });
+      triggerToast('Mosque deleted successfully.');
       loadData();
     } catch (err: any) {
-      triggerToast(`Error: ${err?.message || 'Failed to delete mosque.'}`);
+      setDeleteError(err?.message || 'Failed to delete mosque.');
     } finally {
       setActionLoading(false);
     }
-  }, [confirm.mosqueId, triggerToast, closeDetailModal, loadData]);
+  }, [confirm.mosqueId, closeDetailModal, triggerToast, loadData]);
 
   // ── Add Mosque ───────────────────────────────────────────────────────────
 
+  const closeAddModal = useCallback(() => {
+    setShowAddModal(false);
+    setAddFormError(null);
+    setAddAdminError(null);
+    setAddImageError(null);
+    setAddImageSuccess(null);
+  }, []);
+
   const handleAddMosque = useCallback(async () => {
     if (!addName.trim() || !addAddress.trim() || !addCity.trim()) {
-      triggerToast('Error: Name, Address, and City are required.');
+      setAddFormError('Name, Address, and City are required.');
       return;
     }
 
     setAddSaving(true);
+    setAddFormError(null);
 
     try {
+      // Check admin uniqueness
+      if (addAdminId) {
+        const assignedMosque = mosques.find((m) => m.admin_id === addAdminId);
+        const dbMosque = await mosqueService.fetchMosqueByAdminId(addAdminId);
+        const conflicting = dbMosque || assignedMosque;
+        if (conflicting) {
+          setAddFormError(`Selected admin is already assigned to "${conflicting.name}". Admin must be unique.`);
+          setAddSaving(false);
+          return;
+        }
+      }
+
       await mosqueService.createMosque({
         name: addName.trim(),
         address: addAddress.trim(),
         city: addCity.trim(),
         latitude: parseFloat(addLatitude) || 0,
         longitude: parseFloat(addLongitude) || 0,
-        description: addDescription.trim() || null,
         image_url: addImageUrl.trim() || null,
         admin_id: addAdminId || null,
-        capacity: addCapacity ? parseInt(addCapacity, 10) : null,
         is_active: true,
       });
 
+      closeAddModal();
       triggerToast('Mosque added successfully.');
-      setShowAddModal(false);
       // Reset form
       setAddName('');
       setAddAddress('');
       setAddCity('');
       setAddLatitude('');
       setAddLongitude('');
-      setAddDescription('');
       setAddImageUrl('');
-      setAddCapacity('');
       setAddAdminEmail('');
       setAddAdminId(null);
       loadData();
     } catch (err: any) {
-      triggerToast(`Error: ${err?.message || 'Failed to add mosque.'}`);
+      setAddFormError(err?.message || 'Failed to add mosque.');
     } finally {
       setAddSaving(false);
     }
-  }, [addName, addAddress, addCity, addLatitude, addLongitude, addDescription, addImageUrl, addCapacity, addAdminId, triggerToast, loadData]);
+  }, [addName, addAddress, addCity, addLatitude, addLongitude, addImageUrl, addAdminId, mosques, closeAddModal, triggerToast, loadData]);
 
   // ── Admin Email Lookup (Add) ─────────────────────────────────────────────
 
   const handleAddAdminEmailLookup = useCallback(async () => {
     const email = addAdminEmail.trim();
     if (!email) {
-      triggerToast('Please enter an admin email.');
+      setAddAdminError('Please enter an admin email.');
+      setAddAdminId(null);
       return;
     }
+    setAddAdminLookingUp(true);
+    setAddAdminError(null);
     try {
       const admin = await mosqueService.findAdminByEmail(email);
+
+      // Check unique admin
+      const assignedMosque = mosques.find((m) => m.admin_id === admin.id);
+      const dbMosque = await mosqueService.fetchMosqueByAdminId(admin.id);
+      const conflicting = dbMosque || assignedMosque;
+      if (conflicting) {
+        setAddAdminError(`Admin "${admin.name}" is already assigned to "${conflicting.name}". Admin must be unique.`);
+        setAddAdminId(null);
+        return;
+      }
+
       setAddAdminId(admin.id);
       setAddAdminEmail(admin.email);
-      triggerToast(`Admin "${admin.name}" assigned.`);
+      setAddAdminError(null);
     } catch (err: any) {
-      triggerToast(`Error: ${err?.message || 'Failed to find admin.'}`);
+      setAddAdminError(err?.message || 'Failed to find admin.');
       setAddAdminId(null);
+    } finally {
+      setAddAdminLookingUp(false);
     }
-  }, [addAdminEmail, triggerToast]);
+  }, [addAdminEmail, mosques]);
 
   // ── Tag Creation ─────────────────────────────────────────────────────────
 
   const handleCreateTag = useCallback(async () => {
     const name = newTagName.trim();
     if (!name) {
-      triggerToast('Please enter a tag name.');
+      setTagError('Please enter a tag name.');
       return;
     }
 
     setTagCreating(true);
+    setTagError(null);
     try {
       const newTag = await mosqueService.createTag(name);
       setAllTags((prev) => [...prev, newTag]);
       setNewTagName('');
+      setTagError(null);
       setShowTagModal(false);
       triggerToast(`Tag "${newTag.name}" created.`);
     } catch (err: any) {
-      triggerToast(`Error: ${err?.message || 'Failed to create tag.'}`);
+      setTagError(err?.message || 'Failed to create tag.');
     } finally {
       setTagCreating(false);
     }
@@ -540,8 +635,6 @@ export const ManageMosquesScreen: React.FC = () => {
       adminIds: [],
       tagIds: [],
       status: 'all',
-      capacityMin: '',
-      capacityMax: '',
       sortBy: 'newest',
     };
     setFilterState(cleared);
@@ -555,8 +648,6 @@ export const ManageMosquesScreen: React.FC = () => {
       appliedFilters.adminIds.length > 0 ||
       appliedFilters.tagIds.length > 0 ||
       appliedFilters.status !== 'all' ||
-      appliedFilters.capacityMin !== '' ||
-      appliedFilters.capacityMax !== '' ||
       appliedFilters.sortBy !== 'newest'
     );
   }, [appliedFilters]);
@@ -601,18 +692,7 @@ export const ManageMosquesScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.safeArea} >
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={goBack}
-          style={styles.backButton}
-          activeOpacity={0.8}
-          accessibilityLabel="Go back"
-        >
-          <ArrowLeft size={20} color={colors.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Manage Mosques</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <SectionHeader title="Manage Mosques" />
 
       {/* Search + Filter */}
       <View style={styles.searchRow}>
@@ -673,6 +753,7 @@ export const ManageMosquesScreen: React.FC = () => {
           renderItem={({ item }) => (
             <MosqueCard
               item={item}
+              distanceText={getDistanceText(item)}
               onPress={() => openDetailModal(item)}
             />
           )}
@@ -682,7 +763,10 @@ export const ManageMosquesScreen: React.FC = () => {
       {/* Floating Add Button */}
       <TouchableOpacity
         style={styles.addButton}
-        onPress={() => setShowAddModal(true)}
+        onPress={() => {
+          setAddAdminError(null);
+          setShowAddModal(true);
+        }}
         activeOpacity={0.8}
       >
         <Plus size={20} color="#ffffff" />
@@ -711,6 +795,12 @@ export const ManageMosquesScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
+            {editFormError && (
+              <View style={styles.modalBannerError}>
+                <Text style={styles.modalBannerErrorText}>✕ {editFormError}</Text>
+              </View>
+            )}
+
             <ScrollView style={styles.detailScroll} showsVerticalScrollIndicator={false}>
               {/* Image preview */}
               {editImageUrl ? (
@@ -729,18 +819,17 @@ export const ManageMosquesScreen: React.FC = () => {
               </View>
 
               {/* Form fields */}
-              <DetailField label="Name" value={editName} onChangeText={setEditName} />
-              <DetailField label="Address" value={editAddress} onChangeText={setEditAddress} />
-              <DetailField label="City" value={editCity} onChangeText={setEditCity} />
+              <DetailField label="Name" value={editName} onChangeText={(t) => { setEditName(t); setEditFormError(null); }} />
+              <DetailField label="Address" value={editAddress} onChangeText={(t) => { setEditAddress(t); setEditFormError(null); }} />
+              <DetailField label="City" value={editCity} onChangeText={(t) => { setEditCity(t); setEditFormError(null); }} />
               <View style={styles.detailRow}>
                 <View style={styles.detailHalfField}>
-                  <DetailField label="Latitude" value={editLatitude} onChangeText={setEditLatitude} keyboardType="numeric" />
+                  <DetailField label="Latitude" value={editLatitude} onChangeText={(t) => { setEditLatitude(t); setEditFormError(null); }} keyboardType="numeric" />
                 </View>
                 <View style={styles.detailHalfField}>
-                  <DetailField label="Longitude" value={editLongitude} onChangeText={setEditLongitude} keyboardType="numeric" />
+                  <DetailField label="Longitude" value={editLongitude} onChangeText={(t) => { setEditLongitude(t); setEditFormError(null); }} keyboardType="numeric" />
                 </View>
               </View>
-              <DetailField label="Description" value={editDescription} onChangeText={setEditDescription} multiline />
 
               {/* Image upload area - click to upload */}
               <Text style={styles.detailLabel}>Image</Text>
@@ -748,10 +837,14 @@ export const ManageMosquesScreen: React.FC = () => {
                 style={styles.imageUploadArea}
                 onPress={async () => {
                   setEditImageUploading(true);
-                  const url = await pickAndUploadImage();
-                  if (url) {
-                    setEditImageUrl(url);
-                    triggerToast('Image uploaded successfully.');
+                  setEditImageError(null);
+                  setEditImageSuccess(null);
+                  const res = await pickAndUploadImage();
+                  if (res.url) {
+                    setEditImageUrl(res.url);
+                    setEditImageSuccess('Image uploaded successfully.');
+                  } else if (res.error) {
+                    setEditImageError(res.error);
                   }
                   setEditImageUploading(false);
                 }}
@@ -776,8 +869,11 @@ export const ManageMosquesScreen: React.FC = () => {
                   </View>
                 )}
               </TouchableOpacity>
-
-              <DetailField label="Capacity" value={editCapacity} onChangeText={setEditCapacity} keyboardType="numeric" />
+              {editImageError ? (
+                <Text style={styles.adminErrorText}>✕ {editImageError}</Text>
+              ) : editImageSuccess ? (
+                <Text style={styles.adminVerifiedText}>✓ {editImageSuccess}</Text>
+              ) : null}
 
               {/* Admin Email */}
               <Text style={styles.detailLabel}>Assigned Admin Email</Text>
@@ -788,6 +884,7 @@ export const ManageMosquesScreen: React.FC = () => {
                   onChangeText={(text) => {
                     setEditAdminEmail(text);
                     setEditAdminId(null);
+                    setEditAdminError(null);
                   }}
                   placeholder="admin@example.com"
                   placeholderTextColor={colors.light.textMuted}
@@ -798,13 +895,20 @@ export const ManageMosquesScreen: React.FC = () => {
                   style={styles.uploadBtn}
                   onPress={handleEditAdminEmailLookup}
                   activeOpacity={0.7}
+                  disabled={editAdminLookingUp}
                 >
-                  <Mail size={18} color="#ffffff" />
+                  {editAdminLookingUp ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Mail size={18} color="#ffffff" />
+                  )}
                 </TouchableOpacity>
               </View>
-              {editAdminId && (
+              {editAdminError ? (
+                <Text style={styles.adminErrorText}>✕ {editAdminError}</Text>
+              ) : editAdminId ? (
                 <Text style={styles.adminVerifiedText}>✓ Admin verified</Text>
-              )}
+              ) : null}
 
               {/* Tags */}
               <Text style={[styles.detailLabel, { marginTop: spacing.md }]}>Tags</Text>
@@ -879,7 +983,7 @@ export const ManageMosquesScreen: React.FC = () => {
         visible={showAddModal}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowAddModal(false)}
+        onRequestClose={closeAddModal}
       >
         <KeyboardAvoidingView
           style={styles.modalOverlay}
@@ -887,27 +991,30 @@ export const ManageMosquesScreen: React.FC = () => {
         >
           <View style={styles.addModalContainer}>
             <View style={styles.detailModalHeader}>
-              <Text style={styles.detailModalTitle}>Add Mosque</Text>
-              <TouchableOpacity onPress={() => setShowAddModal(false)} style={styles.detailCloseBtn}>
+              <Text style={styles.detailModalTitle}>Add New Mosque</Text>
+              <TouchableOpacity onPress={closeAddModal} style={styles.detailCloseBtn}>
                 <X size={20} color={colors.light.text} />
               </TouchableOpacity>
             </View>
 
+            {addFormError && (
+              <View style={styles.modalBannerError}>
+                <Text style={styles.modalBannerErrorText}>✕ {addFormError}</Text>
+              </View>
+            )}
+
             <ScrollView style={styles.detailScroll} showsVerticalScrollIndicator={false}>
-              <DetailField label="Name *" value={addName} onChangeText={setAddName} />
-              <DetailField label="Address *" value={addAddress} onChangeText={setAddAddress} />
-              <DetailField label="City *" value={addCity} onChangeText={setAddCity} />
+              <DetailField label="Name *" value={addName} onChangeText={(t) => { setAddName(t); setAddFormError(null); }} />
+              <DetailField label="Address *" value={addAddress} onChangeText={(t) => { setAddAddress(t); setAddFormError(null); }} />
+              <DetailField label="City *" value={addCity} onChangeText={(t) => { setAddCity(t); setAddFormError(null); }} />
               <View style={styles.detailRow}>
                 <View style={styles.detailHalfField}>
-                  <DetailField label="Latitude" value={addLatitude} onChangeText={setAddLatitude} keyboardType="numeric" />
+                  <DetailField label="Latitude" value={addLatitude} onChangeText={(t) => { setAddLatitude(t); setAddFormError(null); }} keyboardType="numeric" />
                 </View>
                 <View style={styles.detailHalfField}>
-                  <DetailField label="Longitude" value={addLongitude} onChangeText={setAddLongitude} keyboardType="numeric" />
+                  <DetailField label="Longitude" value={addLongitude} onChangeText={(t) => { setAddLongitude(t); setAddFormError(null); }} keyboardType="numeric" />
                 </View>
               </View>
-              <DetailField label="Description" value={addDescription} onChangeText={setAddDescription} multiline />
-
-              <DetailField label="Capacity" value={addCapacity} onChangeText={setAddCapacity} keyboardType="numeric" />
 
               {/* Admin Email */}
               <Text style={styles.detailLabel}>Assigned Admin Email *</Text>
@@ -918,6 +1025,7 @@ export const ManageMosquesScreen: React.FC = () => {
                   onChangeText={(text) => {
                     setAddAdminEmail(text);
                     setAddAdminId(null);
+                    setAddAdminError(null);
                   }}
                   placeholder="admin@example.com"
                   placeholderTextColor={colors.light.textMuted}
@@ -928,13 +1036,20 @@ export const ManageMosquesScreen: React.FC = () => {
                   style={styles.uploadBtn}
                   onPress={handleAddAdminEmailLookup}
                   activeOpacity={0.7}
+                  disabled={addAdminLookingUp}
                 >
-                  <Mail size={18} color="#ffffff" />
+                  {addAdminLookingUp ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Mail size={18} color="#ffffff" />
+                  )}
                 </TouchableOpacity>
               </View>
-              {addAdminId && (
+              {addAdminError ? (
+                <Text style={styles.adminErrorText}>✕ {addAdminError}</Text>
+              ) : addAdminId ? (
                 <Text style={styles.adminVerifiedText}>✓ Admin verified</Text>
-              )}
+              ) : null}
 
               {/* Image upload area - click to upload */}
               <Text style={styles.detailLabel}>Image</Text>
@@ -942,10 +1057,14 @@ export const ManageMosquesScreen: React.FC = () => {
                 style={styles.imageUploadArea}
                 onPress={async () => {
                   setAddImageUploading(true);
-                  const url = await pickAndUploadImage();
-                  if (url) {
-                    setAddImageUrl(url);
-                    triggerToast('Image uploaded successfully.');
+                  setAddImageError(null);
+                  setAddImageSuccess(null);
+                  const res = await pickAndUploadImage();
+                  if (res.url) {
+                    setAddImageUrl(res.url);
+                    setAddImageSuccess('Image uploaded successfully.');
+                  } else if (res.error) {
+                    setAddImageError(res.error);
                   }
                   setAddImageUploading(false);
                 }}
@@ -970,11 +1089,16 @@ export const ManageMosquesScreen: React.FC = () => {
                   </View>
                 )}
               </TouchableOpacity>
+              {addImageError ? (
+                <Text style={styles.adminErrorText}>✕ {addImageError}</Text>
+              ) : addImageSuccess ? (
+                <Text style={styles.adminVerifiedText}>✓ {addImageSuccess}</Text>
+              ) : null}
 
               <View style={styles.detailActions}>
                 <TouchableOpacity
                   style={[styles.detailActionBtn, styles.modalBtnCancel]}
-                  onPress={() => setShowAddModal(false)}
+                  onPress={closeAddModal}
                 >
                   <Text style={[styles.modalBtnTextStyle, { color: colors.light.text }]}>Cancel</Text>
                 </TouchableOpacity>
@@ -1016,14 +1140,25 @@ export const ManageMosquesScreen: React.FC = () => {
               placeholder="Enter tag name"
               placeholderTextColor={colors.light.textMuted}
               value={newTagName}
-              onChangeText={setNewTagName}
+              onChangeText={(text) => {
+                setNewTagName(text);
+                setTagError(null);
+              }}
               autoCapitalize="none"
               autoCorrect={false}
             />
+            {tagError && (
+              <Text style={[styles.adminErrorText, { alignSelf: 'flex-start', marginTop: 0 }]}>
+                ✕ {tagError}
+              </Text>
+            )}
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={[styles.modalBtn, styles.modalBtnCancel]}
-                onPress={() => setShowTagModal(false)}
+                onPress={() => {
+                  setTagError(null);
+                  setShowTagModal(false);
+                }}
               >
                 <Text style={[styles.modalBtnText, { color: colors.light.text }]}>Cancel</Text>
               </TouchableOpacity>
@@ -1160,32 +1295,6 @@ export const ManageMosquesScreen: React.FC = () => {
                 </>
               )}
 
-              {/* Capacity Range */}
-              <Text style={styles.filterSectionTitle}>Capacity Range (optional)</Text>
-              <View style={styles.detailRow}>
-                <View style={styles.detailHalfField}>
-                  <TextInput
-                    style={styles.capacityInput}
-                    placeholder="Min"
-                    placeholderTextColor={colors.light.textMuted}
-                    value={filterState.capacityMin}
-                    onChangeText={(t) => setFilterState((prev) => ({ ...prev, capacityMin: t }))}
-                    keyboardType="numeric"
-                  />
-                </View>
-                <Text style={styles.capacitySeparator}>-</Text>
-                <View style={styles.detailHalfField}>
-                  <TextInput
-                    style={styles.capacityInput}
-                    placeholder="Max"
-                    placeholderTextColor={colors.light.textMuted}
-                    value={filterState.capacityMax}
-                    onChangeText={(t) => setFilterState((prev) => ({ ...prev, capacityMax: t }))}
-                    keyboardType="numeric"
-                  />
-                </View>
-              </View>
-
               {/* Action buttons */}
               <View style={styles.filterActions}>
                 <TouchableOpacity
@@ -1224,6 +1333,11 @@ export const ManageMosquesScreen: React.FC = () => {
                 <Text style={styles.modalBody}>
                   Are you sure you want to permanently delete {confirm.mosqueName}? This action cannot be undone.
                 </Text>
+                {deleteError && (
+                  <Text style={[styles.adminErrorText, { textAlign: 'center', marginTop: -spacing.md, marginBottom: spacing.md }]}>
+                    ✕ {deleteError}
+                  </Text>
+                )}
                 <View style={styles.modalActions}>
                   <TouchableOpacity
                     style={[styles.modalBtn, styles.modalBtnCancel]}
@@ -1247,79 +1361,92 @@ export const ManageMosquesScreen: React.FC = () => {
   );
 };
 
+// ─── Location Pin Icon ────────────────────────────────────────────────────────
+
+const LocationPinIcon = ({ color = '#03BECD', size = 12 }: { color?: string; size?: number }) => (
+  <Svg width={size} height={size * (14 / 10)} viewBox="0 0 10 14" fill="none">
+    <Path
+      d="M5 0C2.23858 0 0 2.23858 0 5C0 8.75 5 14 5 14C5 14 10 8.75 10 5C10 2.23858 7.76142 0 5 0ZM5 6.75C4.0335 6.75 3.25 5.9665 3.25 5C3.25 4.0335 4.0335 3.25 5 3.25C5.9665 3.25 6.75 5.9665 6.75 5C6.75 5.9665 5.9665 6.75 5 6.75Z"
+      fill={color}
+    />
+  </Svg>
+);
+
 // ─── Mosque Card ─────────────────────────────────────────────────────────────
 
 interface MosqueCardProps {
   item: MosqueWithAdmin;
+  distanceText?: string;
   onPress: () => void;
 }
 
-const MosqueCard: React.FC<MosqueCardProps> = React.memo(({ item, onPress }) => {
-  return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
-      {/* Background image if available */}
-      {item.image_url ? (
-        <Image source={{ uri: item.image_url }} style={styles.cardBgImage} resizeMode="cover" />
-      ) : null}
+const MosqueCard: React.FC<MosqueCardProps> = React.memo(({ item, distanceText, onPress }) => {
+  const { isRtl } = useApp();
 
-      {/* Overlay for readability */}
-      <View style={[styles.cardOverlay, item.image_url ? styles.cardOverlayDark : null]}>
-        {/* Top row: name + status */}
-        <View style={styles.cardTopRow}>
-          <View style={styles.nameBlock}>
+  return (
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
+      {/* Mosque Thumbnail */}
+      <View style={styles.imageWrapper}>
+        {item.image_url ? (
+          <Image
+            source={{ uri: item.image_url }}
+            style={styles.mosqueImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.placeholderWrapper}>
+            <Text style={styles.placeholderEmoji}>🕌</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Mosque Details */}
+      <View style={[styles.infoWrapper, isRtl && styles.alignRight]}>
+        <Text style={styles.mosqueName} numberOfLines={1}>
+          {item.name}
+        </Text>
+
+        <Text style={styles.mosqueAddress} numberOfLines={1}>
+          {item.address || 'Mosque Area'}
+        </Text>
+
+        <View style={styles.metaRow}>
+          <Text style={styles.cityName} numberOfLines={1}>
+            {item.city || 'Detected City'}
+          </Text>
+
+          {distanceText ? (
+            <View style={styles.distanceBadge}>
+              <LocationPinIcon size={11} color={colors.primary} />
+              <Text style={styles.distanceText}>{distanceText}</Text>
+            </View>
+          ) : null}
+
+          <View
+            style={[
+              styles.statusBadge,
+              {
+                backgroundColor: item.is_active
+                  ? 'rgba(34, 197, 94, 0.12)'
+                  : 'rgba(228, 72, 72, 0.12)',
+              },
+            ]}
+          >
             <Text
-              style={[styles.cardName, item.image_url && { color: '#ffffff' }]}
-              numberOfLines={1}
-            >
-              {item.name}
-            </Text>
-            <View
               style={[
-                styles.statusBadge,
-                { backgroundColor: item.is_active ? 'rgba(34,197,94,0.15)' : colors.dangerLight },
+                styles.statusText,
+                { color: item.is_active ? '#16a34a' : colors.danger },
               ]}
             >
-              <Text
-                style={[
-                  styles.statusText,
-                  { color: item.is_active ? colors.success : colors.danger },
-                ]}
-              >
-                {item.is_active ? 'Active' : 'Inactive'}
-              </Text>
-            </View>
+              {item.is_active ? 'Active' : 'Inactive'}
+            </Text>
           </View>
         </View>
+      </View>
 
-        {/* Info rows */}
-        <View style={styles.infoList}>
-          <InfoRow
-            icon={<MapPin size={13} color={item.image_url ? '#fff' : colors.primary} />}
-            label={`${item.city}${item.address ? ` · ${item.address}` : ''}`}
-            light={!!item.image_url}
-          />
-          {/* Admin name - always show */}
-          <InfoRow
-            icon={<Users size={13} color={item.image_url ? '#fff' : colors.primary} />}
-            label={item.admin_name ? `Admin: ${item.admin_name}` : 'No Admin Assigned'}
-            light={!!item.image_url}
-          />
-          {item.tags.length > 0 && (
-            <View style={styles.cardTagsRow}>
-              <Tag size={13} color={item.image_url ? '#fff' : colors.primary} style={{ marginRight: 6 }} />
-              <Text style={[styles.cardTagsText, item.image_url && { color: '#ffffffcc' }]} numberOfLines={1}>
-                {item.tags.join(', ')}
-              </Text>
-            </View>
-          )}
-          {item.capacity !== null && (
-            <InfoRow
-              icon={<Users size={13} color={item.image_url ? '#fff' : colors.primary} />}
-              label={`Capacity: ${item.capacity}`}
-              light={!!item.image_url}
-            />
-          )}
-        </View>
+      {/* Chevron Right */}
+      <View style={styles.chevronWrapper}>
+        <ChevronRight size={22} color="#1D3B6D" />
       </View>
     </TouchableOpacity>
   );
@@ -1347,17 +1474,6 @@ const DetailField: React.FC<DetailFieldProps> = ({ label, value, onChangeText, m
       numberOfLines={multiline ? 3 : 1}
       keyboardType={keyboardType || 'default'}
     />
-  </View>
-);
-
-// ─── Info Row Helper ─────────────────────────────────────────────────────────
-
-const InfoRow: React.FC<{ icon: React.ReactNode; label: string; light?: boolean }> = ({ icon, label, light }) => (
-  <View style={styles.infoRow}>
-    <View style={styles.infoIcon}>{icon}</View>
-    <Text style={[styles.infoText, light && { color: '#ffffffcc' }]} numberOfLines={1}>
-      {label}
-    </Text>
   </View>
 );
 
@@ -1496,9 +1612,10 @@ const styles = StyleSheet.create({
 
   // List
   listContent: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: 100,
-    gap: spacing.sm,
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 150,
+    gap: 12,
   },
 
   // Empty state
@@ -1514,90 +1631,122 @@ const styles = StyleSheet.create({
     maxWidth: 240,
   },
 
-  // Card
+  // Mosque Card
   card: {
-    borderRadius: spacing.borderRadiusLg,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.light.border,
-    minHeight: 120,
-  },
-  cardBgImage: {
-    ...StyleSheet.absoluteFillObject,
-    width: undefined,
-    height: undefined,
-  },
-  cardOverlay: {
-    padding: spacing.md,
-  },
-  cardOverlayDark: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  cardTopRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#88E2EB',
+    padding: 12,
+    gap: 5,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#03BECD',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 5,
+      },
+      android: {
+        elevation: 2,
+      },
+      default: {
+        shadowColor: '#03BECD',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 5,
+      },
+    }),
   },
-  nameBlock: {
+  alignRight: {
+    alignItems: 'flex-end',
+  },
+
+  // Thumbnail
+  imageWrapper: {
+    marginRight: 12,
+  },
+  mosqueImage: {
+    width: 58,
+    height: 58,
+    borderRadius: 12,
+  },
+  placeholderWrapper: {
+    width: 58,
+    height: 58,
+    borderRadius: 12,
+    backgroundColor: 'rgba(3, 190, 205, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderEmoji: {
+    fontSize: 24,
+  },
+
+  // Info Details
+  infoWrapper: {
     flex: 1,
+    justifyContent: 'center',
+  },
+  mosqueName: {
+    fontSize: typography.sizes.sm + 1,
+    fontWeight: typography.weights.bold,
+    color: '#1D3B6D',
+    marginBottom: 2,
+  },
+  mosqueAddress: {
+    fontSize: typography.sizes.xs,
+    color: '#8C9199',
+    fontWeight: typography.weights.medium,
+    marginBottom: 4,
+  },
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: spacing.xs,
-    paddingRight: spacing.sm,
+    gap: 8,
   },
-  cardName: {
-    fontSize: typography.sizes.base,
-    fontWeight: '700',
-    color: colors.light.text,
-    flexShrink: 1,
+  cityName: {
+    fontSize: typography.sizes.xs,
+    color: '#1D3B6D',
+    fontWeight: typography.weights.semibold,
+  },
+  distanceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  distanceText: {
+    fontSize: typography.sizes.xs,
+    color: colors.primary,
+    fontWeight: typography.weights.bold,
   },
   statusBadge: {
-    borderRadius: 10,
-    paddingHorizontal: spacing.sm,
+    borderRadius: 8,
+    paddingHorizontal: 7,
     paddingVertical: 2,
   },
   statusText: {
     fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  cardTagsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  cardTagsText: {
-    fontSize: typography.sizes.sm,
-    color: colors.light.textMuted,
-    flex: 1,
+    letterSpacing: 0.3,
   },
 
-  // Info rows (reused)
-  infoList: {
-    gap: 6,
-  },
-  infoRow: {
-    flexDirection: 'row',
+  // Chevron
+  chevronWrapper: {
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
-  },
-  infoIcon: {
-    width: 18,
-    alignItems: 'center',
-  },
-  infoText: {
-    fontSize: typography.sizes.sm,
-    color: colors.light.textMuted,
-    flex: 1,
+    paddingLeft: 4,
   },
 
   // Add Button
   addButton: {
     position: 'absolute',
     bottom: 24,
-    alignSelf: 'center',
+    alignSelf: 'flex-end',
+    marginRight: 15,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
@@ -1785,6 +1934,29 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: -spacing.sm,
     marginBottom: spacing.md,
+  },
+  adminErrorText: {
+    fontSize: typography.sizes.xs,
+    color: colors.danger,
+    fontWeight: '600',
+    marginTop: -spacing.sm,
+    marginBottom: spacing.md,
+  },
+  modalBannerError: {
+    backgroundColor: 'rgba(228, 72, 72, 0.10)',
+    borderRadius: spacing.borderRadiusMd,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(228, 72, 72, 0.25)',
+  },
+  modalBannerErrorText: {
+    fontSize: typography.sizes.xs,
+    color: colors.danger,
+    fontWeight: '600',
   },
 
   // Tags

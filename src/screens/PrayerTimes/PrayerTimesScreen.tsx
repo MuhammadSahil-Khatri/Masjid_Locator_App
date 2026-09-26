@@ -123,7 +123,7 @@ export const PrayerTimesScreen: React.FC = () => {
       fetchPrayerTimes(
         location.lat,
         location.lng,
-        2,
+        1,
         language,
         target,
         city || undefined
@@ -154,7 +154,7 @@ export const PrayerTimesScreen: React.FC = () => {
             const res = await fetchPrayerTimes(
               location.lat,
               location.lng,
-              2,
+              1,
               language,
               target,
               city || undefined

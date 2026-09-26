@@ -17,6 +17,7 @@ import { colors } from '../../theme';
 import { useNavigation } from '../../navigation/NavigationContext';
 import { useApp } from '../../context/AppContext';
 import { announcementService, Announcement } from '../../services/announcementService';
+import { usePublicAnnouncementsQuery } from '../../queries/useAnnouncementsQueries';
 
 // ── Back Arrow SVG matching SettingsScreen ──────────────────────────────────
 const BackArrowIcon = ({ color = '#1D3B6D', size = 14 }: { color?: string; size?: number }) => (
@@ -135,48 +136,31 @@ export const CategoryAnnouncementsScreen: React.FC = () => {
   const categoryNameEn: string = params?.categoryName || params?.categoryNameEn || 'Announcement';
   const categoryNameUr: string = params?.categoryNameUr || '';
 
-  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [dbAnnouncements, setDbAnnouncements] = useState<Announcement[]>([]);
 
-  // Dynamically load announcements from Supabase
-  const loadAnnouncements = async () => {
+  // Source from the persistent query cache — no network required for cached data
+  const { data: allAnnouncements = [], isLoading, refetch } = usePublicAnnouncementsQuery();
+
+  const dbAnnouncements: Announcement[] = React.useMemo(() => {
+    if (!allAnnouncements || allAnnouncements.length === 0) return [];
+    return allAnnouncements.filter(
+      (a) =>
+        a.category_id === categoryId ||
+        (a.category_name_en && a.category_name_en.toLowerCase() === categoryNameEn.toLowerCase()) ||
+        (a.category_name && a.category_name.toLowerCase() === categoryNameEn.toLowerCase())
+    );
+  }, [allAnnouncements, categoryId, categoryNameEn]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
     try {
-      let data: Announcement[] = [];
-      if (categoryId) {
-        data = await announcementService.fetchAnnouncementsByCategory(categoryId);
-      }
-
-      // Fallback search in public announcements by category ID or category name
-      if (!data || data.length === 0) {
-        const publicList = await announcementService.fetchPublicAnnouncements();
-        data = publicList.filter(
-          (a) =>
-            a.category_id === categoryId ||
-            (a.category_name_en && a.category_name_en.toLowerCase() === categoryNameEn.toLowerCase()) ||
-            (a.category_name && a.category_name.toLowerCase() === categoryNameEn.toLowerCase())
-        );
-      }
-
-      setDbAnnouncements(data || []);
-    } catch (e) {
-      console.error('Error fetching dynamic announcements from Supabase:', e);
-      setDbAnnouncements([]);
+      await refetch();
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    setLoading(true);
-    loadAnnouncements();
-  }, [categoryId]);
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadAnnouncements();
-  };
+  const loading = isLoading && allAnnouncements.length === 0;
 
   const categoryDisplayName = isRtl && categoryNameUr ? categoryNameUr : categoryNameEn;
 

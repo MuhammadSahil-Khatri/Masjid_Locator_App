@@ -14,7 +14,7 @@ import { colors } from '../../theme';
 import { useNavigation } from '../../navigation/NavigationContext';
 import { useApp } from '../../context/AppContext';
 import { AnnouncementCard } from '../../components/cards/AnnouncementCard';
-import { announcementService } from '../../services/announcementService';
+import { useAnnouncementCategoriesQuery } from '../../queries/useAnnouncementsQueries';
 
 
 const BackArrowIcon = ({ color = '#1D3B6D', size = 14 }: { color?: string; size?: number }) => (
@@ -77,30 +77,23 @@ export const AnnouncementsScreen: React.FC = () => {
   const { navigate, goBack } = useNavigation();
   const { isRtl } = useApp();
 
-  const [categories, setCategories] = React.useState<AnnouncementCategory[]>(ANNOUNCEMENT_CATEGORIES);
+  const { data: remoteCategories } = useAnnouncementCategoriesQuery();
 
-  React.useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        const data = await announcementService.fetchCategories();
-        if (data && data.length > 0) {
-          // Merge dynamic categories with Urdu/English translations
-          const merged: AnnouncementCategory[] = data.map((c: any) => {
-            const staticMatch = ANNOUNCEMENT_CATEGORIES.find((s) => s.id === c.id || s.name_en.toLowerCase() === (c.name_en || c.name || '').toLowerCase());
-            return {
-              id: c.id,
-              name_en: c.name_en || c.name || staticMatch?.name_en || '',
-              name_ur: c.name_ur || staticMatch?.name_ur || '',
-            };
-          });
-          setCategories(merged);
-        }
-      } catch {
-        // Fallback to static categories
-      }
-    };
-    loadCategories();
-  }, []);
+  const categories: AnnouncementCategory[] = React.useMemo(() => {
+    if (remoteCategories && remoteCategories.length > 0) {
+      return remoteCategories.map((c: any) => {
+        const staticMatch = ANNOUNCEMENT_CATEGORIES.find(
+          (s) => s.id === c.id || s.name_en.toLowerCase() === (c.name_en || c.name || '').toLowerCase()
+        );
+        return {
+          id: c.id,
+          name_en: c.name_en || c.name || staticMatch?.name_en || '',
+          name_ur: c.name_ur || staticMatch?.name_ur || '',
+        };
+      });
+    }
+    return ANNOUNCEMENT_CATEGORIES;
+  }, [remoteCategories]);
 
   const handleCategoryPress = (category: AnnouncementCategory) => {
     navigate('CategoryAnnouncements', {

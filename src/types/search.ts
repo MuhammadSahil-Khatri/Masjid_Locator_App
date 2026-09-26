@@ -11,7 +11,7 @@ export interface SearchMosque {
   latitude: number;
   longitude: number;
   image_url: string | null;
-  capacity: number | null;
+  capacity?: number | null;
   is_active: boolean;
 }
 
@@ -24,9 +24,9 @@ export interface MosqueDetails {
   latitude: number;
   longitude: number;
   image_url: string | null;
-  capacity: number | null;
+  capacity?: number | null;
   is_active: boolean;
-  description: string | null;
+  description?: string | null;
   tags: string[];
   admin_name: string | null;
   admin_email: string | null;

@@ -288,17 +288,38 @@ export const announcementService = {
   },
 
   async createCategory(name: string): Promise<AnnouncementCategory> {
-    const { data, error } = await supabase
+    const trimmed = name.trim();
+    const res1 = await supabase
       .from('announcement_categories')
-      .insert({ name: name.trim() })
+      .insert({ name_en: trimmed, name: trimmed })
       .select()
       .single();
 
-    if (error) {
-      console.error('Error creating category:', error);
-      throw error;
+    if (!res1.error && res1.data) {
+      return res1.data;
     }
-    return data;
+
+    const res2 = await supabase
+      .from('announcement_categories')
+      .insert({ name_en: trimmed })
+      .select()
+      .single();
+
+    if (!res2.error && res2.data) {
+      return res2.data;
+    }
+
+    const res3 = await supabase
+      .from('announcement_categories')
+      .insert({ name: trimmed })
+      .select()
+      .single();
+
+    if (res3.error) {
+      console.error('Error creating category:', res3.error);
+      throw res3.error;
+    }
+    return res3.data;
   },
 
   async fetchMosques(): Promise<{ id: string; name: string }[]> {
@@ -315,25 +336,26 @@ export const announcementService = {
   },
 
   async createAnnouncement(announcement: {
-    mosque_id: string;
+    mosque_id?: string | null;
     category_id: string;
-    title: string;
-    description: string;
-    event_date: string | null;
-    event_time: string | null;
+    description_en: string;
+    description_ur: string;
     created_by: string;
+    is_active?: boolean;
+    title?: string;
+    description?: string;
+    event_date?: string | null;
+    event_time?: string | null;
   }): Promise<Announcement> {
     const { data, error } = await supabase
       .from('announcements')
       .insert({
-        mosque_id: announcement.mosque_id,
+        mosque_id: announcement.mosque_id || null,
         category_id: announcement.category_id,
-        title: announcement.title,
-        description: announcement.description,
-        event_date: announcement.event_date,
-        event_time: announcement.event_time,
+        description_en: announcement.description_en,
+        description_ur: announcement.description_ur,
         created_by: announcement.created_by,
-        is_active: true,
+        is_active: announcement.is_active ?? true,
       })
       .select()
       .single();

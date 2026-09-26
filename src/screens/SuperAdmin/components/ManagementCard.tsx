@@ -79,7 +79,7 @@ export const ManagementCard: React.FC<ManagementCardProps> = ({
               </View>
             </View>
             {item.nameUr && (
-              <Text style={[styles.subtitleUr, { color: themeColors.textMuted }]} arabic>
+              <Text style={[styles.subtitleUr, { color: themeColors.textMuted }]} urdu>
                 {item.nameUr}
               </Text>
             )}

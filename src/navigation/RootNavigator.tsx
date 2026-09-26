@@ -16,16 +16,24 @@ export const RootNavigator: React.FC = () => {
 
   // Route protection
   useEffect(() => {
+    // 1. Wait for initial authentication determination to resolve
     if (authLoading) return;
 
-    if (currentScreen === 'Splash' || currentScreen === 'Welcome') return;
+    // 2. While on Splash, let SplashScreen handle the initial transition once ready
+    if (currentScreen === 'Splash') return;
 
-    if (!user && currentScreen !== 'Auth') {
-      navigate('Auth');
-    } else if (user && currentScreen === 'Auth') {
-      navigate('Home');
+    if (!user) {
+      // Unauthenticated user should only be on Welcome or Auth
+      if (currentScreen !== 'Welcome' && currentScreen !== 'Auth') {
+        navigate('Welcome');
+      }
+    } else {
+      // Authenticated user should not be on Welcome or Auth
+      if (currentScreen === 'Welcome' || currentScreen === 'Auth') {
+        navigate('Home');
+      }
     }
-  }, [user, authLoading, currentScreen]);
+  }, [user, authLoading, currentScreen, navigate]);
 
   if (authLoading && currentScreen !== 'Splash') {
     return (

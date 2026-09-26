@@ -1,27 +1,24 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useUserLocation } from "./useUserLocation";
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useUserLocation } from './useUserLocation';
 import {
   fetchPrayerTimes,
   reverseGeocode,
   PrayerTimesResult,
-} from "../services/prayerTimesService";
-import { ParsedPrayerTimes } from "../types";
-import { storageService } from "../services/storageService";
-import { CacheService } from "../services/cacheService";
+} from '../services/prayerTimesService';
+import { ParsedPrayerTimes } from '../types';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 const timeToMinutes = (timeStr: string): number => {
-  // Handles both "HH:MM" (24-hr) and "h:MM AM/PM" (12-hr)
-  const parts = timeStr.trim().split(" ");
-  const [hStr, mStr] = parts[0].split(":");
+  const parts = timeStr.trim().split(' ');
+  const [hStr, mStr] = parts[0].split(':');
   let h = parseInt(hStr, 10);
   const m = parseInt(mStr, 10);
   if (parts[1]) {
-    // 12-hour format
     const period = parts[1].toUpperCase();
-    if (period === "AM" && h === 12) h = 0;
-    if (period === "PM" && h !== 12) h += 12;
+    if (period === 'AM' && h === 12) h = 0;
+    if (period === 'PM' && h !== 12) h += 12;
   }
   return h * 60 + m;
 };
@@ -34,19 +31,19 @@ export interface UpcomingPrayer {
 }
 
 const PRAYER_KEYS: Array<keyof ParsedPrayerTimes> = [
-  "Fajr",
-  "Sunrise",
-  "Dhuhr",
-  "Asr",
-  "Maghrib",
-  "Isha",
+  'Fajr',
+  'Sunrise',
+  'Dhuhr',
+  'Asr',
+  'Maghrib',
+  'Isha',
 ];
 
 const hasValidTimings = (timings: ParsedPrayerTimes | null | undefined): boolean => {
   if (!timings) return false;
   return PRAYER_KEYS.some((name) => {
     const val = timings[name];
-    return typeof val === "string" && val.trim() !== "";
+    return typeof val === 'string' && val.trim() !== '';
   });
 };
 
@@ -58,7 +55,7 @@ const computeUpcoming = (
 
   const prayers = PRAYER_KEYS.filter((name) => {
     const val = timings[name];
-    return typeof val === "string" && val.trim() !== "";
+    return typeof val === 'string' && val.trim() !== '';
   }).map((name) => ({
     name,
     time: timings[name] as string,
@@ -89,8 +86,7 @@ const computeUpcoming = (
   const m = diff % 60;
   const remainingTime = h > 0 ? `${h}h ${m}m` : `${m}m`;
 
-  // Determine current active prayer
-  let currentActive: keyof ParsedPrayerTimes = "Isha";
+  let currentActive: keyof ParsedPrayerTimes = 'Isha';
   for (let i = prayers.length - 1; i >= 0; i--) {
     if (currentMinutes >= prayers[i].minutes) {
       currentActive = prayers[i].name;
@@ -106,8 +102,6 @@ const computeUpcoming = (
   };
 };
 
-// ── Hook ─────────────────────────────────────────────────────────────────────
-
 export interface UsePrayerTimesReturn {
   timings: ParsedPrayerTimes | null;
   hijriDate: string;
@@ -116,11 +110,11 @@ export interface UsePrayerTimesReturn {
   upcoming: UpcomingPrayer | null;
   loading: boolean;
   error: string | null;
-  refetch: () => Promise<void>;
+  refetch: () => Promise<any>;
 }
 
 export const usePrayerTimes = (
-  language: string = "en",
+  language: string = 'en',
 ): UsePrayerTimesReturn => {
   const {
     location,
@@ -128,17 +122,6 @@ export const usePrayerTimes = (
     errorMsg: locationError,
   } = useUserLocation();
 
-  // Load from cache initially (only if valid)
-  const [data, setData] = useState<PrayerTimesResult | null>(() => {
-    const cached = storageService.getCachedPrayerTimes();
-    return cached && hasValidTimings(cached.timings) ? cached : null;
-  });
-
-  const [loading, setLoading] = useState(() => {
-    const cached = storageService.getCachedPrayerTimes();
-    return !cached || !hasValidTimings(cached.timings);
-  });
-  const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(new Date());
 
   // Tick clock every 30 seconds for countdown accuracy
@@ -147,114 +130,49 @@ export const usePrayerTimes = (
     return () => clearInterval(timer);
   }, []);
 
-  const fetchingRef = useRef(false);
-  const userLocationRef = useRef(location);
+  const todayDateStr = useMemo(() => {
+    return new Date().toISOString().split('T')[0];
+  }, []);
 
-  useEffect(() => {
-    userLocationRef.current = location;
-  }, [location]);
+  // Approximate coordinate grid to prevent infinite location cache key fragmentation
+  const latGrid = location ? Math.round(location.lat * 100) / 100 : 24.86;
+  const lngGrid = location ? Math.round(location.lng * 100) / 100 : 67.0;
 
-  const fetchTimes = useCallback(
-    async (lat: number, lng: number, force = false): Promise<void> => {
-      if (fetchingRef.current) return;
-      fetchingRef.current = true;
+  const prayerQuery = useQuery<PrayerTimesResult>({
+    queryKey: ['prayerTimes', todayDateStr, latGrid, lngGrid, language],
+    queryFn: async () => {
+      const lat = location?.lat ?? 24.8607; // Default to Karachi if location not yet granted
+      const lng = location?.lng ?? 67.0011;
 
+      // Reverse geocode to get city label (fallback safely if offline)
+      let city = '';
       try {
-        setError(null);
-        if (force) {
-          const fresh = await fetchPrayerTimes(lat, lng, 2, language);
-          CacheService.setPrayerTimes(fresh.city, fresh);
-          setData(fresh);
-        } else {
-          // Detect city first
-          const detectedCity = await reverseGeocode(lat, lng, language);
-          if (detectedCity) {
-            const cached = CacheService.getPrayerTimes(detectedCity);
-            if (cached && hasValidTimings(cached.timings)) {
-              setData(cached);
-              setLoading(false);
-              fetchingRef.current = false;
-              return;
-            }
-          }
+        city = await reverseGeocode(lat, lng, language);
+      } catch {}
 
-          // Fetch if city/date mismatch or geocoding empty
-          const fresh = await fetchPrayerTimes(lat, lng, 2, language);
-          const finalCity = fresh.city || detectedCity || "Karachi";
-          CacheService.setPrayerTimes(finalCity, { ...fresh, city: finalCity });
-          setData({ ...fresh, city: finalCity });
-        }
-      } catch (err: any) {
-        console.error("[usePrayerTimes] error fetching prayer times:", err);
-        setError(err.message || "Error retrieving prayer times");
-      } finally {
-        setLoading(false);
-        fetchingRef.current = false;
-      }
+      const fresh = await fetchPrayerTimes(lat, lng, 1, language, undefined, city || undefined);
+      return {
+        ...fresh,
+        city: fresh.city || city || 'Karachi',
+      };
     },
-    [],
-  );
+    staleTime: 1000 * 60 * 60 * 12, // 12 hours
+    gcTime: 1000 * 60 * 60 * 24, // 24 hours (prevents storing stale dates indefinitely)
+  });
 
-  // Effect to trigger fetch when location resolves or changes
-  useEffect(() => {
-    if (location) {
-      reverseGeocode(location.lat, location.lng, language)
-        .then((detectedCity) => {
-          const city = detectedCity || "Karachi";
-
-          // 1. If session is already warmed, use in-memory data and don't query
-          if (CacheService.isPrayerTimesWarmed(city)) {
-            const cached = CacheService.getPrayerTimes(city);
-            if (cached && hasValidTimings(cached.timings)) {
-              setData(cached);
-              setLoading(false);
-              return;
-            }
-          }
-
-          // 2. Otherwise, check persistent cache
-          const cached = CacheService.getPrayerTimes(city);
-          if (cached && hasValidTimings(cached.timings)) {
-            setData(cached);
-            setLoading(false);
-            // Save in session
-            CacheService.setPrayerTimes(city, cached);
-          } else {
-            // Expiry or missing -> fetch
-            fetchTimes(location.lat, location.lng);
-          }
-        })
-        .catch(() => {
-          const cached = storageService.getCachedPrayerTimes();
-          if (cached && hasValidTimings(cached.timings)) {
-            setData(cached);
-            setLoading(false);
-          } else {
-            fetchTimes(location.lat, location.lng);
-          }
-        });
-    }
-  }, [location?.lat, location?.lng, fetchTimes]);
-
-  const upcoming = data?.timings ? computeUpcoming(data.timings, now) : null;
-  const combinedError = locationError || error;
-
-  const refetch = useCallback((): Promise<void> => {
-    const loc = userLocationRef.current;
-    if (loc) {
-      return fetchTimes(loc.lat, loc.lng, true);
-    }
-    return Promise.resolve();
-  }, [fetchTimes]);
+  const data = prayerQuery.data;
+  const upcoming = data?.timings && hasValidTimings(data.timings)
+    ? computeUpcoming(data.timings, now)
+    : null;
 
   return {
     timings: data?.timings ?? null,
-    hijriDate: data?.hijriDate ?? "",
-    gregorianDate: data?.gregorianDate ?? "",
-    city: data?.city ?? "",
+    hijriDate: data?.hijriDate ?? '',
+    gregorianDate: data?.gregorianDate ?? '',
+    city: data?.city ?? '',
     upcoming,
-    loading: loading && !data,
-    error: combinedError,
-    refetch,
+    loading: prayerQuery.isLoading && !data,
+    error: (locationError || (prayerQuery.error ? (prayerQuery.error as Error).message : null)),
+    refetch: prayerQuery.refetch,
   };
 };

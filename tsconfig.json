@@ -23,6 +23,12 @@
     "noEmit": true,
     "strict": true
   },
+  "include": [
+    "src",
+    "App.tsx",
+    "index.ts",
+    "env.d.ts"
+  ],
   "exclude": [
     "node_modules",
     ".expo",

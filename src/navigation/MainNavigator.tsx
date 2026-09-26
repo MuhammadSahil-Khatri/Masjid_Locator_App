@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { Text } from '../components/ui/Text';
 import { useApp } from '../context/AppContext';
 import { colors } from '../theme';
 import { useNavigation } from './NavigationContext';
@@ -126,17 +127,7 @@ export const MainNavigator: React.FC = () => {
     },
   ];
 
-  const showBottomBar = ![
-    'SuperAdminPanel',
-    'ManageMosques',
-    'ManageAdmins',
-    'ManageSuperAdmins',
-    'ManageHadith',
-    'ManageAnnouncements',
-    'ManageWorshipers',
-    'AdminPanel',
-    'AssignedMosque',
-  ].includes(currentScreen);
+  const showBottomBar = true;
 
   return (
     <View style={[styles.container, { backgroundColor: currentTheme.background }]}>
@@ -157,7 +148,20 @@ export const MainNavigator: React.FC = () => {
           {navItems.map((item) => {
             const isActive =
               currentScreen === item.key ||
-              (item.key === 'Announcement' && currentScreen === 'CategoryAnnouncements');
+              (item.key === 'Announcement' && currentScreen === 'CategoryAnnouncements') ||
+              (item.key === 'Settings' && [
+                'SuperAdminPanel',
+                'AdminPanel',
+                'ManageMosques',
+                'ManageAdmins',
+                'ManageSuperAdmins',
+                'ManageHadith',
+                'ManageAnnouncements',
+                'ManageWorshipers',
+                'AssignedMosque',
+                'ChangePassword',
+                'EditProfile',
+              ].includes(currentScreen));
             const iconColor = isActive ? '#FFFFFF' : '#1D3B6D';
 
             if (isActive) {

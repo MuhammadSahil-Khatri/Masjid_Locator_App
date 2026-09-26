@@ -1,10 +1,18 @@
 import React from 'react';
-import { StyleSheet, View, ScrollView, Pressable } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronRight, Building2, Users, ShieldCheck, BookOpen, Bell, UserCheck } from 'lucide-react-native';
+import { StyleSheet, View, ScrollView, Pressable, ImageBackground, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  ChevronRight,
+  Building2,
+  Users,
+  ShieldCheck,
+  BookOpen,
+  Bell,
+  UserCheck,
+} from 'lucide-react-native';
 import { Text } from '../../components/ui/Text';
 import { useNavigation } from '../../navigation/NavigationContext';
-import { colors, spacing, typography } from '../../theme';
+import { spacing, typography } from '../../theme';
 import SectionHeader from './components/SectionHeader';
 import Animated, { FadeIn, FadeInDown, useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 
@@ -12,14 +20,14 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 interface AdminOptionProps {
   icon: React.ReactNode;
+  iconBg: string;
   title: string;
   subtitle: string;
   onPress: () => void;
   index: number;
 }
 
-const AdminOptionRow: React.FC<AdminOptionProps> = ({ icon, title, subtitle, onPress, index }) => {
-  const themeColors = colors.light;
+const AdminOptionRow: React.FC<AdminOptionProps> = ({ icon, iconBg, title, subtitle, onPress, index }) => {
   const scale = useSharedValue(1);
 
   const rStyle = useAnimatedStyle(() => {
@@ -29,176 +37,170 @@ const AdminOptionRow: React.FC<AdminOptionProps> = ({ icon, title, subtitle, onP
   });
 
   return (
-    <AnimatedPressable
-      entering={FadeInDown.delay(index * 60).duration(350)}
-      onPressIn={() => {
-        scale.value = withSpring(0.97, { damping: 15, stiffness: 300 });
-      }}
-      onPressOut={() => {
-        scale.value = withSpring(1, { damping: 15, stiffness: 300 });
-      }}
-      onPress={onPress}
-      style={[
-        styles.tileContainer,
-        {
-          backgroundColor: themeColors.surface,
-          borderColor: themeColors.border,
-        },
-        rStyle,
-      ]}
-    >
-      <View style={[styles.iconWrapper, { backgroundColor: 'rgba(246, 139, 53, 0.1)' }]}>
-        {icon}
-      </View>
-      <View style={styles.textContainer}>
-        <Text style={[styles.tileTitle, { color: themeColors.text }]} weight="bold">
-          {title}
-        </Text>
-        <Text style={[styles.tileSubtitle, { color: themeColors.textMuted }]}>
-          {subtitle}
-        </Text>
-      </View>
-      <ChevronRight size={20} color={themeColors.textMuted} />
-    </AnimatedPressable>
+    <Animated.View entering={FadeInDown.delay(index * 50).duration(300)}>
+      <AnimatedPressable
+        onPressIn={() => {
+          scale.value = withSpring(0.97, { damping: 15, stiffness: 300 });
+        }}
+        onPressOut={() => {
+          scale.value = withSpring(1, { damping: 15, stiffness: 300 });
+        }}
+        onPress={onPress}
+        style={[styles.tileContainer, rStyle]}
+      >
+        <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
+          {icon}
+        </View>
+        <View style={styles.textContainer}>
+          <Text style={styles.tileTitle} weight="bold">
+            {title}
+          </Text>
+          <Text style={styles.tileSubtitle}>
+            {subtitle}
+          </Text>
+        </View>
+        <View style={styles.chevronWrapper}>
+          <ChevronRight size={18} color="#1D3B6D" />
+        </View>
+      </AnimatedPressable>
+    </Animated.View>
   );
 };
 
 export const SuperAdminPanel: React.FC = () => {
   const { navigate } = useNavigation();
   const insets = useSafeAreaInsets();
-  const themeColors = colors.light;
 
   const options = [
     {
       key: 'ManageMosques',
       title: 'Manage Mosques',
       subtitle: 'Add, verify, edit, or delete mosque listings',
-      icon: <Building2 size={22} color={colors.primary} />,
+      icon: <Building2 size={22} color="#F68B35" />,
+      iconBg: 'rgba(246, 139, 53, 0.12)',
       route: 'ManageMosques' as const,
     },
     {
       key: 'ManageWorshipers',
       title: 'Manage Worshipers',
       subtitle: 'Audit user accounts, toggle blocks, or remove accounts',
-      icon: <Users size={22} color={colors.primary} />,
+      icon: <Users size={22} color="#2E75B6" />,
+      iconBg: 'rgba(46, 117, 182, 0.12)',
       route: 'ManageWorshipers' as const,
     },
     {
       key: 'ManageAdmins',
       title: 'Manage Admins',
-      subtitle: 'Configure local sub-admins & verify access requests',
-      icon: <UserCheck size={22} color={colors.primary} />,
+      subtitle: 'Configure local mosque admins & verify requests',
+      icon: <UserCheck size={22} color="#CB9E67" />,
+      iconBg: 'rgba(203, 158, 103, 0.15)',
       route: 'ManageAdmins' as const,
     },
     {
       key: 'ManageSuperAdmins',
       title: 'Manage Super Admins',
       subtitle: 'Assign root administrators & security roles',
-      icon: <ShieldCheck size={22} color={colors.primary} />,
+      icon: <ShieldCheck size={22} color="#DC2626" />,
+      iconBg: 'rgba(220, 38, 38, 0.12)',
       route: 'ManageSuperAdmins' as const,
     },
     {
       key: 'ManageHadith',
       title: 'Manage Hadith',
       subtitle: 'Curate, translate, & schedule the Hadith of the day',
-      icon: <BookOpen size={22} color={colors.primary} />,
+      icon: <BookOpen size={22} color="#10B981" />,
+      iconBg: 'rgba(16, 185, 129, 0.12)',
       route: 'ManageHadith' as const,
     },
     {
       key: 'ManageAnnouncements',
       title: 'Manage Announcements',
-      subtitle: 'Publish community updates and urgent broadcast alerts',
-      icon: <Bell size={22} color={colors.primary} />,
+      subtitle: 'Publish community updates and broadcast alerts',
+      icon: <Bell size={22} color="#9333EA" />,
+      iconBg: 'rgba(147, 51, 234, 0.12)',
       route: 'ManageAnnouncements' as const,
     },
   ];
 
   return (
-    // <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.offWhite }]} edges={['top']}>
-    <Animated.View style={styles.container} entering={FadeIn.duration(400)}>
-      <SectionHeader title="Super Admin Panel" />
+    <ImageBackground
+      source={require('../../../assets/background_image_vertical.png')}
+      style={styles.backgroundImage}
+      resizeMode="cover"
+    >
+      <Animated.View style={styles.container} entering={FadeIn.duration(350)}>
+        <SectionHeader title="Super Admin Panel" />
 
-      <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + spacing.xl }]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Welcome/Banner Section */}
-        <Animated.View entering={FadeInDown.duration(350).delay(50)} style={[styles.bannerCard, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}>
-          <Text style={[styles.bannerTitle, { color: themeColors.text }]} weight="bold">
-            Root Administration
-          </Text>
-          <Text style={[styles.bannerSubtitle, { color: themeColors.textMuted }]}>
-            Access system configuration, control data tables, audit moderators, and broadcast messages globally.
-          </Text>
-        </Animated.View>
-
-        {/* Options List */}
-        <View style={styles.optionsList}>
-          {options.map((opt, index) => (
-            <AdminOptionRow
-              key={opt.key}
-              icon={opt.icon}
-              title={opt.title}
-              subtitle={opt.subtitle}
-              index={index}
-              onPress={() => navigate(opt.route)}
-            />
-          ))}
-        </View>
-      </ScrollView>
-    </Animated.View>
-    // </SafeAreaView>
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 20) + 85 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Options List */}
+          <View style={styles.optionsList}>
+            {options.map((opt, index) => (
+              <AdminOptionRow
+                key={opt.key}
+                icon={opt.icon}
+                iconBg={opt.iconBg}
+                title={opt.title}
+                subtitle={opt.subtitle}
+                index={index}
+                onPress={() => navigate(opt.route)}
+              />
+            ))}
+          </View>
+        </ScrollView>
+      </Animated.View>
+    </ImageBackground>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
+  backgroundImage: {
     flex: 1,
+    width: '100%',
+    height: '100%',
   },
   container: {
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.lg,
-  },
-  bannerCard: {
-    borderRadius: spacing.borderRadiusLg,
-    borderWidth: 1,
-    padding: spacing.lg,
-    marginBottom: spacing.xl,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1.5,
-  },
-  bannerTitle: {
-    fontSize: typography.sizes.md + 1,
-    marginBottom: spacing.xs,
-  },
-  bannerSubtitle: {
-    fontSize: typography.sizes.sm,
-    lineHeight: 18,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xs,
   },
   optionsList: {
-    gap: spacing.md,
+    gap: 12,
   },
   tileContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: spacing.borderRadiusLg,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
+    borderColor: 'rgba(29, 59, 109, 0.08)',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 2,
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+      },
+    }),
   },
   iconWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 46,
+    height: 46,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.md,
@@ -209,12 +211,24 @@ const styles = StyleSheet.create({
     marginRight: spacing.sm,
   },
   tileTitle: {
-    fontSize: typography.sizes.base + 1,
+    fontSize: typography.sizes.base,
+    color: '#1D3B6D',
     marginBottom: 2,
   },
   tileSubtitle: {
-    fontSize: typography.sizes.xs + 1,
+    fontSize: 12,
+    color: '#6B7280',
     lineHeight: 16,
   },
+  chevronWrapper: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(29, 59, 109, 0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });
+
 export default SuperAdminPanel;
+

@@ -269,7 +269,7 @@ export const MosqueBottomSheet = memo(
       const target = new Date();
       target.setDate(target.getDate() + dayOffset);
 
-      fetchPrayerTimes(masjidLat, masjidLng, 2, language, target, mosque.city || undefined)
+      fetchPrayerTimes(masjidLat, masjidLng, 1, language, target, mosque.city || undefined)
         .then((res) => {
           setOffsetCache((prev) => ({ ...prev, [dayOffset]: res }));
         })
@@ -295,7 +295,7 @@ export const MosqueBottomSheet = memo(
               const res = await fetchPrayerTimes(
                 masjidLat,
                 masjidLng,
-                2,
+                1,
                 language,
                 target,
                 mosque.city || undefined

@@ -130,7 +130,8 @@ export const SettingsScreen: React.FC = () => {
   const [feedbackText, setFeedbackText] = useState('');
 
   const isSuperAdmin = currentUser?.role === 'super_admin';
-  const isAdmin = currentUser?.role === 'admin' || isSuperAdmin;
+  const isAdmin = currentUser?.role === 'admin';
+  const hasAdminAccess = isSuperAdmin || isAdmin;
 
   const handleFeedbackSubmit = () => {
     if (!feedbackText.trim()) {
@@ -325,42 +326,40 @@ export const SettingsScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* ── Section: ADMINISTRATION ── */}
-        <Text style={[styles.sectionHeader, isRtl && styles.textRtl]}>
-          {isRtl ? 'انتظامیہ' : 'ADMINISTRATION'}
-        </Text>
+        {/* ── Section: ADMINISTRATION (Admin & Super Admin only) ── */}
+        {hasAdminAccess && (
+          <>
+            <Text style={[styles.sectionHeader, isRtl && styles.textRtl]}>
+              {isRtl ? 'انتظامیہ' : 'ADMINISTRATION'}
+            </Text>
 
-        <View style={styles.groupCard}>
-          <TouchableOpacity
-            style={[styles.tileRow, isRtl && styles.rowReverse]}
-            onPress={() => {
-              if (isSuperAdmin) {
-                navigate('SuperAdminPanel');
-              } else if (isAdmin) {
-                navigate('AdminPanel');
-              } else {
-                navigate('SuperAdminPanel'); // Defaults for demo
-              }
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.tileLeft, isRtl && styles.rowReverse]}>
-              <View style={styles.iconBox}>
-                <AdminSvgIcon size={20} color="#1D3B6D" />
-              </View>
-              <Text style={styles.tileLabel}>
-                {isSuperAdmin
-                  ? isRtl
-                    ? 'سپر ایڈمن پینل'
-                    : 'Super Admin Panel'
-                  : isRtl
-                    ? 'ایڈمن پینل'
-                    : 'Super Admin Panel'}
-              </Text>
+            <View style={styles.groupCard}>
+              <TouchableOpacity
+                style={[styles.tileRow, isRtl && styles.rowReverse]}
+                onPress={() => {
+                  if (isSuperAdmin) {
+                    navigate('SuperAdminPanel');
+                  } else {
+                    navigate('AdminPanel');
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.tileLeft, isRtl && styles.rowReverse]}>
+                  <View style={styles.iconBox}>
+                    <AdminSvgIcon size={20} color="#1D3B6D" />
+                  </View>
+                  <Text style={styles.tileLabel}>
+                    {isSuperAdmin
+                      ? (isRtl ? 'سپر ایڈمن پینل' : 'Super Admin Panel')
+                      : (isRtl ? 'ایڈمن پینل' : 'Admin Panel')}
+                  </Text>
+                </View>
+                <NextArrowIcon size={14} color="#1D3B6D" isRtl={isRtl} />
+              </TouchableOpacity>
             </View>
-            <NextArrowIcon size={14} color="#1D3B6D" isRtl={isRtl} />
-          </TouchableOpacity>
-        </View>
+          </>
+        )}
       </ScrollView>
 
 

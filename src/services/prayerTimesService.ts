@@ -2,7 +2,7 @@
  * AlAdhan Prayer Times API Service
  * Docs: https://aladhan.com/prayer-times-api
  *
- * Method 2 = Islamic Society of North America (ISNA) — works globally.
+ * Method 1 = University of Islamic Sciences, Karachi.
  * All network errors are caught and re-thrown as typed Error objects.
  */
 
@@ -66,7 +66,7 @@ const formatAlAdhanDate = (d: Date): string => {
  * Fetch prayer times for the given coordinates and optional date.
  * @param lat  Latitude
  * @param lng  Longitude
- * @param method  AlAdhan calculation method (default 2 = ISNA)
+ * @param method  AlAdhan calculation method (default 1 = University of Islamic Sciences, Karachi)
  * @param language Language code
  * @param date Optional specific Date object
  * @param cityOverride Optional pre-resolved city name to skip reverse geocoding
@@ -74,7 +74,7 @@ const formatAlAdhanDate = (d: Date): string => {
 export const fetchPrayerTimes = async (
   lat: number,
   lng: number,
-  method = 2,
+  method = 1,
   language = 'en',
   date?: Date,
   cityOverride?: string
@@ -82,7 +82,7 @@ export const fetchPrayerTimes = async (
   const endpoint = date ? `${BASE_URL}/timings/${formatAlAdhanDate(date)}` : `${BASE_URL}/timings`;
   const url = `${endpoint}?latitude=${lat}&longitude=${lng}&method=${method}`;
 
-  const response = await fetch(url);
+  const response = await fetch(url)
   if (!response.ok) {
     throw new Error(`AlAdhan API error: ${response.status} ${response.statusText}`);
   }

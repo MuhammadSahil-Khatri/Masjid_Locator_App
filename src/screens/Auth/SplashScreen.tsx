@@ -1,125 +1,136 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Image } from 'react-native';
-import { Text } from '../../components/ui/Text';
-import { colors, spacing, typography } from '../../theme';
+import { View, StyleSheet, Image, ImageBackground, ActivityIndicator, StatusBar } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors } from '../../theme';
 import { useNavigation } from '../../navigation/NavigationContext';
 import { useAuth } from '../../hooks/useAuth';
 
 export const SplashScreen = () => {
-  // Always use light theme for splash
-  const themeColors = colors.light;
-
   const { navigate } = useNavigation();
   const { user, authLoading } = useAuth();
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+  const [showSlowBootIndicator, setShowSlowBootIndicator] = useState(false);
+  const navigatedRef = React.useRef(false);
+  const insets = useSafeAreaInsets();
 
+  const proceedToNextScreen = React.useCallback(() => {
+    if (authLoading) return;
+    if (navigatedRef.current) return;
+    navigatedRef.current = true;
+
+    if (user) {
+      navigate('Home');
+    } else {
+      navigate('Welcome');
+    }
+  }, [user, authLoading, navigate]);
+
+  // Minimum branding display timer (600ms for smooth visual feel)
   useEffect(() => {
     const timer = setTimeout(() => {
       setMinTimeElapsed(true);
-    }, 800);
+    }, 600);
     return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     if (minTimeElapsed && !authLoading) {
-      if (user) {
-        navigate('Home');
-      } else {
-        navigate('Welcome');
-      }
+      proceedToNextScreen();
     }
-  }, [minTimeElapsed, authLoading, user, navigate]);
+  }, [minTimeElapsed, authLoading, proceedToNextScreen]);
+
+  useEffect(() => {
+    const visualFailsafeTimer = setTimeout(() => {
+      if (authLoading) {
+        setShowSlowBootIndicator(true);
+      }
+    }, 1500);
+    return () => clearTimeout(visualFailsafeTimer);
+  }, [authLoading]);
 
   return (
-    <View style={[styles.container, { backgroundColor: themeColors.background }]}>
-      {/* Invisible Top Section to match WelcomeScreen layout position */}
-      <View style={[styles.topSection, { opacity: 0 }]} pointerEvents="none">
-        <Text style={styles.welcomeText}>Welcome to</Text>
-        <View style={styles.appNameContainer}>
-          <Text style={styles.appNameText}>Masjid Locator</Text>
-        </View>
-      </View>
+    <ImageBackground
+      source={require('../../../assets/background_image_vertical.png')}
+      style={styles.container}
+      resizeMode="cover"
+    >
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Middle Section (Only logo is visible) */}
+      {/* Middle Section with Logo */}
       <View style={styles.middleSection}>
-        <View style={styles.illustrationContainer}>
-          <Image 
-            source={require('../../../assets/logo.png')} 
-            style={styles.illustrationImage}
-            resizeMode="contain"
-          />
+        <View style={styles.logoCardWrapper}>
+          <LinearGradient
+            colors={['#0F6B73', '#004B5E']}
+            style={styles.logoCard}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <Image
+              source={require('../../../assets/logo.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
+          </LinearGradient>
         </View>
-        {/* Invisible description text to match WelcomeScreen layout position */}
-        <Text style={[styles.descriptionText, { opacity: 0 }]} pointerEvents="none">
-          Find nearby masjids, check prayer times, and connect with your local community with ease.
-        </Text>
       </View>
 
-      {/* Invisible Bottom Section to match WelcomeScreen layout position */}
-      <View style={[styles.bottomSection, { opacity: 0 }]} pointerEvents="none">
-        <View style={styles.button} />
-        <View style={styles.button} />
+      {/* Bottom Section (Visual loading indicator if boot takes longer than usual) */}
+      <View style={[styles.bottomSection, { paddingBottom: Math.max(insets.bottom + 16, 28) }]}>
+        {showSlowBootIndicator && authLoading && (
+          <View style={styles.spinnerContainer}>
+            <ActivityIndicator size="small" color="#03BECD" />
+          </View>
+        )}
       </View>
-    </View>
+    </ImageBackground>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: spacing.xxl,
-    justifyContent: 'space-between',
-    paddingVertical: spacing.huge,
-  },
-  topSection: {
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: spacing.xl,
-  },
-  welcomeText: {
-    fontSize: typography.sizes.xxl,
-    fontWeight: typography.weights.bold,
-    marginBottom: spacing.xs,
-  },
-  appNameContainer: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.xs,
-    borderRadius: spacing.borderRadiusSm,
-  },
-  appNameText: {
-    fontSize: typography.sizes.huge + 4,
-    fontWeight: typography.weights.bold,
-    color: '#ffffff',
+    paddingHorizontal: 24,
   },
   middleSection: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: spacing.md,
   },
-  illustrationContainer: {
+  logoCardWrapper: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  logoCard: {
+    width: 130,
+    height: 130,
+    borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    borderWidth: 1.5,
+    borderColor: 'rgba(3, 190, 205, 0.4)',
   },
-  illustrationImage: {
-    width: 250,
-    height: 250,
-  },
-  descriptionText: {
-    fontSize: typography.sizes.md,
-    textAlign: 'center',
-    lineHeight: typography.lineHeights.relaxed,
-    paddingHorizontal: spacing.md,
+  logoImage: {
+    width: 90,
+    height: 90,
+    borderRadius: 20,
   },
   bottomSection: {
-    width: '100%',
-    marginTop: spacing.lg,
-    paddingBottom: spacing.sm,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
-  button: {
-    marginBottom: spacing.md,
-    width: '100%',
+  spinnerContainer: {
     height: 56,
-    borderRadius: spacing.borderRadiusRound,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
+

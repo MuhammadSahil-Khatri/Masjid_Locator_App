@@ -1,26 +1,30 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
-  Animated,
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
   ImageBackground,
   StatusBar,
   Platform,
-  Image
+  Alert,
+  Linking,
 } from 'react-native';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
+import * as Location from 'expo-location';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
-import { useUserLocation } from '../../hooks/useUserLocation';
 import { Text } from '../../components/ui/Text';
-import { RefreshCw, AlertTriangle } from 'lucide-react-native';
+import { RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-react-native';
 import { colors, spacing, typography } from '../../theme';
 import { useQibla } from '../../hooks/useQibla';
 import { useNavigation } from '../../navigation/NavigationContext';
+import { useApp } from '../../context/AppContext';
+import { storageService } from '../../services/storageService';
 
-// ── Same back-arrow SVG as PrayerTimesScreen ──────────────────────────────────
+// ── Back-arrow SVG matching app standard ──────────────────────────────────────
 const BackArrowIcon: React.FC<{ color?: string; size?: number }> = ({
   color = '#1D3B6D',
   size = 14,
@@ -33,88 +37,83 @@ const BackArrowIcon: React.FC<{ color?: string; size?: number }> = ({
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const COMPASS_SIZE = Math.min(SCREEN_WIDTH, SCREEN_HEIGHT) * 0.78;
 
-const getShortestAngle = (from: number, to: number) => {
-  let diff = to - from;
-  diff = ((diff + 180) % 360 + 360) % 360 - 180;
-  return diff;
-};
-
-// Compute great-circle distance in km between two lat/lng points
-const getDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-    Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLon / 2) *
-    Math.sin(dLon / 2);
-  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-};
-
-// Kaaba coordinates
-const KAABA_LAT = 21.4225;
-const KAABA_LON = 39.8262;
-
-import { useApp } from '../../context/AppContext';
-import { storageService } from '../../services/storageService';
-
 export const QiblaScreen: React.FC = () => {
   const { language, isRtl } = useApp();
   const {
     qiblaBearing,
-    compassHeading,
     city,
     loading,
     error,
     refetch,
+    animatedCompassRotation,
+    animatedQiblaRotation,
+    calibrationNeeded,
+    calibrationMessage,
+    isAligned,
   } = useQibla(language);
-
-  const { location } = useUserLocation();
+  const [retrying, setRetrying] = useState(false);
   const { goBack } = useNavigation();
   const insets = useSafeAreaInsets();
 
-  const compassAnim = useRef(new Animated.Value(0)).current;
-  const needleAnim = useRef(new Animated.Value(0)).current;
+  const handleTryAgain = async () => {
+    if (retrying) return;
+    setRetrying(true);
+    try {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        const { status: newStatus, canAskAgain } = await Location.requestForegroundPermissionsAsync();
+        if (newStatus !== 'granted') {
+          if (!canAskAgain && Platform.OS !== 'web') {
+            Alert.alert(
+              isRtl ? 'لوکیشن کی اجازت درکار ہے' : 'Location Permission Required',
+              isRtl
+                ? 'قبلہ کی درست سمت معلوم کرنے کے لیے لوکیشن کی اجازت درکار ہے۔ براہ کرم سیٹنگز میں جا کر اجازت دیں۔'
+                : 'Location permission is required to determine the Qibla direction. Please enable it in device settings.',
+              [
+                { text: isRtl ? 'منسوخ کریں' : 'Cancel', style: 'cancel' },
+                {
+                  text: isRtl ? 'سیٹنگز کھولیں' : 'Open Settings',
+                  onPress: () => Linking.openSettings(),
+                },
+              ]
+            );
+          }
+          return;
+        }
+      }
+      await refetch();
+    } catch (err) {
+      console.warn('Error requesting location permission:', err);
+    } finally {
+      setRetrying(false);
+    }
+  };
 
-  const lastCompassHeading = useRef(0);
-  const accumulatedCompassRotation = useRef(0);
-
-  const lastNeedleHeading = useRef(0);
-  const accumulatedNeedleRotation = useRef(0);
-
-  useEffect(() => {
-    const diff = getShortestAngle(lastCompassHeading.current, compassHeading);
-    accumulatedCompassRotation.current -= diff;
-    lastCompassHeading.current = compassHeading;
-
-    Animated.spring(compassAnim, {
-      toValue: accumulatedCompassRotation.current,
-      useNativeDriver: true,
-      friction: 8,
-      tension: 50,
-    }).start();
-  }, [compassHeading]);
-
-  useEffect(() => {
-    const targetNeedle = (qiblaBearing ?? 0) - compassHeading;
-    const diff = getShortestAngle(lastNeedleHeading.current, targetNeedle);
-    accumulatedNeedleRotation.current += diff;
-    lastNeedleHeading.current = targetNeedle;
-
-    Animated.spring(needleAnim, {
-      toValue: accumulatedNeedleRotation.current,
-      useNativeDriver: true,
-      friction: 8,
-      tension: 50,
-    }).start();
-  }, [qiblaBearing, compassHeading]);
-
-  const dialRotationStr = compassAnim.interpolate({
-    inputRange: [-72000, 72000],
-    outputRange: ['-72000deg', '72000deg'],
+  // ── Reanimated Animated Styles for 60/120fps UI Thread Animation ─────────────
+  const compassAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ rotate: `${animatedCompassRotation.value}deg` }],
+    };
   });
+
+  const qiblaIndicatorAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ rotate: `${animatedQiblaRotation.value}deg` }],
+    };
+  });
+
+  // ── Haptic Feedback when Aligned with Qibla (±3°) ───────────────────────────
+  const hasTriggeredHaptic = useRef(false);
+  useEffect(() => {
+    if (isAligned && !hasTriggeredHaptic.current) {
+      hasTriggeredHaptic.current = true;
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch { }
+    } else if (!isAligned) {
+      hasTriggeredHaptic.current = false;
+    }
+  }, [isAligned]);
 
   // ── Loading State ──────────────────────────────────────────────────────────
   if (loading && qiblaBearing === null) {
@@ -150,8 +149,17 @@ export const QiblaScreen: React.FC = () => {
             {isRtl ? 'قبلہ کا رخ نہیں مل سکا' : 'Unable to find Qibla'}
           </Text>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={refetch}>
-            <RefreshCw size={16} color="#fff" />
+          <TouchableOpacity
+            style={[styles.retryButton, retrying && { opacity: 0.8 }]}
+            onPress={handleTryAgain}
+            disabled={retrying}
+            activeOpacity={0.8}
+          >
+            {retrying ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <RefreshCw size={16} color="#fff" />
+            )}
             <Text style={styles.retryButtonText}>
               {isRtl ? 'دوبارہ کوشش کریں' : 'Try Again'}
             </Text>
@@ -161,11 +169,7 @@ export const QiblaScreen: React.FC = () => {
     );
   }
 
-  const effectiveLocation = location || storageService.getCachedLocation();
   const bearing = qiblaBearing !== null ? Math.round(qiblaBearing) : 0;
-  const distanceKm = effectiveLocation
-    ? getDistanceKm(effectiveLocation.lat, effectiveLocation.lng, KAABA_LAT, KAABA_LON)
-    : 3800; // sensible fallback distance
 
   return (
     <ImageBackground
@@ -193,38 +197,62 @@ export const QiblaScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Compass */}
+      {/* Calibration / Warning Notice */}
+      {calibrationNeeded && calibrationMessage && (
+        <View style={styles.calibrationBanner}>
+          <AlertTriangle size={15} color="#FBBF24" />
+          <Text style={styles.calibrationText}>{calibrationMessage}</Text>
+        </View>
+      )}
+
+      {/* Compass with Reanimated Dial & Qibla Indicator */}
       <View style={styles.compassWrapper}>
+        {/* Rotating Compass Rose Dial */}
         <Animated.Image
           source={require('../../../assets/compass.png')}
-          style={[
-            styles.compassImage,
-            { transform: [{ rotate: dialRotationStr }] },
-          ]}
+          style={[styles.compassImage, compassAnimatedStyle]}
           resizeMode="contain"
           fadeDuration={0}
         />
+
+        {/* Rotating Qibla Indicator (Shortest-path tracked via Reanimated) */}
+        <Animated.View
+          style={[styles.qiblaIndicatorContainer, qiblaIndicatorAnimatedStyle]}
+          pointerEvents="none"
+        >
+          <View
+            style={[
+              styles.qiblaBadge,
+              isAligned ? styles.qiblaBadgeAligned : styles.qiblaBadgeNormal,
+            ]}
+          >
+            <Text style={styles.kaabaBadgeIcon}>🕋</Text>
+          </View>
+        </Animated.View>
       </View>
 
       {/* Info Card */}
       <View style={styles.infoCard}>
-        <ImageBackground source={require('../../../assets/background_double_sided.png')} style={styles.backgroundImage} resizeMode="stretch">
-          <Text style={styles.infoHint}>
-            {isRtl ? 'اپنا فون گھمائیں' : 'Rotate your phone on'}
-          </Text>
-          <Text style={styles.bearingValue}>{bearing}°</Text>
-          {/* {isRtl ? (
-            <Text style={styles.distanceText}>
-              سے قبلہ تک کا فاصلہ {city}
-              <Text style={styles.distanceBold}>{distanceKm.toLocaleString()} کلومیٹر</Text>
-            </Text>
+        <ImageBackground
+          source={require('../../../assets/background_double_sided.png')}
+          style={styles.backgroundImage}
+          resizeMode="stretch"
+        >
+          {isAligned ? (
+            <View style={styles.alignedStatusRow}>
+              <CheckCircle2 size={18} color="#10B981" />
+              <Text style={styles.alignedStatusText}>
+                {isRtl ? 'آپ قبلہ کی درست سمت میں ہیں' : 'Aligned with Holy Kaaba'}
+              </Text>
+            </View>
           ) : (
-            <Text style={styles.distanceText}>
-              There are{' '}
-              <Text style={styles.distanceBold}>{distanceKm.toLocaleString()} km</Text>
-              {' '}from {city} to Qibla
+            <Text style={styles.infoHint}>
+              {isRtl ? 'اپنا فون قبلہ کی طرف گھمائیں' : 'Rotate phone towards Qibla'}
             </Text>
-          )} */}
+          )}
+
+          <Text style={styles.bearingValue}>{bearing}°</Text>
+
         </ImageBackground>
       </View>
     </ImageBackground>
@@ -333,16 +361,87 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
+  // ── Calibration Banner ──────────────────────────────────────────────────────
+  calibrationBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    marginHorizontal: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.4)',
+  },
+  calibrationText: {
+    color: '#FDE68A',
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+
   // ── Compass ─────────────────────────────────────────────────────────────────
   compassWrapper: {
     width: COMPASS_SIZE,
     height: COMPASS_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
   },
   compassImage: {
     width: COMPASS_SIZE,
     height: COMPASS_SIZE,
+  },
+  qiblaIndicatorContainer: {
+    position: 'absolute',
+    width: COMPASS_SIZE,
+    height: COMPASS_SIZE,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  qiblaBadge: {
+    marginTop: -14,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
+  },
+  qiblaBadgeNormal: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#D4AF37', // Refined gold
+  },
+  qiblaBadgeAligned: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#10B981', // Emerald green
+    ...Platform.select({
+      ios: {
+        shadowColor: '#10B981',
+        shadowOpacity: 0.6,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
+  kaabaBadgeIcon: {
+    fontSize: 18,
+    lineHeight: 22,
   },
 
   // ── Info Card ────────────────────────────────────────────────────────────────
@@ -350,7 +449,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 200,
     borderTopRightRadius: 36,
-    // paddingVertical: spacing.xl * 1.2,
     paddingHorizontal: spacing.xs,
     gap: 6,
   },
@@ -358,18 +456,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderTopLeftRadius: 36,
-    // position: 'absolute',
-    // top: 0,
-    // left: 0,
-    // right: 0,
-    // bottom: 0,
     width: '100%',
     height: '100%',
-    // zIndex: -1,
-    // borderRadius: 36,
+  },
+  alignedStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  alignedStatusText: {
+    color: '#34D399',
+    fontSize: typography.sizes.base,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   infoHint: {
-    color: 'rgba(255,255,255,0.75)',
+    color: 'rgba(255,255,255,0.85)',
     fontSize: typography.sizes.base,
     fontWeight: typography.weights.medium,
     textAlign: 'center',
@@ -380,20 +482,13 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
     lineHeight: typography.sizes.xxl * 1.8,
     textAlign: 'center',
-    marginBottom: spacing.sm,
-    marginTop: spacing.sm,
+    marginBottom: 2,
+    marginTop: spacing.xs,
   },
-  distanceText: {
-    color: 'rgba(255,255,255,0.75)',
+  cityText: {
+    color: 'rgba(255,255,255,0.7)',
     fontSize: typography.sizes.sm,
+    fontWeight: '500',
     textAlign: 'center',
-    // marginTop: 6,
-  },
-  distanceBold: {
-    color: '#ffffff',
-    fontWeight: typography.weights.bold,
-  },
-  rowReverse: {
-    flexDirection: 'row-reverse',
   },
 });

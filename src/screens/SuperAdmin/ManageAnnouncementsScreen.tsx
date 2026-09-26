@@ -15,7 +15,6 @@ import {
   Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import {
   Bell,
   ArrowLeft,
@@ -24,14 +23,14 @@ import {
   Plus,
   Save,
   Trash2,
-  Calendar,
-  Clock,
   WifiOff,
   Building2,
   Tag,
   Filter,
+  Calendar,
 } from 'lucide-react-native';
 import { colors, spacing, typography } from '../../theme';
+import SectionHeader from './components/SectionHeader';
 import { useApp } from '../../context/AppContext';
 import { useNavigation } from '../../navigation/NavigationContext';
 import { supabase } from '../../lib/supabase';
@@ -50,6 +49,110 @@ interface FilterState {
   categoryIds: string[];
   sortBy: 'newest' | 'oldest';
 }
+
+// ─── Announcement Card (Consistent with MosqueBottomSheet) ───────────────────
+
+interface ManageAnnouncementCardProps {
+  item: Announcement;
+  onPress: () => void;
+}
+
+const ManageAnnouncementCard: React.FC<ManageAnnouncementCardProps> = ({ item, onPress }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const englishText = item.description_en || item.description || '';
+  const urduText = item.description_ur || '';
+  const hasBoth = Boolean(englishText && urduText);
+
+  const rawDate = item.event_date || item.created_at;
+  const formattedDate = rawDate
+    ? new Date(rawDate).toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    })
+    : '';
+
+  const totalLength = englishText.length + urduText.length;
+  const isLongText =
+    totalLength > 140 ||
+    (englishText.match(/\n/g) || []).length > 2 ||
+    (urduText.match(/\n/g) || []).length > 2;
+
+  const categoryLabel = item.category_name_en || item.category_name || item.category_name_ur;
+
+  return (
+    <TouchableOpacity
+      style={styles.sheetAnnouncementCard}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
+      {/* Header Row: Badges */}
+      <View style={styles.sheetCardHeader}>
+        <View style={styles.sheetBadgesLeft}>
+          {categoryLabel ? (
+            <View style={styles.sheetAnnounceBadge}>
+              <Text style={styles.sheetAnnounceBadgeText}>{categoryLabel}</Text>
+            </View>
+          ) : null}
+          {item.mosque_name ? (
+            <View style={styles.sheetMosqueBadge}>
+              <Building2 size={11} color="#03BECD" />
+              <Text style={styles.sheetMosqueBadgeText} numberOfLines={1}>
+                {item.mosque_name}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+        <View
+          style={[
+            styles.badgeActive,
+            {
+              backgroundColor: item.is_active
+                ? 'rgba(34,197,94,0.1)'
+                : 'rgba(142,142,142,0.1)',
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.badgeActiveText,
+              { color: item.is_active ? colors.success : colors.light.textMuted },
+            ]}
+          >
+            {item.is_active ? 'Active' : 'Inactive'}
+          </Text>
+        </View>
+      </View>
+
+      {/* English Description */}
+      {!!englishText && (
+        <Text
+          style={[styles.sheetAnnounceBodyText, styles.sheetAnnounceBodyEnglish]}
+          numberOfLines={isExpanded ? undefined : 3}
+        >
+          {englishText}
+        </Text>
+      )}
+
+      {/* Urdu Description */}
+      {!!urduText && (
+        <Text
+          style={[
+            styles.sheetAnnounceBodyText,
+            styles.sheetAnnounceBodyUrdu,
+            hasBoth && { marginTop: 6 },
+          ]}
+          numberOfLines={isExpanded ? undefined : 3}
+        >
+          {urduText}
+        </Text>
+      )}
+
+
+    </TouchableOpacity>
+  );
+};
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
@@ -80,18 +183,16 @@ export const ManageAnnouncementsScreen: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [formTitle, setFormTitle] = useState('');
-  const [formDescription, setFormDescription] = useState('');
-  const [formMosqueId, setFormMosqueId] = useState('');
+  const [formDescriptionEn, setFormDescriptionEn] = useState('');
+  const [formDescriptionUr, setFormDescriptionUr] = useState('');
+  const [formMosqueId, setFormMosqueId] = useState<string | null>(null);
   const [formCategoryId, setFormCategoryId] = useState('');
-  const [formEventDate, setFormEventDate] = useState('');
-  const [formEventTime, setFormEventTime] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
+  const [formCreatedAt, setFormCreatedAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-
-  // Native DateTimePicker state
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [mosqueInput, setMosqueInput] = useState('');
+  const [mosqueError, setMosqueError] = useState<string | null>(null);
+  const [mosqueName, setMosqueName] = useState<string | null>(null);
 
   // Category creation modal
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -161,8 +262,10 @@ export const ManageAnnouncementsScreen: React.FC = () => {
     if (q) {
       result = result.filter(
         (a) =>
-          a.title?.toLowerCase().includes(q) ||
+          a.description_en?.toLowerCase().includes(q) ||
+          a.description_ur?.toLowerCase().includes(q) ||
           a.description?.toLowerCase().includes(q) ||
+          a.title?.toLowerCase().includes(q) ||
           a.category_name?.toLowerCase().includes(q) ||
           a.mosque_name?.toLowerCase().includes(q)
       );
@@ -178,19 +281,8 @@ export const ManageAnnouncementsScreen: React.FC = () => {
       result = result.filter((a) => a.category_id && appliedFilters.categoryIds.includes(a.category_id));
     }
 
-    // Add is_today flag
-    const today = new Date().toISOString().split('T')[0];
-    result = result.map(a => ({
-      ...a,
-      is_today: a.event_date === today,
-    }));
-
     // Sort
     result.sort((a, b) => {
-      // Today's announcements always first
-      if (a.is_today && !b.is_today) return -1;
-      if (!a.is_today && b.is_today) return 1;
-      // Then by sort preference
       if (appliedFilters.sortBy === 'newest') {
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       }
@@ -205,38 +297,72 @@ export const ManageAnnouncementsScreen: React.FC = () => {
   const openAddModal = useCallback(() => {
     setEditMode(false);
     setEditId(null);
-    setFormTitle('');
-    setFormDescription('');
-    setFormMosqueId('');
+    setFormDescriptionEn('');
+    setFormDescriptionUr('');
+    setFormMosqueId(null);
     setFormCategoryId('');
-    setFormEventDate('');
-    setFormEventTime('');
     setFormIsActive(true);
+    setFormCreatedAt(null);
+    setMosqueInput('');
+    setMosqueError(null);
+    setMosqueName(null);
     setShowModal(true);
   }, []);
 
   const openEditModal = useCallback((item: Announcement) => {
     setEditMode(true);
     setEditId(item.id);
-    setFormTitle(item.title || '');
-    setFormDescription(item.description || '');
-    setFormMosqueId(item.mosque_id || '');
+    setFormDescriptionEn(item.description_en || item.description || '');
+    setFormDescriptionUr(item.description_ur || '');
+    setFormMosqueId(item.mosque_id || null);
     setFormCategoryId(item.category_id || '');
-    setFormEventDate(item.event_date || '');
-    setFormEventTime(item.event_time || '');
     setFormIsActive(item.is_active);
+    setFormCreatedAt(item.created_at || null);
+    // Pre-fill mosque input from existing mosque_id
+    const existing = mosques.find((m) => m.id === item.mosque_id);
+    setMosqueInput(existing?.name || '');
+    setMosqueName(existing?.name || null);
+    setMosqueError(null);
     setShowModal(true);
-  }, []);
+  }, [mosques]);
 
   const closeModal = useCallback(() => {
     setShowModal(false);
-    setShowDatePicker(false);
-    setShowTimePicker(false);
   }, []);
 
+  const handleMosqueLookup = useCallback(() => {
+    const query = mosqueInput.trim();
+    if (!query) {
+      // Empty means None
+      setFormMosqueId(null);
+      setMosqueName(null);
+      setMosqueError(null);
+      return;
+    }
+    const match = mosques.find(
+      (m) => m.name.toLowerCase() === query.toLowerCase()
+    ) || mosques.find(
+      (m) => m.name.toLowerCase().includes(query.toLowerCase())
+    );
+    if (match) {
+      setFormMosqueId(match.id);
+      setMosqueName(match.name);
+      setMosqueError(null);
+      setMosqueInput(match.name);
+    } else {
+      setFormMosqueId(null);
+      setMosqueName(null);
+      setMosqueError(`No mosque found matching "${query}"`);
+    }
+  }, [mosqueInput, mosques]);
+
   const handleSave = useCallback(async () => {
-    if (!formTitle.trim() || !formDescription.trim() || !formCategoryId || !formMosqueId) {
-      triggerToast('Error: Title, Description, Category, and Mosque are required.');
+    if (!formDescriptionEn.trim() && !formDescriptionUr.trim()) {
+      triggerToast('Error: Description (English or Urdu) is required.');
+      return;
+    }
+    if (!formCategoryId) {
+      triggerToast('Error: Category is required.');
       return;
     }
 
@@ -248,24 +374,21 @@ export const ManageAnnouncementsScreen: React.FC = () => {
 
       if (editMode && editId) {
         await announcementService.updateAnnouncement(editId, {
-          title: formTitle.trim(),
-          description: formDescription.trim(),
-          mosque_id: formMosqueId,
+          description_en: formDescriptionEn.trim(),
+          description_ur: formDescriptionUr.trim(),
+          mosque_id: formMosqueId || null,
           category_id: formCategoryId,
-          event_date: formEventDate || null,
-          event_time: formEventTime || null,
           is_active: formIsActive,
         });
         triggerToast('Announcement updated successfully.');
       } else {
         await announcementService.createAnnouncement({
-          mosque_id: formMosqueId,
+          mosque_id: formMosqueId || null,
           category_id: formCategoryId,
-          title: formTitle.trim(),
-          description: formDescription.trim(),
-          event_date: formEventDate || null,
-          event_time: formEventTime || null,
+          description_en: formDescriptionEn.trim(),
+          description_ur: formDescriptionUr.trim(),
           created_by: userId || '',
+          is_active: formIsActive,
         });
         triggerToast('Announcement created successfully.');
       }
@@ -277,11 +400,22 @@ export const ManageAnnouncementsScreen: React.FC = () => {
     } finally {
       setSaving(false);
     }
-  }, [formTitle, formDescription, formMosqueId, formCategoryId, formEventDate, formEventTime, formIsActive, editMode, editId, triggerToast, closeModal, loadData]);
+  }, [formDescriptionEn, formDescriptionUr, formMosqueId, formCategoryId, formIsActive, editMode, editId, triggerToast, closeModal, loadData]);
 
   const handleEdit = useCallback((item: any) => {
     openEditModal(item);
   }, [openEditModal]);
+
+  const handleDeleteFromModal = useCallback(() => {
+    if (!editId) return;
+    const title = formDescriptionEn || formDescriptionUr || 'Announcement';
+    setShowModal(false);
+    setConfirm({
+      visible: true,
+      announcementId: editId,
+      announcementTitle: title,
+    });
+  }, [editId, formDescriptionEn, formDescriptionUr]);
 
   const handleDelete = useCallback((item: any) => {
     setConfirm({
@@ -299,64 +433,19 @@ export const ManageAnnouncementsScreen: React.FC = () => {
       await announcementService.deleteAnnouncement(confirm.announcementId);
       triggerToast('Announcement deleted successfully.');
       setConfirm({ visible: false, announcementId: null, announcementTitle: '' });
+      closeModal();
       loadData();
     } catch (err: any) {
       triggerToast(`Error: ${err?.message || 'Failed to delete announcement.'}`);
     } finally {
       setActionLoading(false);
     }
-  }, [confirm.announcementId, triggerToast, loadData]);
+  }, [confirm.announcementId, triggerToast, closeModal, loadData]);
 
   const closeConfirm = useCallback(() => {
     if (actionLoading) return;
     setConfirm({ visible: false, announcementId: null, announcementTitle: '' });
   }, [actionLoading]);
-
-  // ── Native DateTimePicker Handlers ─────────────────────────────────────
-
-  const formatTimeForDb = (date: Date): string => {
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    return `${hours}:${minutes}:00`;
-  };
-
-  const formatTimeDisplay = (timeStr: string | null): string => {
-    if (!timeStr) return '';
-    const [h, m] = timeStr.split(':').map(Number);
-    if (isNaN(h) || isNaN(m)) return timeStr.substring(0, 5);
-    const period = h >= 12 ? 'PM' : 'AM';
-    const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-    return `${hour12}:${m.toString().padStart(2, '0')} ${period}`;
-  };
-
-  const onDateChange = useCallback((event: DateTimePickerEvent, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
-      setShowDatePicker(false);
-    }
-    if (event.type === 'set' && selectedDate) {
-      const dateStr = selectedDate.toISOString().split('T')[0];
-      setFormEventDate(dateStr);
-      if (Platform.OS === 'ios') {
-        setShowDatePicker(false);
-      }
-    } else if (event.type === 'dismissed') {
-      setShowDatePicker(false);
-    }
-  }, []);
-
-  const onTimeChange = useCallback((event: DateTimePickerEvent, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
-      setShowTimePicker(false);
-    }
-    if (event.type === 'set' && selectedDate) {
-      setFormEventTime(formatTimeForDb(selectedDate));
-      if (Platform.OS === 'ios') {
-        setShowTimePicker(false);
-      }
-    } else if (event.type === 'dismissed') {
-      setShowTimePicker(false);
-    }
-  }, []);
 
   // ── Category Creation ──────────────────────────────────────────────────
 
@@ -374,7 +463,8 @@ export const ManageAnnouncementsScreen: React.FC = () => {
       setFormCategoryId(newCategory.id);
       setNewCategoryName('');
       setShowCategoryModal(false);
-      triggerToast(`Category "${newCategory.name}" created.`);
+      const catDisplayName = newCategory.name_en || newCategory.name || newCategory.name_ur || name;
+      triggerToast(`Category "${catDisplayName}" created.`);
     } catch (err: any) {
       triggerToast(`Error: ${err?.message || 'Failed to create category.'}`);
     } finally {
@@ -444,18 +534,7 @@ export const ManageAnnouncementsScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={goBack}
-          style={styles.backButton}
-          activeOpacity={0.8}
-          accessibilityLabel="Go back"
-        >
-          <ArrowLeft size={20} color={colors.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Manage Announcements</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <SectionHeader title="Manage Announcements" />
 
       {/* Search + Filter */}
       <View style={styles.searchRow}>
@@ -512,73 +591,12 @@ export const ManageAnnouncementsScreen: React.FC = () => {
               </Text>
             </View>
           }
-          renderItem={({ item, index }) => {
-            const isToday = item.is_today;
-            return (
-              <TouchableOpacity
-                style={[
-                  styles.card,
-                  isToday && styles.cardToday,
-                ]}
-                onPress={() => openEditModal(item)}
-                activeOpacity={0.7}
-              >
-                {isToday && <View style={styles.todayBadge} />}
-                <View style={styles.cardContent}>
-                  <View style={styles.cardHeader}>
-                    <Text style={[styles.cardTitle, isToday && styles.cardTitleToday]} numberOfLines={1}>
-                      {item.title}
-                    </Text>
-                    <View style={styles.cardBadges}>
-                      {isToday && (
-                        <View style={styles.badgeToday}>
-                          <Text style={styles.badgeTodayText}>Today</Text>
-                        </View>
-                      )}
-                      <View style={[styles.badgeActive, { backgroundColor: item.is_active ? 'rgba(34,197,94,0.1)' : 'rgba(142,142,142,0.1)' }]}>
-                        <Text style={[styles.badgeActiveText, { color: item.is_active ? colors.success : colors.light.textMuted }]}>
-                          {item.is_active ? 'Active' : 'Inactive'}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                  <Text style={styles.cardDescription} numberOfLines={2}>
-                    {item.description}
-                  </Text>
-                  <View style={styles.cardFooter}>
-                    {item.category_name && (
-                      <View style={styles.cardMetaRow}>
-                        <Tag size={12} color={colors.primary} />
-                        <Text style={styles.cardMetaText}>{item.category_name}</Text>
-                      </View>
-                    )}
-                    {item.mosque_name && (
-                      <View style={styles.cardMetaRow}>
-                        <Building2 size={12} color={colors.primary} />
-                        <Text style={styles.cardMetaText}>{item.mosque_name}</Text>
-                      </View>
-                    )}
-                    {item.event_date && (
-                      <View style={styles.cardMetaRow}>
-                        <Calendar size={12} color={colors.primary} />
-                        <Text style={styles.cardMetaText}>
-                          {item.event_date}
-                          {item.event_time ? ` ${formatTimeDisplay(item.event_time)}` : ''}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-                <TouchableOpacity
-                  style={styles.cardDeleteBtn}
-                  onPress={() => handleDelete(item)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Trash2 size={16} color={colors.danger} />
-                </TouchableOpacity>
-              </TouchableOpacity>
-            );
-          }}
+          renderItem={({ item }) => (
+            <ManageAnnouncementCard
+              item={item}
+              onPress={() => openEditModal(item)}
+            />
+          )}
         />
       </View>
 
@@ -615,7 +633,7 @@ export const ManageAnnouncementsScreen: React.FC = () => {
             </View>
 
             <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
-              {/* Active Toggle */}
+              {/* 1. Active Toggle */}
               <View style={styles.activeToggleRow}>
                 <Text style={styles.fieldLabel}>Active</Text>
                 <Switch
@@ -626,155 +644,132 @@ export const ManageAnnouncementsScreen: React.FC = () => {
                 />
               </View>
 
-              {/* Title */}
-              <Text style={styles.fieldLabel}>Title *</Text>
-              <TextInput
-                style={styles.fieldInput}
-                value={formTitle}
-                onChangeText={setFormTitle}
-                placeholder="Enter announcement title"
-                placeholderTextColor={colors.light.textMuted}
-              />
-
-              {/* Description */}
-              <Text style={styles.fieldLabel}>Description *</Text>
+              {/* 2. English Description */}
+              <Text style={styles.fieldLabel}>Description (English) *</Text>
               <TextInput
                 style={[styles.fieldInput, styles.fieldInputMultiline]}
-                value={formDescription}
-                onChangeText={setFormDescription}
-                placeholder="Enter announcement description"
+                value={formDescriptionEn}
+                onChangeText={setFormDescriptionEn}
+                placeholder="Enter announcement description in English"
                 placeholderTextColor={colors.light.textMuted}
                 multiline
                 numberOfLines={4}
                 textAlignVertical="top"
               />
 
-              {/* Mosque */}
-              <Text style={styles.fieldLabel}>Mosque *</Text>
-              <View style={styles.pickerRow}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContainer}>
-                  {mosques.map((mosque) => (
-                    <TouchableOpacity
-                      key={mosque.id}
-                      style={[styles.chip, formMosqueId === mosque.id && styles.chipSelected]}
-                      onPress={() => setFormMosqueId(mosque.id)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.chipText, formMosqueId === mosque.id && styles.chipTextSelected]}>
-                        {mosque.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                  {mosques.length === 0 && (
-                    <Text style={styles.noDataText}>No mosques available.</Text>
-                  )}
-                </ScrollView>
+              {/* 3. Urdu Description */}
+              <Text style={styles.fieldLabel}>Description (Urdu) *</Text>
+              <TextInput
+                style={[styles.fieldInput, styles.fieldInputMultiline, { textAlign: 'right' }]}
+                value={formDescriptionUr}
+                onChangeText={setFormDescriptionUr}
+                placeholder="اردو میں اعلان کی تفصیل درج کریں"
+                placeholderTextColor={colors.light.textMuted}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+
+              {/* 4. Mosque (Optional) */}
+              <Text style={styles.fieldLabel}>Mosque (Optional)</Text>
+              <View style={styles.mosqueInputRow}>
+                <TextInput
+                  style={[styles.fieldInput, { flex: 1 }]}
+                  value={mosqueInput}
+                  onChangeText={(text) => {
+                    setMosqueInput(text);
+                    setMosqueError(null);
+                    setMosqueName(null);
+                    setFormMosqueId(null);
+                  }}
+                  placeholder="Type mosque name"
+                  placeholderTextColor={colors.light.textMuted}
+                />
+                <TouchableOpacity
+                  style={styles.mosqueLookupBtn}
+                  onPress={handleMosqueLookup}
+                  activeOpacity={0.7}
+                >
+                  <Search size={18} color="#ffffff" />
+                </TouchableOpacity>
               </View>
+              {mosqueError ? (
+                <Text style={styles.mosqueErrorText}>✕ {mosqueError}</Text>
+              ) : mosqueName ? (
+                <Text style={styles.mosqueVerifiedText}>✓ Mosque: {mosqueName}</Text>
+              ) : null}
 
-              {/* Event Date */}
-              <Text style={styles.fieldLabel}>Event Date</Text>
-              <TouchableOpacity
-                style={styles.dateTimeButton}
-                onPress={() => setShowDatePicker(true)}
-                activeOpacity={0.7}
-              >
-                <Calendar size={18} color={colors.primary} />
-                <Text style={[styles.dateTimeButtonText, !formEventDate && styles.placeholderText]}>
-                  {formEventDate || 'Select event date'}
-                </Text>
-                {formEventDate ? (
-                  <TouchableOpacity onPress={() => setFormEventDate('')}>
-                    <X size={16} color={colors.light.textMuted} />
-                  </TouchableOpacity>
-                ) : null}
-              </TouchableOpacity>
-
-              {showDatePicker && (
-                <DateTimePicker
-                  value={formEventDate ? new Date(formEventDate + 'T00:00:00') : new Date()}
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={onDateChange}
-                  maximumDate={new Date(2099, 11, 31)}
-                />
-              )}
-
-              {/* Event Time */}
-              <Text style={styles.fieldLabel}>Event Time</Text>
-              <TouchableOpacity
-                style={styles.dateTimeButton}
-                onPress={() => setShowTimePicker(true)}
-                activeOpacity={0.7}
-              >
-                <Clock size={18} color={colors.primary} />
-                <Text style={[styles.dateTimeButtonText, !formEventTime && styles.placeholderText]}>
-                  {formEventTime ? formatTimeDisplay(formEventTime) : 'Select event time'}
-                </Text>
-                {formEventTime ? (
-                  <TouchableOpacity onPress={() => setFormEventTime('')}>
-                    <X size={16} color={colors.light.textMuted} />
-                  </TouchableOpacity>
-                ) : null}
-              </TouchableOpacity>
-
-              {showTimePicker && (
-                <DateTimePicker
-                  value={(() => {
-                    if (formEventTime) {
-                      const [h, m] = formEventTime.split(':').map(Number);
-                      const d = new Date();
-                      d.setHours(h || 0, m || 0, 0, 0);
-                      return d;
-                    }
-                    return new Date();
-                  })()}
-                  mode="time"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  is24Hour={false}
-                  onChange={onTimeChange}
-                />
-              )}
-
-              {/* Category (moved to end, before buttons) */}
+              {/* 5. Category */}
               <Text style={styles.fieldLabel}>Category *</Text>
-              <View style={styles.pickerRow}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContainer}>
-                  {categories.map((cat) => (
+              <View style={styles.categoryChipsContainer}>
+                {categories.map((cat) => {
+                  const catName = cat.name_en || cat.name || cat.name_ur || 'Unnamed';
+                  return (
                     <TouchableOpacity
                       key={cat.id}
-                      style={[styles.chip, formCategoryId === cat.id && styles.chipSelected]}
+                      style={[styles.categoryChip, formCategoryId === cat.id && styles.categoryChipSelected]}
                       onPress={() => setFormCategoryId(cat.id)}
                       activeOpacity={0.7}
                     >
-                      <Text style={[styles.chipText, formCategoryId === cat.id && styles.chipTextSelected]}>
-                        {cat.name}
+                      <Text style={[styles.categoryChipText, formCategoryId === cat.id && styles.categoryChipTextSelected]}>
+                        {catName}
                       </Text>
                     </TouchableOpacity>
-                  ))}
-                  <TouchableOpacity
-                    style={styles.addChipButton}
-                    onPress={() => {
-                      setNewCategoryName('');
-                      setShowCategoryModal(true);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Plus size={14} color={colors.primary} />
-                  </TouchableOpacity>
-                  {categories.length === 0 && (
-                    <Text style={styles.noDataText}>No categories available.</Text>
-                  )}
-                </ScrollView>
+                  );
+                })}
+                <TouchableOpacity
+                  style={styles.addCategoryChipBtn}
+                  onPress={() => {
+                    setNewCategoryName('');
+                    setShowCategoryModal(true);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Plus size={16} color={colors.primary} />
+                </TouchableOpacity>
+                {categories.length === 0 && (
+                  <Text style={styles.noDataText}>No categories yet.</Text>
+                )}
               </View>
+
+              {/* Date of Creation */}
+              {editMode && formCreatedAt ? (
+                <View style={styles.createdAtContainer}>
+                  <Calendar size={14} color={colors.light.textMuted} />
+                  <Text style={styles.createdAtLabel}>Created:</Text>
+                  <View style={styles.createdAtBadge}>
+                    <Text style={styles.createdAtText}>
+                      {new Date(formCreatedAt).toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
 
               {/* Action buttons */}
               <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={[styles.modalActionBtn, styles.cancelBtn]}
-                  onPress={closeModal}
-                >
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
+                {editMode ? (
+                  <TouchableOpacity
+                    style={[styles.modalActionBtn, styles.deleteBtn]}
+                    onPress={handleDeleteFromModal}
+                    activeOpacity={0.7}
+                    disabled={saving}
+                  >
+                    <Trash2 size={16} color={colors.danger} />
+                    <Text style={styles.deleteBtnText}>Delete</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.modalActionBtn, styles.cancelBtn]}
+                    onPress={closeModal}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.cancelBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   style={[styles.modalActionBtn, styles.saveBtn]}
                   onPress={handleSave}
@@ -896,18 +891,21 @@ export const ManageAnnouncementsScreen: React.FC = () => {
                 <>
                   <Text style={styles.filterSectionTitle}>Categories</Text>
                   <View style={styles.filterChipsRow}>
-                    {categories.map((cat) => (
-                      <TouchableOpacity
-                        key={cat.id}
-                        style={[styles.filterChip, filterState.categoryIds.includes(cat.id) && styles.filterChipSelected]}
-                        onPress={() => toggleFilterCategory(cat.id)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[styles.filterChipLabel, filterState.categoryIds.includes(cat.id) && styles.filterChipLabelSelected]}>
-                          {cat.name}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+                    {categories.map((cat) => {
+                      const catName = cat.name_en || cat.name || cat.name_ur || 'Unnamed';
+                      return (
+                        <TouchableOpacity
+                          key={cat.id}
+                          style={[styles.filterChip, filterState.categoryIds.includes(cat.id) && styles.filterChipSelected]}
+                          onPress={() => toggleFilterCategory(cat.id)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.filterChipLabel, filterState.categoryIds.includes(cat.id) && styles.filterChipLabelSelected]}>
+                            {catName}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 </>
               )}
@@ -1109,7 +1107,7 @@ const styles = StyleSheet.create({
   // List
   listContent: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: 100,
+    paddingBottom: 150,
     gap: spacing.sm,
   },
 
@@ -1126,68 +1124,71 @@ const styles = StyleSheet.create({
     maxWidth: 240,
   },
 
-  // Card
-  card: {
-    backgroundColor: colors.light.surface,
-    borderRadius: spacing.borderRadiusLg,
-    borderWidth: 1,
-    borderColor: colors.light.border,
-    padding: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    overflow: 'hidden',
+  // Announcement Card (Consistent with MosqueBottomSheet)
+  sheetAnnouncementCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1.2,
+    borderColor: '#D8F3FA',
+    padding: 14,
+    marginBottom: 10,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+      },
+    }),
   },
-  cardToday: {
-    backgroundColor: 'rgba(246, 139, 53, 0.06)',
-    borderColor: colors.primaryBorder,
-  },
-  todayBadge: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 4,
-    backgroundColor: colors.primary,
-    borderTopLeftRadius: spacing.borderRadiusLg,
-    borderBottomLeftRadius: spacing.borderRadiusLg,
-  },
-  cardContent: {
-    flex: 1,
-    gap: 4,
-  },
-  cardHeader: {
+  sheetCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
+    marginBottom: 8,
   },
-  cardTitle: {
-    fontSize: typography.sizes.base,
-    fontWeight: '700',
-    color: colors.light.text,
-    flexShrink: 1,
-    maxWidth: '60%',
-  },
-  cardTitleToday: {
-    color: colors.primary,
-  },
-  cardBadges: {
+  sheetBadgesLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: 6,
+    flexWrap: 'wrap',
+    flex: 1,
   },
-  badgeToday: {
-    backgroundColor: 'rgba(246, 139, 53, 0.15)',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: 10,
+  sheetAnnounceBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#D1F3F9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
-  badgeTodayText: {
-    fontSize: 9,
+  sheetAnnounceBadgeText: {
+    color: '#153258',
+    fontSize: 11,
     fontWeight: '700',
-    color: colors.primary,
-    textTransform: 'uppercase',
+  },
+  sheetMosqueBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#E6F7F9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  sheetMosqueBadgeText: {
+    color: '#088395',
+    fontSize: 11,
+    fontWeight: '600',
+    maxWidth: 150,
   },
   badgeActive: {
     paddingHorizontal: spacing.sm,
@@ -1199,36 +1200,49 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
   },
-  cardDescription: {
-    fontSize: typography.sizes.sm,
-    color: colors.light.textMuted,
-    lineHeight: 18,
+  sheetAnnounceBodyText: {
+    color: '#1B365D',
+    letterSpacing: 0.1,
   },
-  cardFooter: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginTop: 2,
+  sheetAnnounceBodyEnglish: {
+    fontSize: 13.5,
+    lineHeight: 20,
+    textAlign: 'left',
   },
-  cardMetaRow: {
+  sheetAnnounceBodyUrdu: {
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: 'right',
+  },
+  sheetAnnounceFooterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'space-between',
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 0.5,
+    borderTopColor: '#EEF2F6',
   },
-  cardMetaText: {
-    fontSize: typography.sizes.xs,
-    color: colors.light.textMuted,
+  sheetAnnounceSeeMoreBtn: {
+    paddingVertical: 2,
   },
-  cardDeleteBtn: {
-    padding: spacing.sm,
-    marginLeft: spacing.sm,
+  sheetAnnounceSeeMoreText: {
+    fontSize: 12,
+    color: '#03BECD',
+    fontWeight: '700',
+  },
+  sheetAnnounceDateText: {
+    fontSize: 11,
+    color: '#8C9199',
+    fontWeight: '600',
   },
 
   // Add Button
   addButton: {
     position: 'absolute',
     bottom: 24,
-    alignSelf: 'center',
+    alignSelf: 'flex-end',
+    marginRight: 15,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
@@ -1368,6 +1382,82 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
 
+  // Category chips (matching ManageMosquesScreen tags layout)
+  categoryChipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  categoryChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.light.border,
+    backgroundColor: colors.light.surface,
+  },
+  categoryChipSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  categoryChipText: {
+    fontSize: typography.sizes.xs,
+    fontWeight: '600',
+    color: colors.light.textMuted,
+  },
+  categoryChipTextSelected: {
+    color: '#ffffff',
+  },
+  addCategoryChipBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(246, 139, 53, 0.08)',
+  },
+
+  // Mosque input row (same pattern as ManageMosquesScreen admin email field)
+  mosqueInputRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  mosqueLookupBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: spacing.borderRadiusMd,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mosqueVerifiedText: {
+    fontSize: typography.sizes.xs,
+    color: colors.success,
+    fontWeight: '600',
+    marginTop: 2,
+    marginBottom: spacing.sm,
+  },
+  mosqueErrorText: {
+    fontSize: typography.sizes.xs,
+    color: colors.danger,
+    fontWeight: '600',
+    marginTop: 2,
+    marginBottom: spacing.sm,
+  },
+  mosqueNoneText: {
+    fontSize: typography.sizes.xs,
+    color: colors.light.textMuted,
+    fontStyle: 'italic',
+    marginTop: 2,
+    marginBottom: spacing.sm,
+  },
+
   // Date/Time
   dateTimeButton: {
     flexDirection: 'row',
@@ -1422,6 +1512,16 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.base,
     fontWeight: '700',
     color: colors.light.text,
+  },
+  deleteBtn: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  deleteBtnText: {
+    fontSize: typography.sizes.base,
+    fontWeight: '700',
+    color: colors.danger,
   },
 
   // Filter modal
@@ -1541,6 +1641,30 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.base,
     fontWeight: '600',
     color: colors.light.text,
+  },
+
+  // Created At
+  createdAtContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+    paddingTop: spacing.sm,
+  },
+  createdAtLabel: {
+    fontSize: typography.sizes.sm,
+    color: colors.light.textMuted,
+    fontWeight: '600',
+  },
+  createdAtBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  createdAtText: {
+    fontSize: typography.sizes.sm,
+    color: colors.light.text,
+    fontWeight: '600',
   },
 });
 

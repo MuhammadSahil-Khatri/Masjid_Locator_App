@@ -10,19 +10,6 @@ import {
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useFonts } from 'expo-font';
-import {
-  Inter_300Light,
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-} from '@expo-google-fonts/inter';
-import {
-  NotoNaskhArabic_400Regular,
-  NotoNaskhArabic_500Medium,
-  NotoNaskhArabic_600SemiBold,
-  NotoNaskhArabic_700Bold,
-} from '@expo-google-fonts/noto-naskh-arabic';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from './context/AppContext';
 import { NavigationProvider } from './navigation/NavigationContext';
@@ -31,10 +18,9 @@ import RootNavigator from './navigation/RootNavigator';
 import { CustomToast } from './components/common/CustomToast';
 import Toast from 'react-native-toast-message';
 import { toastConfig } from './components/common/ToastConfig';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { queryClient, asyncStoragePersister } from './lib/queryClient';
 import { colors, spacing, typography } from './theme';
-
-const queryClient = new QueryClient();
 
 function AppMain() {
   const { highContrast: isDark } = useApp();
@@ -51,15 +37,18 @@ function AppMain() {
 
 export default function App() {
   const [fontsLoaded] = useFonts({
-    'Inter-Light': Inter_300Light,
-    'Inter-Regular': Inter_400Regular,
-    'Inter-Medium': Inter_500Medium,
-    'Inter-SemiBold': Inter_600SemiBold,
-    'Inter-Bold': Inter_700Bold,
-    'NotoNaskhArabic-Regular': NotoNaskhArabic_400Regular,
-    'NotoNaskhArabic-Medium': NotoNaskhArabic_500Medium,
-    'NotoNaskhArabic-SemiBold': NotoNaskhArabic_600SemiBold,
-    'NotoNaskhArabic-Bold': NotoNaskhArabic_700Bold,
+    'Aeonik-Light': require('../assets/Fonts/AEONIK/AEONIK-LIGHT.OTF'),
+    'Aeonik-Regular': require('../assets/Fonts/AEONIK/AEONIK-REGULAR.OTF'),
+    'Aeonik-Medium': require('../assets/Fonts/AEONIK/AEONIK-MEDIUM.OTF'),
+    'Aeonik-SemiBold': require('../assets/Fonts/AEONIK/AEONIK-BOLD.OTF'),
+    'Aeonik-Bold': require('../assets/Fonts/AEONIK/AEONIK-BOLD.OTF'),
+    'Aeonik-Black': require('../assets/Fonts/AEONIK/AEONIK-BLACK.OTF'),
+    'NotoNastaliqUrdu-Regular': require('../assets/Fonts/Noto_Nastaliq_Urdu/NotoNastaliqUrdu-Regular.ttf'),
+    'NotoNastaliqUrdu-Medium': require('../assets/Fonts/Noto_Nastaliq_Urdu/NotoNastaliqUrdu-Medium.ttf'),
+    'NotoNastaliqUrdu-SemiBold': require('../assets/Fonts/Noto_Nastaliq_Urdu/NotoNastaliqUrdu-SemiBold.ttf'),
+    'NotoNastaliqUrdu-Bold': require('../assets/Fonts/Noto_Nastaliq_Urdu/NotoNastaliqUrdu-Bold.ttf'),
+    'Amiri-Regular': require('../assets/Fonts/Amiri/Amiri-Regular.ttf'),
+    'Amiri-Bold': require('../assets/Fonts/Amiri/Amiri-Bold.ttf'),
   });
 
   if (!fontsLoaded) {
@@ -67,7 +56,10 @@ export default function App() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{ persister: asyncStoragePersister }}
+    >
       <SafeAreaProvider>
         <AuthProvider>
           <AppProvider>
@@ -82,7 +74,7 @@ export default function App() {
           <Toast config={toastConfig} />
         </AuthProvider>
       </SafeAreaProvider>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   );
 }
 

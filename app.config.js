@@ -2,7 +2,7 @@ require('dotenv').config();
 
 export default {
   expo: {
-    name: "Masjid Locator App",
+    name: "Jamiyat Ahl-e-Hadith Hyd",
     slug: "masjid-locator-app",
     version: "1.0.0",
     orientation: "portrait",
