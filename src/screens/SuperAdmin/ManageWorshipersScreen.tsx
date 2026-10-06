@@ -214,7 +214,7 @@ export const ManageWorshipersScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <View style={styles.safeArea}>
       {/* Header */}
       <SectionHeader title="Manage Worshipers" />
 
@@ -341,7 +341,7 @@ export const ManageWorshipersScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 

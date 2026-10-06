@@ -266,7 +266,7 @@ export const ManageSuperAdminsScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <View style={styles.safeArea}>
       {/* Header */}
       <SectionHeader title="Manage Super Admins" />
 
@@ -423,7 +423,7 @@ export const ManageSuperAdminsScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 

@@ -79,7 +79,7 @@ export const ManageScreenLayout: React.FC<ManageScreenLayoutProps> = ({
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.white }]} edges={['top']}>
+    <View style={[styles.safeArea, { backgroundColor: colors.white }]}>
       <Animated.View style={styles.container} entering={FadeIn.duration(400)}>
         {/* Screen Header */}
         <SectionHeader title={title} />
@@ -129,7 +129,7 @@ export const ManageScreenLayout: React.FC<ManageScreenLayoutProps> = ({
           <AddButton label={addButtonLabel} onPress={handleAddPress} />
         )}
       </Animated.View>
-    </SafeAreaView>
+    </View>
   );
 };
 

@@ -5,35 +5,57 @@
  */
 import Toast from 'react-native-toast-message';
 
-export const showSuccess = (message: string, title = 'Success') => {
+type VisibilityListener = (visible: boolean) => void;
+const listeners: Set<VisibilityListener> = new Set();
+let hideTimer: ReturnType<typeof setTimeout> | null = null;
+
+export const subscribeToastVisibility = (listener: VisibilityListener): (() => void) => {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+};
+
+const notifyListeners = (visible: boolean) => {
+  listeners.forEach((listener) => listener(visible));
+};
+
+const triggerToast = (
+  type: 'success' | 'error' | 'info',
+  text2: string,
+  text1: string,
+  duration: number
+) => {
+  if (hideTimer) {
+    clearTimeout(hideTimer);
+    hideTimer = null;
+  }
+  notifyListeners(true);
   Toast.show({
-    type: 'success',
-    text1: title,
-    text2: message,
+    type,
+    text1,
+    text2,
     position: 'top',
-    visibilityTime: 3000,
+    visibilityTime: duration,
     autoHide: true,
+    onHide: () => {
+      notifyListeners(false);
+    },
   });
+
+  hideTimer = setTimeout(() => {
+    notifyListeners(false);
+  }, duration + 500);
+};
+
+export const showSuccess = (message: string, title = 'Success') => {
+  triggerToast('success', message, title, 3000);
 };
 
 export const showError = (message: string, title = 'Error') => {
-  Toast.show({
-    type: 'error',
-    text1: title,
-    text2: message,
-    position: 'top',
-    visibilityTime: 4000,
-    autoHide: true,
-  });
+  triggerToast('error', message, title, 4000);
 };
 
 export const showInfo = (message: string, title = 'Info') => {
-  Toast.show({
-    type: 'info',
-    text1: title,
-    text2: message,
-    position: 'top',
-    visibilityTime: 3000,
-    autoHide: true,
-  });
+  triggerToast('info', message, title, 3000);
 };

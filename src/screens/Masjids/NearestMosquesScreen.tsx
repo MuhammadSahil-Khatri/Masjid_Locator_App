@@ -7,7 +7,6 @@ import {
   TextInput,
   Image,
   ImageBackground,
-  StatusBar,
   Platform,
   ActivityIndicator,
   Linking,
@@ -35,14 +34,35 @@ const LocationPinIcon = ({ color = '#03BECD', size = 12 }: { color?: string; siz
   </Svg>
 );
 
+const SearchIcon = ({ color = '#1D3B6D', size = 18 }: { color?: string; size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M11 19C15.4183 19 19 15.4183 19 11C19 6.58172 15.4183 3 11 3C6.58172 3 3 6.58172 3 11C3 15.4183 6.58172 19 11 19Z"
+      stroke={color}
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path
+      d="M21 21L16.65 16.65"
+      stroke={color}
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
 export const NearestMosquesScreen: React.FC = () => {
   const { isRtl } = useApp();
   const { goBack } = useNavigation();
   const insets = useSafeAreaInsets();
   const theme = colors.light;
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchActive, setIsSearchActive] = useState(false);
   const [selectedMosque, setSelectedMosque] = useState<any | null>(null);
   const [isBottomSheetVisible, setBottomSheetVisible] = useState(false);
+  const searchInputRef = React.useRef<TextInput>(null);
 
   const { location } = useUserLocation();
   // Fetch and cache strictly the top 10 nearest mosques
@@ -74,6 +94,18 @@ export const NearestMosquesScreen: React.FC = () => {
       Linking.openURL(fallbackUrl);
     }
   }, [selectedMosque]);
+
+  const handleSearchIconPress = useCallback(() => {
+    setIsSearchActive(true);
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 50);
+  }, []);
+
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+    setIsSearchActive(false);
+  }, []);
 
   // Filtered mosques based on search query (within top 10)
   const filteredMosques = useMemo(() => {
@@ -113,7 +145,7 @@ export const NearestMosquesScreen: React.FC = () => {
         </View>
 
         {/* Mosque Details */}
-        <View style={[styles.infoWrapper, isRtl && styles.alignRight]}>
+        <View style={[styles.infoWrapper]}>
           <Text style={styles.mosqueName} numberOfLines={1}>
             {item.name}
           </Text>
@@ -153,35 +185,50 @@ export const NearestMosquesScreen: React.FC = () => {
       style={styles.backgroundImage}
       resizeMode="cover"
     >
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* ── Top Header Section with Floating Search Pill ── */}
+      {/* ── Top Header Section with Floating Pill ── */}
       <View style={[styles.headerWrapper, { paddingTop: Math.max(insets.top - 20, 16) }]}>
         <View style={styles.pillContainer}>
           {/* Back Arrow */}
-          <TouchableOpacity style={styles.searchIconBtn} onPress={goBack}>
-            <ChevronLeft size={36} color="#1D3B6D" />
+          <TouchableOpacity style={styles.pillActionBtn} onPress={goBack} accessibilityLabel="Go Back">
+            <ChevronLeft size={38} color="#1D3B6D" />
           </TouchableOpacity>
 
-          {/* Search Input */}
-          <TextInput
-            style={[styles.searchInput, isRtl && styles.textRtl]}
-            placeholder={isRtl ? 'قریبی مساجد تلاش کریں' : 'Nearby Masjid'}
-            placeholderTextColor="#afb0b185"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            returnKeyType="search"
-            autoCorrect={false}
-          />
+          {/* Title or Search Input */}
+          {isSearchActive ? (
+            <TextInput
+              ref={searchInputRef}
+              style={[styles.searchInput, isRtl && styles.textRtl]}
+              placeholder={isRtl ? 'قریبی مساجد تلاش کریں' : 'Search masjids...'}
+              placeholderTextColor="#afb0b185"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              returnKeyType="search"
+              autoCorrect={false}
+            />
+          ) : (
+            <Text style={styles.pillTitle} numberOfLines={1}>
+              {isRtl ? 'مساجد' : 'Masjids'}
+            </Text>
+          )}
 
-          {/* Clear or Filter Button */}
-          {searchQuery.length > 0 && (
+          {/* Search icon or Clear button */}
+          {isSearchActive ? (
             <TouchableOpacity
-              style={styles.filterBtn}
-              onPress={() => setSearchQuery('')}
+              style={styles.pillActionBtn}
+              onPress={handleClearSearch}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityLabel="Clear search"
             >
               <X size={20} color="#1D3B6D" />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.pillActionBtn}
+              onPress={handleSearchIconPress}
+              accessibilityLabel="Search masjids"
+            >
+              <SearchIcon size={25} color="#1D3B6D" />
             </TouchableOpacity>
           )}
         </View>
@@ -206,7 +253,7 @@ export const NearestMosquesScreen: React.FC = () => {
           />
         ) : (
           <View style={styles.centerContainer}>
-            <Compass size={44} color="#8C9199" />
+            <Compass size={44} color="#ffffffff" />
             <Text style={styles.emptyTitle}>
               {searchQuery ? 'No Mosques Found' : 'No Nearby Mosques'}
             </Text>
@@ -289,12 +336,19 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  searchIconBtn: {
-    width: 26,
-    height: 26,
+  pillActionBtn: {
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 6,
+  },
+  pillTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1D3B6D',
+    textAlign: 'center',
+    letterSpacing: 0.2,
   },
   searchInput: {
     flex: 1,
@@ -307,13 +361,6 @@ const styles = StyleSheet.create({
   },
   textRtl: {
     textAlign: 'right',
-  },
-  filterBtn: {
-    width: 26,
-    height: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 6,
   },
 
   // ── Main White Container ───────────────────────────────────────────────────
@@ -448,13 +495,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: typography.sizes.base,
     fontWeight: typography.weights.bold,
-    color: '#1D3B6D',
+    color: '#ffffffff',
     marginTop: spacing.md,
     marginBottom: spacing.xs,
   },
   emptyText: {
     fontSize: typography.sizes.xs,
-    color: '#8C9199',
+    color: '#ffffffff',
     textAlign: 'center',
     lineHeight: 18,
     paddingHorizontal: spacing.lg,

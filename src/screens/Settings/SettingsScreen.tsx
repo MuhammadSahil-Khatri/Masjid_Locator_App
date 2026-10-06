@@ -5,21 +5,26 @@ import {
   ScrollView,
   TouchableOpacity,
   ImageBackground,
-  StatusBar,
   Platform,
   Modal,
   TextInput,
   ActivityIndicator,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
-import { X, Check } from 'lucide-react-native';
+import { X, Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react-native';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { Text } from '../../components/ui/Text';
 import { colors, spacing, typography } from '../../theme';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigation } from '../../navigation/NavigationContext';
+import { FormInput } from '../../components/ui/FormInput';
+import { loginSchema, LoginFormData } from '../../utils/validationSchemas';
 
 // ─── SVG Icons Matching Assets ────────────────────────────────────────────────
 
@@ -117,10 +122,12 @@ const AdminSvgIcon = ({ color = '#1D3B6D', size = 20 }: { color?: string; size?:
 export const SettingsScreen: React.FC = () => {
   const { currentUser, language, setLanguage, isRtl, triggerToast } = useApp();
   const { goBack, navigate } = useNavigation();
-  const { logout } = useAuth();
+  const { user, profile, login, logout } = useAuth();
   const insets = useSafeAreaInsets();
 
   // Modals state
+  const [loginModalVisible, setLoginModalVisible] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
@@ -129,9 +136,39 @@ export const SettingsScreen: React.FC = () => {
   // Form states
   const [feedbackText, setFeedbackText] = useState('');
 
-  const isSuperAdmin = currentUser?.role === 'super_admin';
-  const isAdmin = currentUser?.role === 'admin';
-  const hasAdminAccess = isSuperAdmin || isAdmin;
+  // ── Login Form setup with react-hook-form & Zod validation ──
+  const loginForm = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: '', password: '' },
+  });
+
+  const onLoginSubmit = loginForm.handleSubmit(async (data: LoginFormData) => {
+    try {
+      await login(data.email, data.password);
+      triggerToast(language === 'ur' ? 'لاگ ان کامیاب!' : 'Logged in successfully!');
+      setLoginModalVisible(false);
+      loginForm.reset();
+    } catch (err: any) {
+      const msg: string = err?.message || '';
+      if (msg.toLowerCase().includes('email not confirmed')) {
+        triggerToast(
+          language === 'ur'
+            ? 'ای میل تصدیق نہیں ہوئی۔ ان باکس چیک کریں۔'
+            : 'Email not confirmed. Check your inbox.'
+        );
+      } else if (msg.toLowerCase().includes('invalid login credentials')) {
+        triggerToast(
+          language === 'ur' ? 'ای میل یا پاس ورڈ غلط ہے۔' : 'Incorrect email or password.'
+        );
+      } else {
+        triggerToast(msg || (language === 'ur' ? 'سائن ان ناکام ہوا۔' : 'Login failed. Please try again.'));
+      }
+    }
+  });
+
+  const isSuperAdmin = currentUser?.role === 'super_admin' || profile?.role === 'super_admin';
+  const isAdmin = currentUser?.role === 'admin' || profile?.role === 'admin';
+  const isAuthenticated = !!user;
 
   const handleFeedbackSubmit = () => {
     if (!feedbackText.trim()) {
@@ -161,8 +198,6 @@ export const SettingsScreen: React.FC = () => {
       style={styles.backgroundImage}
       resizeMode="cover"
     >
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-
       {/* ── Top Header Section with Floating Pill ── */}
       <View style={[styles.headerWrapper, { paddingTop: Math.max(insets.top - 20, 16) }]}>
         <View style={styles.pillContainer}>
@@ -175,7 +210,7 @@ export const SettingsScreen: React.FC = () => {
             <BackArrowIcon size={14} color="#1D3B6D" />
           </TouchableOpacity>
 
-          <Text style={styles.pillTitle}>{isRtl ? 'ترتیبات' : 'Settings'}</Text>
+          <Text style={[styles.pillTitle, isRtl && { lineHeight: 36 }]}>{isRtl ? 'ترتیبات' : 'Settings'}</Text>
 
           <View style={styles.pillActionPlaceholder} />
         </View>
@@ -226,73 +261,88 @@ export const SettingsScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* ── User Information Card ── */}
-        <View style={[styles.userCard]}>
-          <View style={[styles.userInfo]}>
-            <Text style={styles.userName} numberOfLines={1}>
-              {currentUser?.name || 'User Name'}
-            </Text>
-            {currentUser?.phone ? (
-              <Text style={styles.userPhone} numberOfLines={1}>
-                {currentUser.phone}
-              </Text>
-            ) : null}
-            <Text style={styles.userEmail} numberOfLines={1}>
-              {currentUser?.email || 'Example123@gmail.com'}
-            </Text>
+        {/* ── User Information or Login Card ── */}
+        {isAuthenticated ? (
+          <View style={[styles.userCard]}>
+            <View style={[styles.userInfo]}>
+              <View style={[styles.userHeaderRow, isRtl && styles.rowReverse]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.userName, isRtl && styles.textRtl]} numberOfLines={1}>
+                    {currentUser?.name || user?.user_metadata?.name || 'Administrator'}
+                  </Text>
+                  <Text style={[styles.userEmail, isRtl && styles.textRtl]} numberOfLines={1}>
+                    {currentUser?.email || user?.email || 'admin@nur.com'}
+                  </Text>
+                </View>
+                <View style={styles.roleBadgeContainer}>
+                  <Text style={[styles.roleBadgeText, isRtl && { lineHeight: 28 }]}>
+                    {isSuperAdmin
+                      ? (isRtl ? 'سپر ایڈمن' : 'Super Admin')
+                      : isAdmin
+                        ? (isRtl ? 'ایڈمن' : 'Admin')
+                        : (isRtl ? 'صارف' : 'User')}
+                  </Text>
+                </View>
+              </View>
 
-            {/* Logout text button */}
-            <TouchableOpacity
-              style={styles.logoutButton}
-              onPress={() => setLogoutModalVisible(true)}
-              activeOpacity={0.7}
-              accessibilityLabel="Logout"
-            >
-              <Text style={styles.logoutTextButton}>Log out</Text>
-            </TouchableOpacity>
+              {/* Logout button */}
+              <TouchableOpacity
+                style={styles.logoutButton}
+                onPress={() => setLogoutModalVisible(true)}
+                activeOpacity={0.7}
+                accessibilityLabel="Logout"
+              >
+                <Text style={[styles.logoutTextButton, isRtl && { lineHeight: 32 }]}>{isRtl ? 'لاگ آؤٹ' : 'Log out'}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        ) : (
+          <View style={styles.userCard}>
+            <View style={styles.loginCardContent}>
+              <View style={[styles.loginCardHeader, isRtl && styles.rowReverse]}>
+                <View style={styles.loginIconCircle}>
+                  <Lock size={22} color="#0081A0" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.loginCardTitle, isRtl && styles.textRtl]}>
+                    {isRtl ? 'انتظامی لاگ ان' : 'Admin Login'}
+                  </Text>
+                  <Text style={[styles.loginCardSub, isRtl && [styles.textRtl, { lineHeight: 32 }]]}>
+                    {isRtl
+                      ? 'انتظامیہ کے اختیارات تک رسائی کے لیے لاگ ان کریں'
+                      : 'Sign in to access admin or super admin controls'}
+                  </Text>
+                </View>
+              </View>
 
-        {/* ── Section: GENERAL ── */}
-        <Text style={[styles.sectionHeader, isRtl && styles.textRtl]}>
+              <TouchableOpacity
+                style={styles.loginSubmitButton}
+                onPress={() => {
+                  loginForm.reset();
+                  setLoginModalVisible(true);
+                }}
+                activeOpacity={0.85}
+              >
+                <LinearGradient
+                  colors={colors.gradients.cyan as [string, string]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.loginGradientInner}
+                >
+                  <LogIn size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                  <Text style={[styles.loginBtnText, isRtl && { lineHeight: 25 }]}>{isRtl ? 'لاگ ان کریں' : 'Log In'}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* ── Section: GENERAL (No edit profile / change password) ── */}
+        <Text style={[styles.sectionHeader, isRtl && [styles.textRtl, { lineHeight: 34 }]]}>
           {isRtl ? 'عام' : 'GENERAL'}
         </Text>
 
         <View style={styles.groupCard}>
-          {/* Edit Profile */}
-          <TouchableOpacity
-            style={[styles.tileRow, isRtl && styles.rowReverse]}
-            onPress={() => navigate('EditProfile')}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.tileLeft, isRtl && styles.rowReverse]}>
-              <View style={styles.iconBox}>
-                <ProfileSvgIcon size={19} color="#1D3B6D" />
-              </View>
-              <Text style={styles.tileLabel}>{isRtl ? 'پروفائل میں ترمیم کریں' : 'Edit Profile'}</Text>
-            </View>
-            <NextArrowIcon size={14} color="#1D3B6D" isRtl={isRtl} />
-          </TouchableOpacity>
-
-          <View style={styles.divider} />
-
-          {/* Change Password */}
-          <TouchableOpacity
-            style={[styles.tileRow, isRtl && styles.rowReverse]}
-            onPress={() => navigate('ChangePassword')}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.tileLeft, isRtl && styles.rowReverse]}>
-              <View style={styles.iconBox}>
-                <SecureSvgIcon size={19} color="#1D3B6D" />
-              </View>
-              <Text style={styles.tileLabel}>{isRtl ? 'پاس ورڈ تبدیل کریں' : 'Change Password'}</Text>
-            </View>
-            <NextArrowIcon size={14} color="#1D3B6D" isRtl={isRtl} />
-          </TouchableOpacity>
-
-          <View style={styles.divider} />
-
           {/* Send Feedback */}
           <TouchableOpacity
             style={[styles.tileRow, isRtl && styles.rowReverse]}
@@ -303,7 +353,7 @@ export const SettingsScreen: React.FC = () => {
               <View style={styles.iconBox}>
                 <FeedbackSvgIcon size={19} color="#1D3B6D" />
               </View>
-              <Text style={styles.tileLabel}>{isRtl ? 'رائے بھیجیں' : 'Send Feedback'}</Text>
+              <Text style={[styles.tileLabel, isRtl && styles.textRtl]}>{isRtl ? 'رائے بھیجیں' : 'Send Feedback'}</Text>
             </View>
             <NextArrowIcon size={14} color="#1D3B6D" isRtl={isRtl} />
           </TouchableOpacity>
@@ -320,43 +370,53 @@ export const SettingsScreen: React.FC = () => {
               <View style={styles.iconBox}>
                 <PrivacyPolicySvgIcon size={19} color="#1D3B6D" />
               </View>
-              <Text style={styles.tileLabel}>{isRtl ? 'رازداری کی پالیسی' : 'Privacy Policy'}</Text>
+              <Text style={[styles.tileLabel, isRtl && styles.textRtl]}>{isRtl ? 'رازداری کی پالیسی' : 'Privacy Policy'}</Text>
             </View>
             <NextArrowIcon size={14} color="#1D3B6D" isRtl={isRtl} />
           </TouchableOpacity>
         </View>
 
-        {/* ── Section: ADMINISTRATION (Admin & Super Admin only) ── */}
-        {hasAdminAccess && (
+        {/* ── Section: ADMINISTRATION (Enabled once logged in as Admin or Super Admin) ── */}
+        {isAuthenticated && (isSuperAdmin || isAdmin) && (
           <>
-            <Text style={[styles.sectionHeader, isRtl && styles.textRtl]}>
+            <Text style={[styles.sectionHeader, isRtl && [styles.textRtl, { lineHeight: 34 }]]}>
               {isRtl ? 'انتظامیہ' : 'ADMINISTRATION'}
             </Text>
 
             <View style={styles.groupCard}>
-              <TouchableOpacity
-                style={[styles.tileRow, isRtl && styles.rowReverse]}
-                onPress={() => {
-                  if (isSuperAdmin) {
-                    navigate('SuperAdminPanel');
-                  } else {
-                    navigate('AdminPanel');
-                  }
-                }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.tileLeft, isRtl && styles.rowReverse]}>
-                  <View style={styles.iconBox}>
-                    <AdminSvgIcon size={20} color="#1D3B6D" />
+              {isSuperAdmin ? (
+                <TouchableOpacity
+                  style={[styles.tileRow, isRtl && styles.rowReverse]}
+                  onPress={() => navigate('SuperAdminPanel')}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.tileLeft, isRtl && styles.rowReverse]}>
+                    <View style={styles.iconBox}>
+                      <AdminSvgIcon size={20} color="#1D3B6D" />
+                    </View>
+                    <Text style={[styles.tileLabel, isRtl && styles.textRtl]}>
+                      {isRtl ? 'سپر ایڈمن پینل' : 'Super Admin Panel'}
+                    </Text>
                   </View>
-                  <Text style={styles.tileLabel}>
-                    {isSuperAdmin
-                      ? (isRtl ? 'سپر ایڈمن پینل' : 'Super Admin Panel')
-                      : (isRtl ? 'ایڈمن پینل' : 'Admin Panel')}
-                  </Text>
-                </View>
-                <NextArrowIcon size={14} color="#1D3B6D" isRtl={isRtl} />
-              </TouchableOpacity>
+                  <NextArrowIcon size={14} color="#1D3B6D" isRtl={isRtl} />
+                </TouchableOpacity>
+              ) : isAdmin ? (
+                <TouchableOpacity
+                  style={[styles.tileRow, isRtl && styles.rowReverse]}
+                  onPress={() => navigate('AdminPanel')}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.tileLeft, isRtl && styles.rowReverse]}>
+                    <View style={styles.iconBox}>
+                      <AdminSvgIcon size={20} color="#1D3B6D" />
+                    </View>
+                    <Text style={[styles.tileLabel, isRtl && styles.textRtl]}>
+                      {isRtl ? 'ایڈمن پینل' : 'Admin Panel'}
+                    </Text>
+                  </View>
+                  <NextArrowIcon size={14} color="#1D3B6D" isRtl={isRtl} />
+                </TouchableOpacity>
+              ) : null}
             </View>
           </>
         )}
@@ -365,6 +425,101 @@ export const SettingsScreen: React.FC = () => {
 
 
 
+
+      {/* ── Login Modal ── */}
+      <Modal
+        visible={loginModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLoginModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.loginModalCard}>
+            <View style={[styles.modalHeader, isRtl && styles.rowReverse]}>
+              <View>
+                <Text style={[styles.modalTitle, isRtl && styles.textRtl]}>
+                  {isRtl ? 'لاگ ان' : 'Sign In'}
+                </Text>
+                <Text style={[styles.loginModalSubtitle, isRtl && styles.textRtl]}>
+                  {isRtl ? 'اپنا ای میل اور پاس ورڈ درج کریں' : 'Enter your email and password'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setLoginModalVisible(false)}
+                accessibilityLabel="Close"
+                style={styles.modalCloseBtn}
+              >
+                <X size={20} color="#1D3B6D" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.loginFormBody}>
+              <Controller
+                control={loginForm.control}
+                name="email"
+                render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => (
+                  <FormInput
+                    placeholder={isRtl ? 'ای میل درج کریں' : 'Enter your email'}
+                    value={value}
+                    onChangeText={onChange}
+                    onBlur={onBlur}
+                    error={error}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    leftIcon={<Mail size={18} color="#1D3B6D" />}
+                  />
+                )}
+              />
+
+              <Controller
+                control={loginForm.control}
+                name="password"
+                render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => (
+                  <FormInput
+                    placeholder={isRtl ? 'پاس ورڈ درج کریں' : 'Enter your password'}
+                    value={value}
+                    onChangeText={onChange}
+                    onBlur={onBlur}
+                    secureTextEntry={!showPassword}
+                    error={error}
+                    leftIcon={<Lock size={18} color="#1D3B6D" />}
+                    rightIcon={
+                      <TouchableOpacity onPress={() => setShowPassword(v => !v)}>
+                        {showPassword ? <EyeOff size={18} color="#1D3B6D" /> : <Eye size={18} color="#1D3B6D" />}
+                      </TouchableOpacity>
+                    }
+                  />
+                )}
+              />
+
+              <TouchableOpacity
+                style={styles.loginModalSubmitBtn}
+                onPress={onLoginSubmit}
+                disabled={loginForm.formState.isSubmitting}
+                activeOpacity={0.85}
+              >
+                <LinearGradient
+                  colors={colors.gradients.cyan as [string, string]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.loginModalGradient}
+                >
+                  {loginForm.formState.isSubmitting ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={[styles.loginModalSubmitText, isRtl && { lineHeight: 30 }]}>
+                      {isRtl ? 'لاگ ان کریں' : 'Log In'}
+                    </Text>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* ── Feedback Modal ── */}
       <Modal visible={feedbackModalVisible} transparent animationType="fade">
@@ -440,7 +595,7 @@ export const SettingsScreen: React.FC = () => {
                     <X size={20} color="#1D3B6D" />
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.modalSubText}>
+                <Text style={[styles.modalSubText, isRtl && [styles.textRtl, { lineHeight: 34 }]]}>
                   {isRtl
                     ? 'کیا آپ واقعی اپنے اکاؤنٹ سے لاگ آؤٹ کرنا چاہتے ہیں؟'
                     : 'Are you sure you want to log out of your account?'}
@@ -451,7 +606,7 @@ export const SettingsScreen: React.FC = () => {
                     onPress={() => setLogoutModalVisible(false)}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.modalCancelBtnText}>
+                    <Text style={[styles.modalCancelBtnText, isRtl && { lineHeight: 32 }]}>
                       {isRtl ? 'منسوخ کریں' : 'Cancel'}
                     </Text>
                   </TouchableOpacity>
@@ -460,7 +615,7 @@ export const SettingsScreen: React.FC = () => {
                     onPress={confirmLogout}
                     activeOpacity={0.7}
                   >
-                    <Text style={styles.modalDangerBtnText}>
+                    <Text style={[styles.modalDangerBtnText, isRtl && { lineHeight: 32 }]}>
                       {isRtl ? 'لاگ آؤٹ' : 'Log Out'}
                     </Text>
                   </TouchableOpacity>
@@ -644,6 +799,122 @@ const styles = StyleSheet.create({
     color: '#8C9199',
     marginTop: 2,
   },
+  userHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  roleBadgeContainer: {
+    backgroundColor: '#E0F2FE',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  roleBadgeText: {
+    color: '#0081A0',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  // ── Login Card Styles ──
+  loginCardContent: {
+    gap: 12,
+  },
+  loginCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  loginIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#E0F7FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loginCardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1D3B6D',
+  },
+  loginCardSub: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  loginSubmitButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  loginGradientInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 44,
+    borderRadius: 12,
+  },
+  loginBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  loginModalCard: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: spacing.xl,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 6,
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+      },
+    }),
+  },
+  loginModalSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loginFormBody: {
+    marginTop: 16,
+  },
+  loginModalSubmitBtn: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 10,
+  },
+  loginModalGradient: {
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loginModalSubmitText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
 
   // ── Section Headers ─────────────────────────────────────────────────────────
   sectionHeader: {
@@ -657,6 +928,7 @@ const styles = StyleSheet.create({
   },
   textRtl: {
     textAlign: 'right',
+    lineHeight: 35,
   },
   alignRight: {
     alignItems: 'flex-end',

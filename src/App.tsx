@@ -6,7 +6,8 @@
 import React from 'react';
 import {
   StyleSheet,
-  View
+  View,
+  StatusBar,
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useFonts } from 'expo-font';
@@ -28,6 +29,7 @@ function AppMain() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: safeAreaBg }]}>
+      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
       <View style={styles.container}>
         <RootNavigator />
       </View>

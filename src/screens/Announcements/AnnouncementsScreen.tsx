@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ImageBackground,
   Platform,
+  StatusBar,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -220,6 +221,7 @@ const styles = StyleSheet.create({
     color: '#1D3B6D',
     textAlign: 'center',
     letterSpacing: 0.2,
+    // lineHeight: 1006,
     flex: 1,
   },
   rowReverse: {

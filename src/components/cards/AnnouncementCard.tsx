@@ -71,13 +71,13 @@ export const AnnouncementCard: React.FC<AnnouncementCardProps> = ({
         {isRtl ? (
           <>
             <View style={styles.cardRightContent}>
-              <View style={styles.nextIconWrapper}>
+              <View style={[styles.nextIconWrapper, { paddingRight: 20 }]}>
                 <NextIcon size={16} color="#FAFEFF" isRtl={isRtl} />
               </View>
               {renderRightContent()}
             </View>
             <View style={styles.cardLeftContent}>
-              <Text style={[styles.cardTitle, { textAlign: 'right' }]}>{title}</Text>
+              <Text style={[styles.cardTitle, { textAlign: 'right', lineHeight: 26 }]}>{title}</Text>
             </View>
           </>
         ) : (
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     color: '#FAFEFF',
     fontSize: 16,
     fontWeight: '700',
-    lineHeight: 20,
+    lineHeight: 26,
     letterSpacing: 0.2,
     flexShrink: 1,
   },
@@ -175,6 +175,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingLeft: 2,
+    // padding: 10,
   },
 });
 

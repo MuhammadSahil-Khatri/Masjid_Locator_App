@@ -19,12 +19,8 @@ export const SplashScreen = () => {
     if (navigatedRef.current) return;
     navigatedRef.current = true;
 
-    if (user) {
-      navigate('Home');
-    } else {
-      navigate('Welcome');
-    }
-  }, [user, authLoading, navigate]);
+    navigate('Home');
+  }, [authLoading, navigate]);
 
   // Minimum branding display timer (600ms for smooth visual feel)
   useEffect(() => {

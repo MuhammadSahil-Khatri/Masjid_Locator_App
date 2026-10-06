@@ -16,7 +16,7 @@ export const colors = {
 
   secondary: "#0088A5", // Deep Cyan / Teal
   secondaryLight: "rgba(0, 136, 165, 0.10)",
-  secondaryBorder: "rgba(0, 136, 165, 0.30)",
+  secondaryBorder: "rgba(0, 136, 165, 0.3)",
 
   warning: "#FDC700", // Yellow
   warningLight: "rgba(253, 199, 0, 0.10)",

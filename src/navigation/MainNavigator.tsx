@@ -17,6 +17,7 @@ import { PrayerTimesScreen } from '../screens/PrayerTimes/PrayerTimesScreen';
 import { QiblaScreen } from '../screens/Qibla/QiblaScreen';
 import { storageService } from '../services/storageService';
 import { HadeesScreen } from '../screens/Hadees/HadeesScreen';
+import { DuaScreen } from '../screens/Duas/DuaScreen';
 
 // Super Admin Imports
 import { SuperAdminPanel } from '../screens/SuperAdmin/SuperAdminPanel';
@@ -29,7 +30,7 @@ import { ManageWorshipersScreen } from '../screens/SuperAdmin/ManageWorshipersSc
 import { AdminPanel } from '../screens/SuperAdmin/AdminPanel.tsx';
 import { AssignedMosqueScreen } from '../screens/SuperAdmin/AssignedMosqueScreen';
 import { LinearGradient } from 'expo-linear-gradient';
-import { HomeIcon, AnnouncementIcon, MapIcon, MasjidIcon, ProfileIcon } from './NavbarIcons';
+import { HomeIcon, AnnouncementIcon, MapIcon, MasjidIcon, SupplicationIcon, SettingsIcon } from './NavbarIcons';
 
 export const MainNavigator: React.FC = () => {
   const { currentScreen, navigate } = useNavigation();
@@ -52,6 +53,10 @@ export const MainNavigator: React.FC = () => {
         return <HomeScreen />;
       case 'Hadees':
         return <HadeesScreen />;
+      case 'Supplication':
+      case 'Dua':
+      case 'Duas':
+        return <DuaScreen />;
       case 'Announcement':
       case 'Announcements':
         return <AnnouncementsScreen />;
@@ -108,21 +113,21 @@ export const MainNavigator: React.FC = () => {
       iconSize: 22,
     },
     {
-      key: 'Search' as const,
-      label: isRtl ? 'نقشہ' : 'Map',
-      Icon: MapIcon,
-      iconSize: 20,
-    },
-    {
       key: 'Masjids' as const,
       label: isRtl ? 'مساجد' : 'Masjid',
       Icon: MasjidIcon,
       iconSize: 20,
     },
     {
+      key: 'Supplication' as const,
+      label: isRtl ? 'دعائیں' : 'Supplication',
+      Icon: SupplicationIcon,
+      iconSize: 20,
+    },
+    {
       key: 'Settings' as const,
       label: isRtl ? 'ترتیبات' : 'Setting',
-      Icon: ProfileIcon,
+      Icon: SettingsIcon,
       iconSize: 20,
     },
   ];
@@ -148,7 +153,8 @@ export const MainNavigator: React.FC = () => {
           {navItems.map((item) => {
             const isActive =
               currentScreen === item.key ||
-              (item.key === 'Announcement' && currentScreen === 'CategoryAnnouncements') ||
+              (item.key === 'Supplication' && (currentScreen === 'Duas' || currentScreen === 'Dua')) ||
+              (item.key === 'Announcement' && (currentScreen === 'Announcements' || currentScreen === 'CategoryAnnouncements')) ||
               (item.key === 'Settings' && [
                 'SuperAdminPanel',
                 'AdminPanel',

@@ -147,17 +147,17 @@ export const AssignedMosqueScreen: React.FC = () => {
 
     if (loading) {
         return (
-            <SafeAreaView style={styles.safeArea} edges={['top']}>
+            <View style={styles.safeArea}>
                 <View style={styles.centered}>
                     <ActivityIndicator size="large" color={colors.primary} />
                 </View>
-            </SafeAreaView>
+            </View>
         );
     }
 
     if (error) {
         return (
-            <SafeAreaView style={styles.safeArea} edges={['top']}>
+            <View style={styles.safeArea}>
                 <View style={styles.headerWrapper}>
                     <View style={styles.pillContainer}>
                         <TouchableOpacity onPress={goBack} style={styles.backButton} activeOpacity={0.7} accessibilityLabel="Go back">
@@ -171,12 +171,12 @@ export const AssignedMosqueScreen: React.FC = () => {
                     <WifiOff size={48} color={colors.danger} />
                     <Text style={styles.errorText}>{error}</Text>
                 </View>
-            </SafeAreaView>
+            </View>
         );
     }
 
     return (
-        <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.safeArea}>
             <View style={styles.headerWrapper}>
                 <View style={styles.pillContainer}>
                     <TouchableOpacity onPress={goBack} style={styles.backButton} activeOpacity={0.7} accessibilityLabel="Go back">
@@ -299,7 +299,7 @@ export const AssignedMosqueScreen: React.FC = () => {
 
                 <View style={{ height: 40 }} />
             </ScrollView>
-        </SafeAreaView>
+        </View>
     );
 };
 

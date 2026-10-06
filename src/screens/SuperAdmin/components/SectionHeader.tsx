@@ -30,7 +30,7 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({ title, onBack, rig
   };
 
   return (
-    <View style={[styles.headerWrapper, { paddingTop: Math.max(insets.top - 20, 16) }]}>
+    <View style={styles.headerWrapper}>
       <View style={styles.pillContainer}>
         <TouchableOpacity
           style={styles.pillActionBtn}
@@ -59,7 +59,8 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({ title, onBack, rig
 
 const styles = StyleSheet.create({
   headerWrapper: {
-    paddingBottom: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
   },
   pillContainer: {
     flexDirection: 'row',
@@ -70,7 +71,7 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     paddingHorizontal: 16,
-    marginTop: 8,
+    marginTop: 0,
     ...Platform.select({
       ios: {
         shadowColor: '#000',

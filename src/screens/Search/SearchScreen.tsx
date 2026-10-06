@@ -20,6 +20,7 @@ import {
   useWindowDimensions,
   Image,
   Share,
+  StatusBar,
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import {

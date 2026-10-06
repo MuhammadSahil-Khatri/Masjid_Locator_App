@@ -120,9 +120,9 @@ const HadithCard = ({ hadith, isRtl }: HadithCardProps) => {
 
       <View style={styles.lineBreaker} />
       {/* Footer Row */}
-      <View style={[styles.cardFooter, isRtl && styles.rowReverse]}>
+      <View style={[styles.cardFooter]}>
         {/* Date + Reference */}
-        <View style={[styles.footerLeft, isRtl && styles.rowReverse]}>
+        <View style={[styles.footerLeft]}>
           {formattedDate ? (
             <Text style={styles.footerDate}>{formattedDate}</Text>
           ) : null}
@@ -179,7 +179,6 @@ export const HadeesScreen: React.FC = () => {
       imageStyle={styles.backgroundImageStyle}
       resizeMode="stretch"
     >
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
       {/* ── Floating Pill Header ── */}
       <View style={[styles.headerWrapper, { paddingTop: Math.max(insets.top - 20, 16) }]}>
@@ -428,6 +427,7 @@ const styles = StyleSheet.create({
   },
   translateBtnText: {
     fontSize: 11,
+    lineHeight: 25,
     color: '#03BECD',
     fontWeight: '600',
   },

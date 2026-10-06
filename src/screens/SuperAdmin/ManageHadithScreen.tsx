@@ -417,7 +417,7 @@ export const ManageHadithScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <View style={styles.safeArea}>
       {/* Header */}
       <SectionHeader title="Manage Hadith" />
 
@@ -747,7 +747,7 @@ export const ManageHadithScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 

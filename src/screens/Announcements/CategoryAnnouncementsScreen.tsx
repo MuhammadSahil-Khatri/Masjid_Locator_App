@@ -170,8 +170,6 @@ export const CategoryAnnouncementsScreen: React.FC = () => {
       style={styles.backgroundImage}
       resizeMode="cover"
     >
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-
       {/* ── Top Header Section with Floating Pill matching SettingsScreen ── */}
       <View style={[styles.headerWrapper, { paddingTop: Math.max(insets.top - 20, 16) }]}>
         <View style={[styles.pillContainer, isRtl && styles.rowReverse]}>
@@ -290,6 +288,7 @@ const styles = StyleSheet.create({
     color: '#1D3B6D',
     textAlign: 'center',
     letterSpacing: 0.2,
+    lineHeight: 26,
     flex: 1,
   },
   rowReverse: {
@@ -357,7 +356,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   alignRight: {
-    alignItems: 'flex-end',
+    // alignItems: 'flex-end',
   },
 
   // ── See More Toggle ──
@@ -416,6 +415,7 @@ const styles = StyleSheet.create({
   },
   translateBtnText: {
     fontSize: 11,
+    lineHeight: 25,
     color: '#03BECD',
     fontWeight: '600',
   },

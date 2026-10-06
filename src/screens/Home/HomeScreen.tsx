@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Modal,
   Animated,
+  StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '../../components/ui/Text';
@@ -252,7 +253,7 @@ export const HomeScreen: React.FC = () => {
           {/* ── TOP DAY CARD SECTION ── */}
           <ImageBackground
             source={require('../../../assets/prayer_time_daycard_bg.png')}
-            style={[styles.headerCard, { paddingTop: Math.max(insets.top, 16) }]}
+            style={[styles.headerCard, { paddingTop: 20, paddingBottom: 30 }]}
             imageStyle={[
               styles.headerCardImage,
               isRtl && { transform: [{ scaleX: -1 }] },
@@ -264,20 +265,17 @@ export const HomeScreen: React.FC = () => {
 
               {/* Text Block (left in EN, right in UR) */}
               <View style={[styles.topLeftTextBlock, isRtl && { alignItems: 'flex-end', paddingLeft: 0, paddingRight: 12 }]}>
-                <Text style={[styles.greetingText, { fontSize: Math.round(10 * fontScale) }, isRtl && { textAlign: 'right' }]}>
+                <Text style={[styles.greetingText, { fontSize: 13, marginBottom: 5 }, isRtl && { textAlign: 'right' }]}>
                   {isRtl ? 'السلام علیکم' : 'Assalam-o-Alaikum'}
                 </Text>
-                <Text style={[styles.userNameText, { fontSize: Math.round(18 * fontScale) }, isRtl && { textAlign: 'right' }]}>
-                  {currentUser?.name || 'User Name'}
-                </Text>
-                <Text style={[styles.hijriDateText, { fontSize: Math.round(14 * fontScale) }, isRtl && { textAlign: 'right' }]}>{formattedHijri}</Text>
-                <Text style={[styles.gregorianDateText, { fontSize: Math.round(14 * fontScale) }, isRtl && { textAlign: 'right' }]}>{formattedGregorian}</Text>
-                <Text style={[styles.liveClockText, { fontSize: Math.round(26 * fontScale) }, isRtl && { textAlign: 'right' }]}>{currentTime}</Text>
-                <Text style={[styles.countdownText, { fontSize: Math.round(14 * fontScale) }, isRtl && { textAlign: 'right' }]}>{countdownText}</Text>
+                <Text style={[styles.hijriDateText, { fontSize: 15 }, isRtl && { textAlign: 'right' }]}>{formattedHijri}</Text>
+                <Text style={[styles.gregorianDateText, { fontSize: 15 }, isRtl && { textAlign: 'right' }]}>{formattedGregorian}</Text>
+                <Text style={[styles.liveClockText, { fontSize: 28 }, isRtl && { textAlign: 'right' }]}>{currentTime}</Text>
+                <Text style={[styles.countdownText, { fontSize: 15 }, isRtl && { textAlign: 'right' }]}>{countdownText}</Text>
               </View>
 
               {/* Action Controls (right in EN, left in UR) */}
-              <View style={[styles.topRightControls, isRtl && { paddingRight: 0, paddingLeft: 10 }]}>
+              <View style={[styles.topRightControls, isRtl && { paddingRight: 0, paddingLeft: 15 }]}>
                 {/* Qibla Direction Button */}
                 <TouchableOpacity
                   onPress={() => navigate('Qibla')}
@@ -467,8 +465,8 @@ export const HomeScreen: React.FC = () => {
                 activeOpacity={0.7}
                 onPress={() => navigate('Announcements')}
               >
-                <Text style={[styles.seeAllText, isRtl && { marginRight: 0, marginLeft: 10 }]}>
-                  {isRtl ? 'سب دیکھیں' : 'See All'}
+                <Text style={[styles.seeAllText, isRtl && { marginRight: 0, marginLeft: 10, lineHeight: 35 }]}>
+                  {isRtl ? 'مزید دیکھیں' : 'See All'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -508,6 +506,7 @@ const styles = StyleSheet.create({
   /* Top Day Card */
   headerCard: {
     width: '100%',
+    height: 270,
     justifyContent: 'space-between',
   },
   headerCardImage: {
@@ -527,7 +526,7 @@ const styles = StyleSheet.create({
   },
   greetingText: {
     color: '#8E7343',
-    fontSize: 10,
+    // fontSize: 25,
     fontWeight: '500',
   },
   userNameText: {
@@ -566,14 +565,13 @@ const styles = StyleSheet.create({
   topRightControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingRight: 10,
+    paddingRight: 15,
     // marginTop: 4,
   },
   qiblaRoundButton: {
-    width: 30,
-    height: 30,
+    width: 40,
+    height: 40,
     borderRadius: 19,
-    marginRight: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -619,46 +617,46 @@ const styles = StyleSheet.create({
 
   /* Prayer Times Row Card */
   prayerTimesPanel: {
+    position: 'absolute',
+    top: 170,
     backgroundColor: 'rgba(216, 243, 250, 1)',
     borderRadius: 10,
-    borderWidth: 1.5,
+    borderWidth: 2.5,
     borderColor: '#a7e7f8ff',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 4,
-    gap: 2,
+    gap: 5,
     marginHorizontal: 8,
-    marginBottom: 10,
-    marginTop: 20
   },
   prayerColumn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: 15,
   },
   activePrayerCard: {
     backgroundColor: '#ffffffff',
     borderRadius: 12,
     paddingVertical: 10,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.12,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-      default: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.12,
-        shadowRadius: 4,
-      },
-    }),
+    // ...Platform.select({
+    //   ios: {
+    //     shadowColor: '#000',
+    //     shadowOffset: { width: 0, height: 2 },
+    //     shadowOpacity: 0.12,
+    //     shadowRadius: 4,
+    //   },
+    //   android: {
+    //     elevation: 3,
+    //   },
+    //   default: {
+    //     shadowColor: '#000',
+    //     shadowOffset: { width: 0, height: 2 },
+    //     shadowOpacity: 0.12,
+    //     shadowRadius: 4,
+    //   },
+    // }),
   },
   prayerDivider: {
     borderRightWidth: 1,
@@ -697,7 +695,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    marginTop: 16,
+    marginTop: 26,
     marginBottom: 16,
   },
   actionItemWrapper: {

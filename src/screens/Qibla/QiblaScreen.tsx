@@ -251,7 +251,7 @@ export const QiblaScreen: React.FC = () => {
             </Text>
           )}
 
-          <Text style={styles.bearingValue}>{bearing}°</Text>
+          <Text style={styles.bearingValue}>{bearing} ° W</Text>
 
         </ImageBackground>
       </View>
@@ -474,16 +474,15 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.85)',
     fontSize: typography.sizes.base,
     fontWeight: typography.weights.medium,
+    lineHeight: 40,
     textAlign: 'center',
   },
   bearingValue: {
     color: colors.white,
-    fontSize: typography.sizes.xxl * 1.6,
-    fontWeight: typography.weights.bold,
-    lineHeight: typography.sizes.xxl * 1.8,
+    fontSize: 32,
+    fontWeight: 900,
     textAlign: 'center',
-    marginBottom: 2,
-    marginTop: spacing.xs,
+    marginTop: 10,
   },
   cityText: {
     color: 'rgba(255,255,255,0.7)',

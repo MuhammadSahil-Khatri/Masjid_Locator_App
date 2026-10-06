@@ -13,7 +13,7 @@ const NavigationContext = createContext<NavigationContextType | undefined>(undef
 
 export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [history, setHistory] = useState<Array<{ screen: AppScreen; params: any }>>([
-    { screen: 'Splash', params: undefined }
+    { screen: 'Home', params: undefined }
   ]);
 
   const current = history[history.length - 1] || { screen: 'Home', params: undefined };
@@ -29,7 +29,7 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   // The main-tab screens (other than Home) that should navigate to Home on back press
-  const MAIN_TAB_SCREENS: string[] = ['Hadees', 'Search', 'Announcement', 'Announcements', 'Masjids', 'Profile', 'Settings'];
+  const MAIN_TAB_SCREENS: string[] = ['Hadees', 'Supplication', 'Announcement', 'Announcements', 'Masjids', 'Profile', 'Settings'];
 
   useEffect(() => {
     const handleBackPress = () => {

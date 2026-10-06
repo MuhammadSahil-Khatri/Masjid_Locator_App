@@ -25,6 +25,7 @@ export default {
 
     android: {
       package: "com.sahilkhatri.masjidlocatorapp",
+      softwareKeyboardLayoutMode: "pan",
 
       config: {
         googleMaps: {

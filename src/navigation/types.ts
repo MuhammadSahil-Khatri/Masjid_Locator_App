@@ -14,10 +14,16 @@ export type MainTabParamList = {
   Settings: undefined;
   Qibla: undefined;
   PrayerTimes: undefined;
+  Supplication: undefined;
+  Duas: undefined;
+  Dua: undefined;
 };
 
 export type AppScreen = 
   | keyof MainTabParamList 
+  | 'Supplication'
+  | 'Duas'
+  | 'Dua'
   | 'Announcements'
   | 'Auth' 
   | 'MosqueDetails' 

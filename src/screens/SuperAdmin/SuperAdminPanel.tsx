@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, ScrollView, Pressable, ImageBackground, Platform } from 'react-native';
+import { StyleSheet, View, ScrollView, Pressable, ImageBackground, Platform, StatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ChevronRight,

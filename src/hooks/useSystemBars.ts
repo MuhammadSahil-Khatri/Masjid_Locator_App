@@ -40,71 +40,34 @@ export const getScreenBgColor = (
   screenName: AppScreen,
   isDark: boolean,
 ): string => {
-  // Screens that respond to the dark/light theme toggle
-  const dynamicScreens: AppScreen[] = [
-    "Settings",
-    "MosqueDetails",
-    "Favorites",
-  ];
-  if (dynamicScreens.includes(screenName)) {
-    return colors.light.background;
-  }
-
-  if (screenName === 'Hadees') {
-    return '#004D61';
-  }
-
-  // Admin / panel screens use the warm off-white background
-  const offWhiteScreens: AppScreen[] = [
-    "Profile",
-    "SuperAdminPanel",
-    "ManageMosques",
-    "ManageAdmins",
-    "ManageSuperAdmins",
-    "ManageHadith",
-    "ManageAnnouncements",
-    "ManageWorshipers",
-    "AdminPanel",
-    "AssignedMosque",
-  ];
-  if (offWhiteScreens.includes(screenName)) {
-    return colors.white || "#faf8efff";
-  }
-
-  // Splash, Welcome, Auth, Home, Search, Qibla — always light
-  return colors.light.background;
+  return '#004D61';
 };
 
 /**
  * Synchronizes the Status Bar and Android Navigation Bar with the active screen background.
- *
- * Android edge-to-edge (API 35 / Expo SDK 54+):
- *  - SystemUI.setBackgroundColorAsync() sets the root background that shows
- *    through the transparent system bars.
- *  - NavigationBar.setStyle() controls icon contrast.
+ * Matches the translucent, light-content status bar style used in DuaScreen across all screens.
  */
 export const useSystemBars = (backgroundColor: string) => {
   useEffect(() => {
-    const isBgDark = isColorDark(backgroundColor);
-
-    // ── Status Bar (top) ─────────────────────────────────────────────────────
-    setStatusBarStyle(isBgDark ? "light" : "dark");
+    // ── Status Bar (top) — matching DuaScreen (light content, translucent) ─
+    setStatusBarStyle("dark");
 
     if (Platform.OS === "android") {
       // ── Status Bar Background (Android fallback) ───────────────────────────
       try {
-        StatusBar.setBackgroundColor(backgroundColor, true);
+        StatusBar.setBackgroundColor("transparent", true);
+        StatusBar.setTranslucent(true);
       } catch {
         // Ignored on edge-to-edge or unsupported environments
       }
 
-      // ── Root background (shows through transparent edge-to-edge system bars) ─
-      SystemUI.setBackgroundColorAsync(backgroundColor).catch(() => {});
+      // ── Root background ──
+      SystemUI.setBackgroundColorAsync("#FAFEFF").catch(() => {});
 
-      // ── Navigation bar button contrast (still works in edge-to-edge) ────────
+      // ── Universal Android System Bottom Navigation Bar ─────────────────────
       try {
         if (typeof NavigationBar.setStyle === "function") {
-          NavigationBar.setStyle(isBgDark ? "light" : "dark");
+          NavigationBar.setStyle("dark");
         }
       } catch {
         // Ignored if navigation bar styling is unavailable

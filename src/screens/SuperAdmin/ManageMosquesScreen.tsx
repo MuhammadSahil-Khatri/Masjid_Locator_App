@@ -115,7 +115,6 @@ export const ManageMosquesScreen: React.FC = () => {
   const [editLongitude, setEditLongitude] = useState('');
   const [editImageUrl, setEditImageUrl] = useState('');
   const [editIsActive, setEditIsActive] = useState(true);
-  const [editSelectedTagIds, setEditSelectedTagIds] = useState<string[]>([]);
   const [editAdminEmail, setEditAdminEmail] = useState('');
   const [editAdminId, setEditAdminId] = useState<string | null>(null);
   const [editAdminError, setEditAdminError] = useState<string | null>(null);
@@ -328,12 +327,6 @@ export const ManageMosquesScreen: React.FC = () => {
     setEditFormError(null);
     setEditImageError(null);
     setEditImageSuccess(null);
-    // Load tag IDs for this mosque
-    mosqueService.getMosqueTagIds(mosque.id).then((ids) => {
-      setEditSelectedTagIds(ids);
-    }).catch(() => {
-      setEditSelectedTagIds([]);
-    });
   }, []);
 
   const closeDetailModal = useCallback(() => {
@@ -381,9 +374,6 @@ export const ManageMosquesScreen: React.FC = () => {
         admin_id: editAdminId || null,
       });
 
-      // Update tags
-      await mosqueService.updateMosqueTags(detailModal.mosque.id, editSelectedTagIds);
-
       closeDetailModal();
       triggerToast('Mosque updated successfully.');
       // Refresh data
@@ -393,7 +383,7 @@ export const ManageMosquesScreen: React.FC = () => {
     } finally {
       setEditSaving(false);
     }
-  }, [detailModal.mosque, editName, editAddress, editCity, editLatitude, editLongitude, editImageUrl, editIsActive, editAdminId, editSelectedTagIds, mosques, closeDetailModal, triggerToast, loadData]);
+  }, [detailModal.mosque, editName, editAddress, editCity, editLatitude, editLongitude, editImageUrl, editIsActive, editAdminId, mosques, closeDetailModal, triggerToast, loadData]);
 
   const handleDeleteFromDetail = useCallback(() => {
     if (!detailModal.mosque) return;
@@ -652,15 +642,7 @@ export const ManageMosquesScreen: React.FC = () => {
     );
   }, [appliedFilters]);
 
-  // ── Tag toggle in edit modal ─────────────────────────────────────────────
 
-  const toggleEditTag = useCallback((tagId: string) => {
-    setEditSelectedTagIds((prev) =>
-      prev.includes(tagId)
-        ? prev.filter((t) => t !== tagId)
-        : [...prev, tagId]
-    );
-  }, []);
 
   // ── Render States ────────────────────────────────────────────────────────
 
@@ -690,7 +672,7 @@ export const ManageMosquesScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} >
+    <View style={styles.safeArea}>
       {/* Header */}
       <SectionHeader title="Manage Mosques" />
 
@@ -909,40 +891,6 @@ export const ManageMosquesScreen: React.FC = () => {
               ) : editAdminId ? (
                 <Text style={styles.adminVerifiedText}>✓ Admin verified</Text>
               ) : null}
-
-              {/* Tags */}
-              <Text style={[styles.detailLabel, { marginTop: spacing.md }]}>Tags</Text>
-              <View style={styles.tagsContainer}>
-                {allTags.map((tag) => {
-                  const selected = editSelectedTagIds.includes(tag.id);
-                  return (
-                    <TouchableOpacity
-                      key={tag.id}
-                      style={[styles.tagChip, selected && styles.tagChipSelected]}
-                      onPress={() => toggleEditTag(tag.id)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.tagChipText, selected && styles.tagChipTextSelected]}>
-                        {tag.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-                {/* "+" button to create new tag */}
-                <TouchableOpacity
-                  style={styles.addTagButton}
-                  onPress={() => {
-                    setNewTagName('');
-                    setShowTagModal(true);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Plus size={16} color={colors.primary} />
-                </TouchableOpacity>
-                {allTags.length === 0 && (
-                  <Text style={styles.noTagsText}>No tags available.</Text>
-                )}
-              </View>
 
               {/* Action buttons */}
               <View style={styles.detailActions}>
@@ -1357,7 +1305,7 @@ export const ManageMosquesScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
