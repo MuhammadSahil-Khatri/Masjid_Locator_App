@@ -43,8 +43,10 @@ export function useActiveMosquesQuery() {
   return useQuery({
     queryKey: MOSQUES_QUERY_KEYS.allActive,
     queryFn: fetchActiveMosques,
-    staleTime: 1000 * 60 * 5, // 5 minutes
-    gcTime: 1000 * 60 * 60 * 24 * 7, // 7 days in persistent storage
+    staleTime: 1000 * 60 * 2,              // 2 minutes — refresh frequently
+    gcTime: 1000 * 60 * 60 * 24 * 7,      // 7 days in persistent storage
+    refetchOnMount: 'always',              // Always check for fresh data on screen open
+    refetchOnReconnect: 'always',          // Immediately re-fetch when WiFi comes back
   });
 }
 

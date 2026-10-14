@@ -158,10 +158,11 @@ export const HadeesScreen: React.FC = () => {
   const { goBack } = useNavigation();
   const { isRtl, triggerToast } = useApp();
 
-  const { data: hadiths = [], isLoading: loading, error: queryError, refetch } = usePublicHadithQuery();
+  const { data: hadiths = [], isLoading, error: queryError, refetch } = usePublicHadithQuery();
   const [refreshing, setRefreshing] = useState(false);
 
-  const error = queryError ? (queryError as Error).message || 'Failed to load Ahadees' : null;
+  const loading = isLoading && hadiths.length === 0;
+  const error = queryError && hadiths.length === 0 ? ((queryError as Error).message || 'Failed to load Ahadees') : null;
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

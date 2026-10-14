@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -10,6 +10,7 @@ import {
   Platform,
   ActivityIndicator,
   Linking,
+  BackHandler,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -66,7 +67,7 @@ export const NearestMosquesScreen: React.FC = () => {
 
   const { location } = useUserLocation();
   // Fetch and cache strictly the top 10 nearest mosques
-  const { mosques, loading, refetch } = useNearestMosques(location);
+  const { mosques, loading, error, refetch } = useNearestMosques(location);
 
   const handleRowPress = useCallback((mosque: any) => {
     setSelectedMosque(mosque);
@@ -77,6 +78,33 @@ export const NearestMosquesScreen: React.FC = () => {
     setBottomSheetVisible(false);
     setSelectedMosque(null);
   }, []);
+
+  const handleBackPress = useCallback(() => {
+    if (isBottomSheetVisible) {
+      handleCloseSheet();
+      return;
+    }
+    goBack();
+  }, [isBottomSheetVisible, handleCloseSheet, goBack]);
+
+  // Intercept Android hardware back press to dismiss bottom sheet if open
+  useEffect(() => {
+    if (!isBottomSheetVisible) return;
+
+    const onHardwareBackPress = () => {
+      handleCloseSheet();
+      return true; // Prevents default navigation
+    };
+
+    const backHandlerSubscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      onHardwareBackPress,
+    );
+
+    return () => {
+      backHandlerSubscription.remove();
+    };
+  }, [isBottomSheetVisible, handleCloseSheet]);
 
   const handleOpenMaps = useCallback(async () => {
     if (!selectedMosque) return;
@@ -183,14 +211,14 @@ export const NearestMosquesScreen: React.FC = () => {
     <ImageBackground
       source={require('../../../assets/background_image_vertical.png')}
       style={styles.backgroundImage}
-      resizeMode="cover"
+      resizeMode="stretch"
     >
 
       {/* ── Top Header Section with Floating Pill ── */}
       <View style={[styles.headerWrapper, { paddingTop: Math.max(insets.top - 20, 16) }]}>
         <View style={styles.pillContainer}>
           {/* Back Arrow */}
-          <TouchableOpacity style={styles.pillActionBtn} onPress={goBack} accessibilityLabel="Go Back">
+          <TouchableOpacity style={styles.pillActionBtn} onPress={handleBackPress} accessibilityLabel="Go Back">
             <ChevronLeft size={38} color="#1D3B6D" />
           </TouchableOpacity>
 
@@ -255,12 +283,14 @@ export const NearestMosquesScreen: React.FC = () => {
           <View style={styles.centerContainer}>
             <Compass size={44} color="#ffffffff" />
             <Text style={styles.emptyTitle}>
-              {searchQuery ? 'No Mosques Found' : 'No Nearby Mosques'}
+              {searchQuery ? 'No Mosques Found' : error ? 'Network Error' : 'No Nearby Mosques'}
             </Text>
             <Text style={styles.emptyText}>
               {searchQuery
                 ? 'Try searching with a different mosque name or area.'
-                : 'Unable to find mosques near your location. Please check your GPS location.'}
+                : error
+                  ? 'Unable to connect to the network. Please check your internet connection.'
+                  : 'Unable to find mosques near your location. Please check your GPS location.'}
             </Text>
           </View>
         )}
@@ -281,7 +311,6 @@ export const NearestMosquesScreen: React.FC = () => {
         isVisible={isBottomSheetVisible}
         onClose={handleCloseSheet}
         backgroundColor={theme.surface}
-        snapPoint={560}
       >
         {selectedMosque && (
           <MosqueBottomSheet

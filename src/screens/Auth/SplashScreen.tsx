@@ -1,49 +1,29 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Image, ImageBackground, ActivityIndicator, StatusBar } from 'react-native';
+import { View, StyleSheet, Image, ImageBackground, ActivityIndicator, StatusBar, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme';
 import { useNavigation } from '../../navigation/NavigationContext';
-import { useAuth } from '../../hooks/useAuth';
 
 export const SplashScreen = () => {
   const { navigate } = useNavigation();
-  const { user, authLoading } = useAuth();
-  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
-  const [showSlowBootIndicator, setShowSlowBootIndicator] = useState(false);
   const navigatedRef = React.useRef(false);
   const insets = useSafeAreaInsets();
 
   const proceedToNextScreen = React.useCallback(() => {
-    if (authLoading) return;
     if (navigatedRef.current) return;
     navigatedRef.current = true;
 
     navigate('Home');
-  }, [authLoading, navigate]);
+  }, [navigate]);
 
   // Minimum branding display timer (600ms for smooth visual feel)
   useEffect(() => {
     const timer = setTimeout(() => {
-      setMinTimeElapsed(true);
+      proceedToNextScreen();
     }, 600);
     return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    if (minTimeElapsed && !authLoading) {
-      proceedToNextScreen();
-    }
-  }, [minTimeElapsed, authLoading, proceedToNextScreen]);
-
-  useEffect(() => {
-    const visualFailsafeTimer = setTimeout(() => {
-      if (authLoading) {
-        setShowSlowBootIndicator(true);
-      }
-    }, 1500);
-    return () => clearTimeout(visualFailsafeTimer);
-  }, [authLoading]);
+  }, [proceedToNextScreen]);
 
   return (
     <ImageBackground
@@ -56,29 +36,20 @@ export const SplashScreen = () => {
       {/* Middle Section with Logo */}
       <View style={styles.middleSection}>
         <View style={styles.logoCardWrapper}>
-          <LinearGradient
-            colors={['#0F6B73', '#004B5E']}
-            style={styles.logoCard}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <Image
-              source={require('../../../assets/logo.png')}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-          </LinearGradient>
+
+          <Image
+            source={require('../../../assets/logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
+        </View>
+        <View style={styles.textContainer}>
+          <Text style={styles.title}>Jamiyat Ahl-e-Hadith Hyd.</Text>
         </View>
       </View>
 
-      {/* Bottom Section (Visual loading indicator if boot takes longer than usual) */}
-      <View style={[styles.bottomSection, { paddingBottom: Math.max(insets.bottom + 16, 28) }]}>
-        {showSlowBootIndicator && authLoading && (
-          <View style={styles.spinnerContainer}>
-            <ActivityIndicator size="small" color="#03BECD" />
-          </View>
-        )}
-      </View>
+      {/* Bottom Section */}
+      <View style={[styles.bottomSection, { paddingBottom: Math.max(insets.bottom + 16, 28) }]} />
     </ImageBackground>
   );
 };
@@ -103,18 +74,26 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   logoCard: {
-    width: 130,
-    height: 130,
-    borderRadius: 30,
+    width: 200,
+    height: 200,
+    borderRadius: 50,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1.5,
     borderColor: 'rgba(3, 190, 205, 0.4)',
   },
   logoImage: {
-    width: 90,
-    height: 90,
+    width: 220,
+    height: 220,
     borderRadius: 20,
+  },
+  textContainer: {
+    marginTop: 20,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#ffff',
   },
   bottomSection: {
     position: 'absolute',

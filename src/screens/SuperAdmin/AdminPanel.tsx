@@ -109,7 +109,7 @@ export const AdminPanel: React.FC = () => {
     <ImageBackground
       source={require('../../../assets/background_image_vertical.png')}
       style={styles.backgroundImage}
-      resizeMode="cover"
+      resizeMode="stretch"
     >
       <Animated.View style={styles.container} entering={FadeIn.duration(350)}>
         <SectionHeader title="Admin Panel" />

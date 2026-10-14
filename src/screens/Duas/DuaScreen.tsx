@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -7,6 +7,8 @@ import {
   ImageBackground,
   StatusBar,
   Platform,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '../../components/ui/Text';
@@ -26,11 +28,47 @@ export const DuaScreen: React.FC = () => {
     params?.categoryId || null
   );
 
+  const categoryFlatListRef = useRef<FlatList>(null);
+  const duaFlatListRef = useRef<FlatList>(null);
+
+  // Preserve scroll positions independently so screens never overwrite each other
+  const categoryListScrollOffset = useRef<number>(0);
+  const categoryScrollOffsets = useRef<Record<string, number>>({});
+
   // Sync internal state with navigation params so back navigation
   // (popping 'Duas' → 'Supplication') clears the category view
-  React.useEffect(() => {
+  useEffect(() => {
     setSelectedCategoryId(params?.categoryId || null);
   }, [params?.categoryId]);
+
+  // Restore scroll positions when switching views
+  useEffect(() => {
+    if (!selectedCategoryId) {
+      // Returning to Categories List -> restore its preserved scroll position
+      if (categoryListScrollOffset.current > 0) {
+        const offset = categoryListScrollOffset.current;
+        const timer = setTimeout(() => {
+          categoryFlatListRef.current?.scrollToOffset({
+            offset,
+            animated: false,
+          });
+        }, 30);
+        return () => clearTimeout(timer);
+      }
+    } else {
+      // Visiting / revisiting a Dua category -> restore that category's own scroll position
+      const savedOffset = categoryScrollOffsets.current[selectedCategoryId] || 0;
+      if (savedOffset > 0) {
+        const timer = setTimeout(() => {
+          duaFlatListRef.current?.scrollToOffset({
+            offset: savedOffset,
+            animated: false,
+          });
+        }, 50);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [selectedCategoryId]);
 
   const categories = useMemo(() => duaService.getCategories(), []);
 
@@ -61,6 +99,23 @@ export const DuaScreen: React.FC = () => {
     }
     return isRtl ? 'دعائیں' : 'Supplication';
   }, [activeCategory, isRtl]);
+
+  const handleCategoryScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      categoryListScrollOffset.current = event.nativeEvent.contentOffset.y;
+    },
+    []
+  );
+
+  const handleDuaScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (selectedCategoryId) {
+        categoryScrollOffsets.current[selectedCategoryId] =
+          event.nativeEvent.contentOffset.y;
+      }
+    },
+    [selectedCategoryId]
+  );
 
   const renderDuaItem = useCallback(
     ({ item, index }: { item: DuaItem; index: number }) => (
@@ -99,33 +154,49 @@ export const DuaScreen: React.FC = () => {
 
       {/* ── Main Content Area ── */}
       <View style={styles.contentArea}>
-        {/* VIEW 1: Categories List */}
-        {!selectedCategoryId ? (
+        {/* VIEW 1: Categories List - kept mounted with display:none so scroll position is never lost */}
+        <View
+          style={[
+            styles.scrollContainer,
+            selectedCategoryId ? styles.hidden : null,
+          ]}
+        >
+          <FlatList
+            ref={categoryFlatListRef}
+            data={categories}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={[
+              styles.listContent,
+              { paddingBottom: Math.max(insets.bottom, 20) + 75 },
+            ]}
+            showsVerticalScrollIndicator={false}
+            onScroll={handleCategoryScroll}
+            scrollEventThrottle={16}
+            renderItem={({ item }) => (
+              <DuaCategoryCard
+                category={item}
+                onPress={() => navigate('Duas', { categoryId: item.id })}
+                isRtl={isRtl}
+              />
+            )}
+          />
+        </View>
+
+        {/* VIEW 2: Duas for selected category - keyed by categoryId so it never shares scroll state */}
+        {selectedCategoryId ? (
           <View style={styles.scrollContainer}>
             <FlatList
-              data={categories}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={[
-                styles.listContent,
-                { paddingBottom: Math.max(insets.bottom, 20) + 75 },
-              ]}
-              showsVerticalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <DuaCategoryCard
-                  category={item}
-                  onPress={() => navigate('Duas', { categoryId: item.id })}
-                  isRtl={isRtl}
-                />
-              )}
-            />
-          </View>
-        ) : (
-          /* VIEW 2: Duas for selected category */
-          <View style={styles.scrollContainer}>
-            <FlatList
+              key={`dua-list-${selectedCategoryId}`}
+              ref={duaFlatListRef}
               data={displayedDuas}
               keyExtractor={(item) => item.id}
               renderItem={renderDuaItem}
+              contentOffset={{
+                x: 0,
+                y: categoryScrollOffsets.current[selectedCategoryId] || 0,
+              }}
+              onScroll={handleDuaScroll}
+              scrollEventThrottle={16}
               contentContainerStyle={[
                 styles.listContent,
                 { paddingBottom: Math.max(insets.bottom, 20) + 75 },
@@ -151,7 +222,7 @@ export const DuaScreen: React.FC = () => {
               }
             />
           </View>
-        )}
+        ) : null}
       </View>
     </ImageBackground>
   );
@@ -225,6 +296,9 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     marginHorizontal: 5,
     overflow: 'hidden',
+  },
+  hidden: {
+    display: 'none',
   },
   listContent: {
     paddingHorizontal: 10,

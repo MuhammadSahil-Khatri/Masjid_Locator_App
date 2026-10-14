@@ -185,7 +185,9 @@ export const SettingsScreen: React.FC = () => {
       setLoggingOut(true);
       await logout();
       setLogoutModalVisible(false);
+      triggerToast(language === 'ur' ? 'کامیابی سے لاگ آؤٹ ہو گیا' : 'Logged out successfully');
     } catch (err: any) {
+      setLogoutModalVisible(false);
       triggerToast(err?.message || 'Logout failed');
     } finally {
       setLoggingOut(false);
@@ -196,7 +198,7 @@ export const SettingsScreen: React.FC = () => {
     <ImageBackground
       source={require('../../../assets/background_image_vertical.png')}
       style={styles.backgroundImage}
-      resizeMode="cover"
+      resizeMode="stretch"
     >
       {/* ── Top Header Section with Floating Pill ── */}
       <View style={[styles.headerWrapper, { paddingTop: Math.max(insets.top - 20, 16) }]}>

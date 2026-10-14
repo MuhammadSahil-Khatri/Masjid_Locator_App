@@ -1,47 +1,41 @@
 /**
  * storageService.ts
  *
- * Hybrid storage layer:
+ * Compact device-local storage layer:
  *   - Native builds: uses react-native-mmkv (synchronous, fastest)
  *   - Expo Go / Web: uses an in-memory map backed by AsyncStorage for persistence
  *
- * All public read methods are synchronous (reads from the in-memory map).
- * Writes are synchronous to memory AND fire-and-forget to the persistence layer.
- * Call `storageService.hydrate()` once at app startup to load AsyncStorage
- * data into the in-memory map before rendering.
+ * Dedicated strictly to device-local state:
+ *   - Last known GPS coordinates
+ *   - GPS reverse-geocoded city name
+ *   - Qibla compass bearing calibration
+ *
+ * Server / API data (mosques, prayer times, announcements, hadith) is managed
+ * exclusively by TanStack Query.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LOCATION_KEY = 'user_last_location';
-const PRAYER_TIMES_KEY = 'prayer_times_cache';
-const QIBLA_KEY = 'qibla_cache';
-const CACHE_VERSION_KEY = 'cache_version';
-const NEARBY_MOSQUES_KEY = 'nearby_mosques_cache';
-const ANNOUNCEMENTS_KEY = 'announcements_cache';
-const HADITH_KEY = 'hadith_cache';
-const ALL_MOSQUES_KEY = 'all_mosques_cache';
 const CITY_NAME_KEY = 'gps_city_name';
-// Bump this whenever the prayer times format changes to auto-purge old cache
-const CACHE_VERSION = '2'; // v2: 12-hour AM/PM format
+const QIBLA_KEY = 'qibla_cache';
 
-const ALL_KEYS = [
+const LOCAL_DEVICE_KEYS = [
   LOCATION_KEY,
-  PRAYER_TIMES_KEY,
-  QIBLA_KEY,
-  CACHE_VERSION_KEY,
-  NEARBY_MOSQUES_KEY,
-  ANNOUNCEMENTS_KEY,
-  HADITH_KEY,
-  ALL_MOSQUES_KEY,
   CITY_NAME_KEY,
+  QIBLA_KEY,
 ];
 
 // ── In-memory sync cache (populated at hydration time) ─────────────────────
 const memoryCache = new Map<string, string>();
 
 // ── Try to load native MMKV, fall back gracefully ─────────────────────────
-let nativeStorage: { set: (k: string, v: string) => void; getString: (k: string) => string | undefined } | null = null;
+let nativeStorage: {
+  set: (k: string, v: string) => void;
+  getString: (k: string) => string | undefined;
+  remove?: (k: string) => boolean | void;
+  delete?: (k: string) => boolean | void;
+} | null = null;
 
 try {
   const { createMMKV } = require('react-native-mmkv');
@@ -54,14 +48,18 @@ try {
 
 function syncSet(key: string, value: string): void {
   memoryCache.set(key, value);
-  if (nativeStorage) {
-    nativeStorage.set(key, value);
-  } else {
-    // Fire-and-forget async write for persistence
-    AsyncStorage.setItem(key, value).catch((e) =>
-      console.warn('[storageService] AsyncStorage.setItem failed:', e)
-    );
+  try {
+    if (nativeStorage && typeof nativeStorage.set === 'function') {
+      nativeStorage.set(key, value);
+      return;
+    }
+  } catch (e) {
+    console.warn('[storageService] nativeStorage.set failed:', e);
   }
+  // Fallback to AsyncStorage
+  AsyncStorage.setItem(key, value).catch((e) =>
+    console.warn('[storageService] AsyncStorage.setItem failed:', e)
+  );
 }
 
 function syncGet(key: string): string | undefined {
@@ -69,15 +67,35 @@ function syncGet(key: string): string | undefined {
   if (memoryCache.has(key)) {
     return memoryCache.get(key);
   }
-  // If MMKV is available, also check there (covers fresh installs where hydrate hasn't run)
-  if (nativeStorage) {
-    const val = nativeStorage.getString(key);
-    if (val !== undefined) {
-      memoryCache.set(key, val);
+  // If MMKV is available, also check there
+  try {
+    if (nativeStorage && typeof nativeStorage.getString === 'function') {
+      const val = nativeStorage.getString(key);
+      if (val !== undefined) {
+        memoryCache.set(key, val);
+      }
+      return val;
     }
-    return val;
+  } catch (e) {
+    console.warn('[storageService] nativeStorage.getString failed:', e);
   }
   return undefined;
+}
+
+function syncDelete(key: string): void {
+  memoryCache.delete(key);
+  try {
+    if (nativeStorage) {
+      if (typeof nativeStorage.remove === 'function') {
+        nativeStorage.remove(key);
+      } else if (typeof nativeStorage.delete === 'function') {
+        nativeStorage.delete(key);
+      }
+    }
+  } catch (e) {
+    console.warn('[storageService] nativeStorage deletion failed:', e);
+  }
+  AsyncStorage.removeItem(key).catch(() => {});
 }
 
 // ── Exported interfaces ────────────────────────────────────────────────────
@@ -85,20 +103,6 @@ function syncGet(key: string): string | undefined {
 export interface CachedLocation {
   lat: number;
   lng: number;
-}
-
-export interface CachedPrayerTimes {
-  timings: {
-    Fajr: string;
-    Dhuhr: string;
-    Asr: string;
-    Maghrib: string;
-    Isha: string;
-  };
-  hijriDate: string;
-  gregorianDate: string;
-  city: string;
-  fetchedAtDate?: string;
 }
 
 export interface CachedQibla {
@@ -110,56 +114,45 @@ export interface CachedQibla {
 
 export const storageService = {
   /**
-   * Hydrate the in-memory cache from AsyncStorage.
-   * Call this ONCE at app startup (before rendering) when not using native MMKV.
-   * On native builds with MMKV this is a no-op.
+   * Hydrate in-memory cache from AsyncStorage for device-local keys.
+   * Call once at app startup before rendering.
    */
   async hydrate(): Promise<void> {
     if (nativeStorage) {
-      // On MMKV, check version and purge if stale
-      const storedVersion = nativeStorage.getString(CACHE_VERSION_KEY);
-      if (storedVersion !== CACHE_VERSION) {
-        nativeStorage.set(PRAYER_TIMES_KEY, '');
-        nativeStorage.set(CACHE_VERSION_KEY, CACHE_VERSION);
-        memoryCache.delete(PRAYER_TIMES_KEY);
-      }
+      // MMKV is already synchronous and persistent; no hydration needed
       return;
     }
     try {
-      const pairs = await AsyncStorage.multiGet(ALL_KEYS);
+      const pairs = await AsyncStorage.multiGet(LOCAL_DEVICE_KEYS);
       for (const [key, value] of pairs) {
         if (value !== null) {
           memoryCache.set(key, value);
         }
-      }
-      // Purge stale cache if version mismatch
-      const storedVersion = memoryCache.get(CACHE_VERSION_KEY);
-      if (storedVersion !== CACHE_VERSION) {
-        memoryCache.delete(PRAYER_TIMES_KEY);
-        await AsyncStorage.removeItem(PRAYER_TIMES_KEY);
-        await AsyncStorage.setItem(CACHE_VERSION_KEY, CACHE_VERSION);
-        memoryCache.set(CACHE_VERSION_KEY, CACHE_VERSION);
       }
     } catch (e) {
       console.warn('[storageService] hydrate failed:', e);
     }
   },
 
-  // ── Location ─────────────────────────────────────────────────────────────
+  // ── Device Location ───────────────────────────────────────────────────────
 
-  saveLocation(lat: number, lng: number) {
+  saveLocation(lat: number, lng: number): void {
     syncSet(LOCATION_KEY, JSON.stringify({ lat, lng }));
   },
 
   getCachedLocation(): CachedLocation | null {
     const raw = syncGet(LOCATION_KEY);
     if (!raw) return null;
-    try { return JSON.parse(raw); } catch { return null; }
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
   },
 
   // ── GPS City Name ─────────────────────────────────────────────────────────
 
-  saveGpsCity(city: string) {
+  saveGpsCity(city: string): void {
     syncSet(CITY_NAME_KEY, city);
   },
 
@@ -167,44 +160,28 @@ export const storageService = {
     return syncGet(CITY_NAME_KEY) || null;
   },
 
-  // ── Prayer Times ──────────────────────────────────────────────────────────
+  // ── Qibla Bearing ─────────────────────────────────────────────────────────
 
-  savePrayerTimes(data: CachedPrayerTimes) {
-    syncSet(PRAYER_TIMES_KEY, JSON.stringify(data));
-  },
-
-  getCachedPrayerTimes(): CachedPrayerTimes | null {
-    const raw = syncGet(PRAYER_TIMES_KEY);
-    if (!raw) return null;
-    try { return JSON.parse(raw); } catch { return null; }
-  },
-
-  // ── Qibla ─────────────────────────────────────────────────────────────────
-
-  saveQibla(data: CachedQibla) {
+  saveQibla(data: CachedQibla): void {
     syncSet(QIBLA_KEY, JSON.stringify(data));
   },
 
   getCachedQibla(): CachedQibla | null {
     const raw = syncGet(QIBLA_KEY);
     if (!raw) return null;
-    try { return JSON.parse(raw); } catch { return null; }
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
   },
 
-  // ── Generic Caching ───────────────────────────────────────────────────────
+  // ── Clear Device Local Data (Purge / Logout) ──────────────────────────────
 
-  saveGenericItem(key: string, value: string): void {
-    syncSet(key, value);
+  async clearLocalData(): Promise<void> {
+    for (const key of LOCAL_DEVICE_KEYS) {
+      syncDelete(key);
+    }
   },
-
-  getGenericItem(key: string): string | null {
-    return syncGet(key) || null;
-  },
-
-  KEYS: {
-    NEARBY_MOSQUES: NEARBY_MOSQUES_KEY,
-    ANNOUNCEMENTS: ANNOUNCEMENTS_KEY,
-    HADITH: HADITH_KEY,
-    ALL_MOSQUES: ALL_MOSQUES_KEY,
-  }
 };
+

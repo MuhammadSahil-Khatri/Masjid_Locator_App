@@ -7,6 +7,8 @@ import {
   PrayerTimesResult,
 } from '../services/prayerTimesService';
 import { ParsedPrayerTimes } from '../types';
+import { queryClient } from '../lib/queryClient';
+import { storageService } from '../services/storageService';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -131,7 +133,11 @@ export const usePrayerTimes = (
   }, []);
 
   const todayDateStr = useMemo(() => {
-    return new Date().toISOString().split('T')[0];
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   }, []);
 
   // Approximate coordinate grid to prevent infinite location cache key fragmentation
@@ -148,19 +154,37 @@ export const usePrayerTimes = (
       let city = '';
       try {
         city = await reverseGeocode(lat, lng, language);
+        if (city) {
+          storageService.saveGpsCity(city);
+        }
       } catch {}
 
-      const fresh = await fetchPrayerTimes(lat, lng, 1, language, undefined, city || undefined);
+      const cachedCity = storageService.getGpsCity();
+      const today = new Date();
+      const fresh = await fetchPrayerTimes(lat, lng, 1, language, today, city || cachedCity || undefined);
       return {
         ...fresh,
-        city: fresh.city || city || 'Karachi',
+        city: fresh.city || city || cachedCity || 'Karachi',
       };
     },
     staleTime: 1000 * 60 * 60 * 12, // 12 hours
-    gcTime: 1000 * 60 * 60 * 24, // 24 hours (prevents storing stale dates indefinitely)
+    gcTime: 1000 * 60 * 60 * 24 * 7, // 7 days in persistent storage
   });
 
-  const data = prayerQuery.data;
+  // Fallback for offline usage: if today's query has no data (e.g. date changed while offline),
+  // retrieve the most recent cached prayer times from TanStack Query's persisted cache
+  const fallbackData = useMemo(() => {
+    if (prayerQuery.data) return prayerQuery.data;
+    const allCached = queryClient.getQueriesData<PrayerTimesResult>({ queryKey: ['prayerTimes'] });
+    for (const [_, cached] of allCached) {
+      if (cached?.timings && hasValidTimings(cached.timings)) {
+        return cached;
+      }
+    }
+    return null;
+  }, [prayerQuery.data]);
+
+  const data = prayerQuery.data || fallbackData;
   const upcoming = data?.timings && hasValidTimings(data.timings)
     ? computeUpcoming(data.timings, now)
     : null;

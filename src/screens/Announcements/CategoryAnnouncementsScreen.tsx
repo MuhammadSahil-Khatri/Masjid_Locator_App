@@ -139,7 +139,7 @@ export const CategoryAnnouncementsScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
 
   // Source from the persistent query cache — no network required for cached data
-  const { data: allAnnouncements = [], isLoading, refetch } = usePublicAnnouncementsQuery();
+  const { data: allAnnouncements = [], isLoading, isError, refetch } = usePublicAnnouncementsQuery();
 
   const dbAnnouncements: Announcement[] = React.useMemo(() => {
     if (!allAnnouncements || allAnnouncements.length === 0) return [];
@@ -161,6 +161,7 @@ export const CategoryAnnouncementsScreen: React.FC = () => {
   };
 
   const loading = isLoading && allAnnouncements.length === 0;
+  const hasError = isError && allAnnouncements.length === 0;
 
   const categoryDisplayName = isRtl && categoryNameUr ? categoryNameUr : categoryNameEn;
 
@@ -168,7 +169,7 @@ export const CategoryAnnouncementsScreen: React.FC = () => {
     <ImageBackground
       source={require('../../../assets/background_image_vertical.png')}
       style={styles.backgroundImage}
-      resizeMode="cover"
+      resizeMode="stretch"
     >
       {/* ── Top Header Section with Floating Pill matching SettingsScreen ── */}
       <View style={[styles.headerWrapper, { paddingTop: Math.max(insets.top - 20, 16) }]}>
@@ -210,12 +211,18 @@ export const CategoryAnnouncementsScreen: React.FC = () => {
           <View style={styles.emptyContainer}>
             <View style={styles.emptyCard}>
               <Text style={styles.emptyTitle}>
-                {isRtl ? 'کوئی اعلان موجود نہیں ہے' : 'No Announcements Found'}
+                {hasError
+                  ? (isRtl ? 'انٹرنیٹ کنکشن کی خرابی' : 'Network Error')
+                  : (isRtl ? 'کوئی اعلان موجود نہیں ہے' : 'No Announcements Found')}
               </Text>
               <Text style={styles.emptySubtitle}>
-                {isRtl
-                  ? 'اس زمرے کے لیے فی الحال کوئی فعال اعلان دستیاب نہیں ہے۔'
-                  : `There are currently no active announcements in ${categoryDisplayName}.`}
+                {hasError
+                  ? (isRtl
+                    ? 'اعلان لوڈ کرنے میں ناکامی۔ براہ کرم اپنا انٹرنیٹ کنکشن چیک کریں۔'
+                    : 'Unable to load announcements. Please check your internet connection.')
+                  : (isRtl
+                    ? 'اس زمرے کے لیے فی الحال کوئی فعال اعلان دستیاب نہیں ہے۔'
+                    : `There are currently no active announcements in ${categoryDisplayName}.`)}
               </Text>
             </View>
           </View>

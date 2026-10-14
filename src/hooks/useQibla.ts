@@ -87,8 +87,8 @@ export const useQibla = (language: string = 'en'): UseQiblaReturn => {
 
   // Load cached data initially
   const cachedQibla = storageService.getCachedQibla();
-  const cachedPrayerTimes = storageService.getCachedPrayerTimes();
-  const initialCity = cachedQibla?.city || cachedPrayerTimes?.city || (language === 'ur' ? 'کراچی' : 'Karachi');
+  const cachedCity = storageService.getGpsCity();
+  const initialCity = cachedQibla?.city || cachedCity || (language === 'ur' ? 'کراچی' : 'Karachi');
 
   const [qiblaBearing, setQiblaBearing] = useState<number | null>(() => {
     if (cachedQibla?.bearing) return cachedQibla.bearing;

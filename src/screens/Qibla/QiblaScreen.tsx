@@ -22,7 +22,6 @@ import { colors, spacing, typography } from '../../theme';
 import { useQibla } from '../../hooks/useQibla';
 import { useNavigation } from '../../navigation/NavigationContext';
 import { useApp } from '../../context/AppContext';
-import { storageService } from '../../services/storageService';
 
 // ── Back-arrow SVG matching app standard ──────────────────────────────────────
 const BackArrowIcon: React.FC<{ color?: string; size?: number }> = ({
@@ -175,10 +174,8 @@ export const QiblaScreen: React.FC = () => {
     <ImageBackground
       source={require('../../../assets/background_image_vertical.png')}
       style={styles.bgImage}
-      resizeMode="cover"
+      resizeMode="stretch"
     >
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-
       {/* Header — pill style matching PrayerTimesScreen */}
       <View style={[styles.headerWrapper, { paddingTop: Math.max(insets.top - 20, 16) }]}>
         <View style={[styles.pillContainer]}>

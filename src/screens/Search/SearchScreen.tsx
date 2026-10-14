@@ -712,7 +712,6 @@ export const SearchScreen: React.FC = () => {
         isVisible={isBottomSheetVisible}
         onClose={handleCloseSheet}
         backgroundColor={theme.surface}
-        snapPoint={560}
       >
         {selectedMosque && (
           <MosqueBottomSheet

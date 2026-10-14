@@ -76,10 +76,10 @@ export const fetchPrayerTimes = async (
   lng: number,
   method = 1,
   language = 'en',
-  date?: Date,
+  date: Date = new Date(),
   cityOverride?: string
 ): Promise<PrayerTimesResult> => {
-  const endpoint = date ? `${BASE_URL}/timings/${formatAlAdhanDate(date)}` : `${BASE_URL}/timings`;
+  const endpoint = `${BASE_URL}/timings/${formatAlAdhanDate(date)}`;
   const url = `${endpoint}?latitude=${lat}&longitude=${lng}&method=${method}`;
 
   const response = await fetch(url)

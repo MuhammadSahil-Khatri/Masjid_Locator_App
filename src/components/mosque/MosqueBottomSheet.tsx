@@ -392,14 +392,7 @@ export const MosqueBottomSheet = memo(
 
     return (
       <View style={styles.sheetWrapper}>
-        <ScrollView
-          style={styles.sheetScroll}
-          contentContainerStyle={styles.sheetScrollContent}
-          showsVerticalScrollIndicator={false}
-          bounces={true}
-          nestedScrollEnabled={true}
-          keyboardShouldPersistTaps="handled"
-        >
+        <View style={styles.sheetScroll}>
           {/* Header Image if present */}
           {mosque.image_url ? (
             <View style={styles.sheetImageContainer}>
@@ -595,7 +588,7 @@ export const MosqueBottomSheet = memo(
               </View>
             )}
           </View>
-        </ScrollView>
+        </View>
       </View>
     );
   }

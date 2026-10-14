@@ -19,8 +19,10 @@ import RootNavigator from './navigation/RootNavigator';
 import { CustomToast } from './components/common/CustomToast';
 import Toast from 'react-native-toast-message';
 import { toastConfig } from './components/common/ToastConfig';
+import { GlobalToastModal } from './components/common/GlobalToastModal';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { queryClient, asyncStoragePersister } from './lib/queryClient';
+import { storageService } from './services/storageService';
 import { colors, spacing, typography } from './theme';
 
 function AppMain() {
@@ -53,6 +55,10 @@ export default function App() {
     'Amiri-Bold': require('../assets/Fonts/Amiri/Amiri-Bold.ttf'),
   });
 
+  React.useEffect(() => {
+    storageService.hydrate();
+  }, []);
+
   if (!fontsLoaded) {
     return null;
   }
@@ -72,8 +78,9 @@ export default function App() {
               </NavigationProvider>
             </GestureHandlerRootView>
           </AppProvider>
-          {/* react-native-toast-message must be outside all providers to overlay everything */}
-          <Toast config={toastConfig} />
+          {/* GlobalToastModal wraps Toast in its own transparent native Modal so it
+              always renders above any other open Modal (Android native window stacking) */}
+          <GlobalToastModal />
         </AuthProvider>
       </SafeAreaProvider>
     </PersistQueryClientProvider>

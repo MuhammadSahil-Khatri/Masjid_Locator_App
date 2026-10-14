@@ -95,6 +95,9 @@ export const HomeScreen: React.FC = () => {
     refetch: refetchPrayer,
   } = usePrayerTimes(language);
 
+  // ── Always use system date (new Date()) ──
+  const [currentDate, setCurrentDate] = useState(() => new Date());
+
   // ── Live Clock Time State ──
   const [currentTime, setCurrentTime] = useState(() => {
     const now = new Date();
@@ -110,6 +113,9 @@ export const HomeScreen: React.FC = () => {
   useEffect(() => {
     const updateClock = () => {
       const now = new Date();
+      if (now.getDate() !== currentDate.getDate()) {
+        setCurrentDate(now);
+      }
       let hours = now.getHours();
       const minutes = now.getMinutes();
       const ampm = hours >= 12 ? 'PM' : 'AM';
@@ -121,7 +127,7 @@ export const HomeScreen: React.FC = () => {
 
     const timer = setInterval(updateClock, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [currentDate]);
 
   // Loading overlay fade animation
   const overlayOpacity = useRef(new Animated.Value(0)).current;
@@ -156,10 +162,8 @@ export const HomeScreen: React.FC = () => {
     return `${hPad}:${m || '00'}`;
   };
 
-  // Format Gregorian date string
+  // Format Gregorian date string — ALWAYS from device's new Date()
   const formattedGregorian = useMemo(() => {
-    if (gregorianDate) return gregorianDate;
-    const now = new Date();
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const monthNames = [
       'Jan',
@@ -175,14 +179,23 @@ export const HomeScreen: React.FC = () => {
       'Nov',
       'Dec',
     ];
-    return `${dayNames[now.getDay()]}, ${now.getDate()} ${monthNames[now.getMonth()]} ${now.getFullYear()}`;
-  }, [gregorianDate]);
+    return `${dayNames[currentDate.getDay()]}, ${currentDate.getDate()} ${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+  }, [currentDate]);
 
-  // Format Hijri date string
+  // Format Hijri date string (from AlAdhan API based on device's date, with dynamic local fallback)
   const formattedHijri = useMemo(() => {
-    if (hijriDate) return hijriDate.replace(' AH', '');
-    return '28 Muharram 1448';
-  }, [hijriDate]);
+    if (hijriDate) return hijriDate.replace(' AH', '').trim();
+    try {
+      const parts = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }).format(currentDate);
+      return parts.replace(' AH', '').trim();
+    } catch {
+      return '28 Muharram 1448';
+    }
+  }, [hijriDate, currentDate]);
 
   // Next prayer countdown text
   const countdownText = useMemo(() => {
@@ -333,7 +346,7 @@ export const HomeScreen: React.FC = () => {
             {/* Prayer Times Row Card — reversed in RTL */}
             <TouchableOpacity
               style={[styles.prayerTimesPanel, isRtl && { flexDirection: 'row-reverse' }]}
-              activeOpacity={0.9}
+              activeOpacity={1}
               onPress={() => navigate('PrayerTimes')}
               accessibilityLabel="View full Prayer Times"
             >
@@ -351,7 +364,7 @@ export const HomeScreen: React.FC = () => {
                     style={[
                       styles.prayerColumn,
                       isActive && styles.activePrayerCard,
-                      !isActive && index < PRAYER_LIST.length - 1 && styles.prayerDivider,
+                      // !isActive && index < PRAYER_LIST.length - 1 && styles.prayerDivider,
                     ]}
                   >
                     <Text

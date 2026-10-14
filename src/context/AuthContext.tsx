@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { authService } from '../services/auth';
 import { User, Session } from '@supabase/supabase-js';
 import { Profile } from '../types';
-import { CacheService } from '../services/cacheService';
+import { storageService } from '../services/storageService';
 import { queryClient } from '../lib/queryClient';
 
 const CACHED_PROFILE_KEY = 'user_cached_profile_v1';
@@ -174,16 +174,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = useCallback(async () => {
     setActionLoading(true);
     try {
-      await authService.logout();
+      try {
+        await authService.logout();
+      } catch (e) {
+        console.warn('[AuthContext] authService.logout warning:', e);
+      }
       // Instantly clear state to prevent rendering outdated views during redirection
       setUser(null);
       setSession(null);
       setProfile(null);
       lastUserIdRef.current = null;
       await AsyncStorage.removeItem(CACHED_PROFILE_KEY).catch(() => {});
-      CacheService.clearAllCache();
+      try {
+        await storageService.clearLocalData();
+      } catch (e) {
+        console.warn('[AuthContext] clearLocalData warning:', e);
+      }
       // Clear TanStack Query persistent cache — prevents stale data from leaking to next login
-      queryClient.clear();
+      try {
+        queryClient.clear();
+      } catch (e) {
+        console.warn('[AuthContext] queryClient.clear warning:', e);
+      }
     } finally {
       setActionLoading(false);
     }
