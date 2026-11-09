@@ -30,7 +30,7 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({ title, onBack, rig
   };
 
   return (
-    <View style={styles.headerWrapper}>
+    <View style={[styles.headerWrapper, { paddingTop: 20 }]}>
       <View style={styles.pillContainer}>
         <TouchableOpacity
           style={styles.pillActionBtn}

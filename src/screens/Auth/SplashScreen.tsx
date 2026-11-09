@@ -1,8 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Image, ImageBackground, ActivityIndicator, StatusBar, Text } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, StyleSheet, Image, ImageBackground, StatusBar, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../../theme';
 import { useNavigation } from '../../navigation/NavigationContext';
 
 export const SplashScreen = () => {
@@ -17,11 +15,11 @@ export const SplashScreen = () => {
     navigate('Home');
   }, [navigate]);
 
-  // Minimum branding display timer (600ms for smooth visual feel)
+  // Branding display timer for custom splash screen
   useEffect(() => {
     const timer = setTimeout(() => {
       proceedToNextScreen();
-    }, 600);
+    }, 2000);
     return () => clearTimeout(timer);
   }, [proceedToNextScreen]);
 
@@ -36,7 +34,6 @@ export const SplashScreen = () => {
       {/* Middle Section with Logo */}
       <View style={styles.middleSection}>
         <View style={styles.logoCardWrapper}>
-
           <Image
             source={require('../../../assets/logo.png')}
             style={styles.logoImage}
@@ -59,52 +56,40 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
   },
   middleSection: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    width: '100%',
   },
   logoCardWrapper: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  logoCard: {
-    width: 200,
-    height: 200,
-    borderRadius: 50,
-    justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(3, 190, 205, 0.4)',
+    justifyContent: 'center',
+    width: '100%',
   },
   logoImage: {
-    width: 220,
-    height: 220,
-    borderRadius: 20,
+    width: 200,
+    height: 200,
+    maxWidth: '100%',
+    maxHeight: 200,
   },
   textContainer: {
-    marginTop: 20,
+    marginTop: 16,
   },
   title: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#ffff',
+    color: '#ffffff',
+    textAlign: 'center',
+    letterSpacing: 0.5,
   },
   bottomSection: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    alignItems: 'center',
-  },
-  spinnerContainer: {
-    height: 56,
-    justifyContent: 'center',
     alignItems: 'center',
   },
 });

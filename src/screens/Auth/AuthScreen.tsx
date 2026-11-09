@@ -17,7 +17,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Text } from '../../components/ui/Text';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ChevronLeft, Eye, EyeOff, User, Mail, Phone, Lock } from 'lucide-react-native';
+import { ChevronLeft, Eye, EyeOff, User, Mail, Phone, Lock, WifiOff } from 'lucide-react-native';
+import { onlineManager } from '@tanstack/react-query';
 
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../hooks/useAuth';
@@ -47,6 +48,11 @@ export const AuthScreen: React.FC = () => {
   const [mode, setMode] = useState<AuthMode>(params?.isSignUp ? 'signup' : 'login');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isOnline, setIsOnline] = useState(onlineManager.isOnline());
+
+  useEffect(() => {
+    return onlineManager.subscribe((online) => setIsOnline(online));
+  }, []);
 
   // Sync mode if route params change (e.g. pressing "Sign Up" on Welcome screen)
   useEffect(() => {
@@ -95,6 +101,15 @@ export const AuthScreen: React.FC = () => {
 
   // ── Submit: Login ─────────────────────────────────────────────────────────────
   const onLogin = loginForm.handleSubmit(async (data: LoginFormData) => {
+    if (!onlineManager.isOnline()) {
+      showError(
+        language === 'ur'
+          ? 'انٹرنیٹ دستیاب نہیں ہے۔ براہ کرم کنکشن چیک کریں۔'
+          : 'Internet unavailable. Please check your network and try again.'
+      );
+      return;
+    }
+
     try {
       await login(data.email, data.password);
       showSuccess(language === 'ur' ? 'لاگ ان کامیاب!' : 'Logged in successfully!');
@@ -108,6 +123,12 @@ export const AuthScreen: React.FC = () => {
         );
       } else if (msg.toLowerCase().includes('invalid login credentials')) {
         showError(language === 'ur' ? 'ای میل یا پاس ورڈ غلط ہے۔' : 'Incorrect email or password.');
+      } else if (msg.toLowerCase().includes('offline') || msg.toLowerCase().includes('network') || msg.toLowerCase().includes('internet')) {
+        showError(
+          language === 'ur'
+            ? 'انٹرنیٹ دستیاب نہیں ہے۔ براہ کرم کنکشن چیک کریں۔'
+            : 'Internet unavailable. Please check your network and try again.'
+        );
       } else {
         showError(msg || (language === 'ur' ? 'سائن ان ناکام ہوا۔' : 'Login failed. Please try again.'));
       }
@@ -231,6 +252,16 @@ export const AuthScreen: React.FC = () => {
               {/* ── LOGIN FORM ─────────────────────────────────────────── */}
               {mode === 'login' && (
                 <View style={styles.formContent}>
+                  {!isOnline && (
+                    <View style={styles.offlineNoticeBanner}>
+                      <WifiOff size={16} color="#B45309" style={{ marginRight: 8 }} />
+                      <Text style={styles.offlineNoticeText}>
+                        {language === 'ur'
+                          ? 'آپ اس وقت آف لائن ہیں۔ لاگ ان کرنے کے لیے انٹرنیٹ درکار ہے۔'
+                          : 'You are currently offline. Connect to the internet to log in.'}
+                      </Text>
+                    </View>
+                  )}
                   <Controller
                     control={loginForm.control}
                     name="email"
@@ -673,6 +704,24 @@ const styles = StyleSheet.create({
     color: '#CB9E67',
     marginTop: 1,
     fontFamily: typography.fonts.english.regular,
+  },
+  offlineNoticeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 16,
+  },
+  offlineNoticeText: {
+    flex: 1,
+    color: '#92400E',
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 16,
   },
 });
 

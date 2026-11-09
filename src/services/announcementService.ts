@@ -1,4 +1,6 @@
-import { supabase } from '../lib/supabase';
+﻿import { supabase } from '../lib/supabase';
+import { queryClient } from '../lib/queryClient';
+import { storageService } from './storageService';
 
 export interface Announcement {
   id: string;
@@ -84,7 +86,7 @@ export const announcementService = {
       }
     }
 
-    return announcements.map(a => {
+    const result = announcements.map(a => {
       const cat = a.category_id ? categoryMap[a.category_id] : null;
       return {
         ...a,
@@ -97,6 +99,9 @@ export const announcementService = {
         description: a.description_en || a.description || a.description_ur || '',
       };
     });
+    // Persist to local cache for offline use
+    storageService.saveAnnouncements(result);
+    return result;
   },
 
   /** Public – fetch active announcements for a specific category. */
@@ -206,7 +211,7 @@ export const announcementService = {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, mosque_id')
       .eq('id', user.id)
       .maybeSingle();
 
@@ -214,10 +219,31 @@ export const announcementService = {
       throw new Error('403: Forbidden - Access restricted to admins.');
     }
 
-    const { data: announcements, error } = await supabase
+    let query = supabase
       .from('announcements')
       .select('*')
       .order('created_at', { ascending: false });
+
+    // Admins only view and manage announcements for their assigned masjid
+    if (profile.role === 'admin') {
+      let mosqueId = profile.mosque_id;
+      if (!mosqueId) {
+        const { data: m } = await supabase
+          .from('mosques')
+          .select('id')
+          .eq('admin_id', user.id)
+          .maybeSingle();
+        if (m) mosqueId = m.id;
+      }
+
+      if (!mosqueId) {
+        return [];
+      }
+
+      query = query.eq('mosque_id', mosqueId);
+    }
+
+    const { data: announcements, error } = await query;
 
     if (error) {
       console.error('Error fetching announcements:', error);
@@ -281,51 +307,37 @@ export const announcementService = {
       .order('created_at', { ascending: true });
 
     if (error) {
+      // 42501 = permission denied; anonymous users cannot read this table by design.
+      // Return an empty array so callers fall back to their static defaults.
+      if (error.code === '42501') {
+        return [];
+      }
       console.error('Error fetching categories:', error);
       throw error;
     }
     return data || [];
   },
 
-  async createCategory(name: string): Promise<AnnouncementCategory> {
-    const trimmed = name.trim();
-    const res1 = await supabase
+  async createCategory(name: string, name_ur?: string): Promise<AnnouncementCategory> {
+    const trimmedEn = name.trim();
+    const trimmedUr = (name_ur && name_ur.trim()) || trimmedEn;
+    const { data, error } = await supabase
       .from('announcement_categories')
-      .insert({ name_en: trimmed, name: trimmed })
+      .insert({ name_en: trimmedEn, name_ur: trimmedUr })
       .select()
       .single();
 
-    if (!res1.error && res1.data) {
-      return res1.data;
+    if (error) {
+      console.error('Error creating category:', error);
+      throw error;
     }
-
-    const res2 = await supabase
-      .from('announcement_categories')
-      .insert({ name_en: trimmed })
-      .select()
-      .single();
-
-    if (!res2.error && res2.data) {
-      return res2.data;
-    }
-
-    const res3 = await supabase
-      .from('announcement_categories')
-      .insert({ name: trimmed })
-      .select()
-      .single();
-
-    if (res3.error) {
-      console.error('Error creating category:', res3.error);
-      throw res3.error;
-    }
-    return res3.data;
+    return data;
   },
 
-  async fetchMosques(): Promise<{ id: string; name: string }[]> {
+  async fetchMosques(): Promise<{ id: string; name: string; city?: string; address?: string }[]> {
     const { data, error } = await supabase
       .from('mosques')
-      .select('id, name')
+      .select('id, name, city, address')
       .order('name', { ascending: true });
 
     if (error) {
@@ -347,14 +359,40 @@ export const announcementService = {
     event_date?: string | null;
     event_time?: string | null;
   }): Promise<Announcement> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Authentication required.');
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, mosque_id')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    let mosqueId = announcement.mosque_id || null;
+
+    if (profile?.role === 'admin') {
+      mosqueId = profile.mosque_id;
+      if (!mosqueId) {
+        const { data: m } = await supabase
+          .from('mosques')
+          .select('id')
+          .eq('admin_id', user.id)
+          .maybeSingle();
+        if (m) mosqueId = m.id;
+      }
+      if (!mosqueId) {
+        throw new Error('You do not have an assigned mosque to create announcements for.');
+      }
+    }
+
     const { data, error } = await supabase
       .from('announcements')
       .insert({
-        mosque_id: announcement.mosque_id || null,
+        mosque_id: mosqueId,
         category_id: announcement.category_id,
         description_en: announcement.description_en,
         description_ur: announcement.description_ur,
-        created_by: announcement.created_by,
+        created_by: user.id,
         is_active: announcement.is_active ?? true,
       })
       .select()
@@ -364,6 +402,7 @@ export const announcementService = {
       console.error('Error creating announcement:', error);
       throw error;
     }
+    queryClient.invalidateQueries({ queryKey: ['announcements'] });
     return data;
   },
 
@@ -380,6 +419,7 @@ export const announcementService = {
       console.error('Error updating announcement:', error);
       throw error;
     }
+    queryClient.invalidateQueries({ queryKey: ['announcements'] });
   },
 
   async deleteAnnouncement(id: string): Promise<void> {
@@ -392,5 +432,6 @@ export const announcementService = {
       console.error('Error deleting announcement:', error);
       throw error;
     }
+    queryClient.invalidateQueries({ queryKey: ['announcements'] });
   },
 };

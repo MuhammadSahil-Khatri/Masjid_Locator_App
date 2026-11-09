@@ -84,39 +84,34 @@ export const mosqueService = {
       }
     }
 
-    // Fetch tags for all mosques
-    const mosqueIds = mosques.map((m) => m.id);
-    const { data: assignments } = await supabase
-      .from("mosque_tag_assignments")
-      .select("mosque_id, tag_id")
-      .in("mosque_id", mosqueIds);
+    // Fetch tags for all mosques (graceful fallback if tag tables are not in live schema)
+    let assignmentLookup: Record<string, string[]> = {};
+    try {
+      const mosqueIds = mosques.map((m) => m.id);
+      const { data: assignments, error: assignError } = await supabase
+        .from("mosque_tag_assignments")
+        .select("mosque_id, tag_id")
+        .in("mosque_id", mosqueIds);
 
-    let tagIds: string[] = [];
-    if (assignments) {
-      tagIds = [...new Set(assignments.map((a) => a.tag_id))];
-    }
+      if (!assignError && assignments && assignments.length > 0) {
+        const tagIds = [...new Set(assignments.map((a) => a.tag_id))];
+        const { data: tags, error: tagError } = await supabase
+          .from("mosque_tags")
+          .select("id, name")
+          .in("id", tagIds);
 
-    let tagMap: Record<string, string> = {};
-    if (tagIds.length > 0) {
-      const { data: tags } = await supabase
-        .from("mosque_tags")
-        .select("id, name")
-        .in("id", tagIds);
-
-      if (tags) {
-        tagMap = Object.fromEntries(tags.map((t) => [t.id, t.name]));
-      }
-    }
-
-    // Build assignment lookup
-    const assignmentLookup: Record<string, string[]> = {};
-    if (assignments) {
-      for (const a of assignments) {
-        if (!assignmentLookup[a.mosque_id]) assignmentLookup[a.mosque_id] = [];
-        if (tagMap[a.tag_id]) {
-          assignmentLookup[a.mosque_id].push(tagMap[a.tag_id]);
+        if (!tagError && tags) {
+          const tagMap = Object.fromEntries(tags.map((t) => [t.id, t.name]));
+          for (const a of assignments) {
+            if (!assignmentLookup[a.mosque_id]) assignmentLookup[a.mosque_id] = [];
+            if (tagMap[a.tag_id]) {
+              assignmentLookup[a.mosque_id].push(tagMap[a.tag_id]);
+            }
+          }
         }
       }
+    } catch {
+      // Tags tables not in live schema
     }
 
     return mosques.map((m) => ({
@@ -131,16 +126,17 @@ export const mosqueService = {
    * Fetches all available mosque tags.
    */
   async fetchAllTags(): Promise<MosqueTag[]> {
-    const { data, error } = await supabase
-      .from("mosque_tags")
-      .select("id, name")
-      .order("name", { ascending: true });
+    try {
+      const { data, error } = await supabase
+        .from("mosque_tags")
+        .select("id, name")
+        .order("name", { ascending: true });
 
-    if (error) {
-      console.error("Error fetching tags:", error);
-      throw error;
+      if (error) return [];
+      return data || [];
+    } catch {
+      return [];
     }
-    return data || [];
   },
 
   /**
@@ -320,23 +316,25 @@ export const mosqueService = {
       }
     }
 
-    // Get tags
-    const { data: assignments } = await supabase
-      .from("mosque_tag_assignments")
-      .select("tag_id")
-      .eq("mosque_id", mosque.id);
-
+    // Get tags (graceful fallback)
     let tags: string[] = [];
-    if (assignments && assignments.length > 0) {
-      const tagIds = [...new Set(assignments.map((a) => a.tag_id))];
-      const { data: tagData } = await supabase
-        .from("mosque_tags")
-        .select("name")
-        .in("id", tagIds);
-      if (tagData) {
-        tags = tagData.map((t) => t.name);
+    try {
+      const { data: assignments, error: assignError } = await supabase
+        .from("mosque_tag_assignments")
+        .select("tag_id")
+        .eq("mosque_id", mosque.id);
+
+      if (!assignError && assignments && assignments.length > 0) {
+        const tagIds = [...new Set(assignments.map((a) => a.tag_id))];
+        const { data: tagData, error: tagError } = await supabase
+          .from("mosque_tags")
+          .select("name")
+          .in("id", tagIds);
+        if (!tagError && tagData) {
+          tags = tagData.map((t) => t.name);
+        }
       }
-    }
+    } catch {}
 
     return {
       ...mosque,
@@ -369,9 +367,19 @@ export const mosqueService = {
     mosqueId: string,
     updates: Partial<Omit<MosqueRow, "id" | "created_at" | "updated_at">>,
   ): Promise<void> {
+    const cleanUpdates: any = { updated_at: new Date().toISOString() };
+    if (updates.name !== undefined) cleanUpdates.name = updates.name;
+    if (updates.address !== undefined) cleanUpdates.address = updates.address;
+    if (updates.city !== undefined) cleanUpdates.city = updates.city;
+    if (updates.latitude !== undefined) cleanUpdates.latitude = updates.latitude;
+    if (updates.longitude !== undefined) cleanUpdates.longitude = updates.longitude;
+    if (updates.image_url !== undefined) cleanUpdates.image_url = updates.image_url;
+    if (updates.admin_id !== undefined) cleanUpdates.admin_id = updates.admin_id;
+    if (updates.is_active !== undefined) cleanUpdates.is_active = updates.is_active;
+
     const { error } = await supabase
       .from("mosques")
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update(cleanUpdates)
       .eq("id", mosqueId);
 
     if (error) {
@@ -386,9 +394,20 @@ export const mosqueService = {
   async createMosque(
     mosque: Omit<MosqueRow, "id" | "created_at" | "updated_at">,
   ): Promise<MosqueRow> {
+    const cleanPayload: any = {
+      name: mosque.name,
+      address: mosque.address,
+      city: mosque.city,
+      latitude: mosque.latitude,
+      longitude: mosque.longitude,
+      image_url: mosque.image_url ?? null,
+      admin_id: mosque.admin_id ?? null,
+      is_active: mosque.is_active ?? true,
+    };
+
     const { data, error } = await supabase
       .from("mosques")
-      .insert(mosque)
+      .insert(cleanPayload)
       .select()
       .single();
 
@@ -418,32 +437,24 @@ export const mosqueService = {
    * Updates tags for a mosque (replaces all tags).
    */
   async updateMosqueTags(mosqueId: string, tagIds: string[]): Promise<void> {
-    // Delete existing assignments
-    const { error: deleteError } = await supabase
-      .from("mosque_tag_assignments")
-      .delete()
-      .eq("mosque_id", mosqueId);
+    try {
+      const { error: deleteError } = await supabase
+        .from("mosque_tag_assignments")
+        .delete()
+        .eq("mosque_id", mosqueId);
 
-    if (deleteError) {
-      console.error("Error deleting old tag assignments:", deleteError);
-      throw deleteError;
-    }
+      if (deleteError || tagIds.length === 0) return;
 
-    if (tagIds.length === 0) return;
+      const assignments = tagIds.map((tagId) => ({
+        mosque_id: mosqueId,
+        tag_id: tagId,
+      }));
 
-    // Insert new assignments
-    const assignments = tagIds.map((tagId) => ({
-      mosque_id: mosqueId,
-      tag_id: tagId,
-    }));
-
-    const { error: insertError } = await supabase
-      .from("mosque_tag_assignments")
-      .insert(assignments);
-
-    if (insertError) {
-      console.error("Error inserting tag assignments:", insertError);
-      throw insertError;
+      await supabase
+        .from("mosque_tag_assignments")
+        .insert(assignments);
+    } catch {
+      // Tags tables not in live schema
     }
   },
 
@@ -451,15 +462,16 @@ export const mosqueService = {
    * Gets tag IDs for a mosque.
    */
   async getMosqueTagIds(mosqueId: string): Promise<string[]> {
-    const { data, error } = await supabase
-      .from("mosque_tag_assignments")
-      .select("tag_id")
-      .eq("mosque_id", mosqueId);
+    try {
+      const { data, error } = await supabase
+        .from("mosque_tag_assignments")
+        .select("tag_id")
+        .eq("mosque_id", mosqueId);
 
-    if (error) {
-      console.error("Error fetching mosque tag IDs:", error);
-      throw error;
+      if (error) return [];
+      return (data || []).map((a) => a.tag_id);
+    } catch {
+      return [];
     }
-    return (data || []).map((a) => a.tag_id);
   },
 };

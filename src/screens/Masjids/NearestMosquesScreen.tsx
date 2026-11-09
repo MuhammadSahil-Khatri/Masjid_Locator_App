@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Linking,
   BackHandler,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -23,6 +24,9 @@ import { useUserLocation } from '../../hooks/useUserLocation';
 import { useNearestMosques } from '../../hooks/useNearestMosques';
 import { AnimatedBottomSheet } from '../../components/ui/AnimatedBottomSheet';
 import { MosqueBottomSheet } from '../../components/mosque/MosqueBottomSheet';
+import { LoadingState } from '../../components/common/LoadingState';
+import { EmptyState } from '../../components/common/EmptyState';
+import { onlineManager } from '@tanstack/react-query';
 
 // ─── SVG Control Icons ─────────────────────────────────────────────────────────
 
@@ -55,7 +59,7 @@ const SearchIcon = ({ color = '#1D3B6D', size = 18 }: { color?: string; size?: n
 );
 
 export const NearestMosquesScreen: React.FC = () => {
-  const { isRtl } = useApp();
+  const { isRtl, triggerToast } = useApp();
   const { goBack } = useNavigation();
   const insets = useSafeAreaInsets();
   const theme = colors.light;
@@ -63,11 +67,32 @@ export const NearestMosquesScreen: React.FC = () => {
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [selectedMosque, setSelectedMosque] = useState<any | null>(null);
   const [isBottomSheetVisible, setBottomSheetVisible] = useState(false);
-  const searchInputRef = React.useRef<TextInput>(null);
+  const searchInputRef = React.useRef<any>(null);
 
   const { location } = useUserLocation();
   // Fetch and cache strictly the top 10 nearest mosques
   const { mosques, loading, error, refetch } = useNearestMosques(location);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      if (!onlineManager.isOnline()) {
+        triggerToast(
+          isRtl
+            ? 'آپ آف لائن ہیں۔ محفوظ شدہ مساجد دکھائی جا رہی ہیں۔'
+            : 'You are offline. Showing cached mosques.'
+        );
+        return;
+      }
+      await refetch();
+    } catch (err) {
+      console.warn('[NearestMosquesScreen] Refresh error:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshing, refetch, isRtl, triggerToast]);
 
   const handleRowPress = useCallback((mosque: any) => {
     setSelectedMosque(mosque);
@@ -266,8 +291,7 @@ export const NearestMosquesScreen: React.FC = () => {
       <View style={styles.mainContainer}>
         {loading && mosques.length === 0 ? (
           <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>Finding nearby mosques…</Text>
+            <LoadingState message={isRtl ? 'قریبی مساجد تلاش کی جا رہی ہیں...' : 'Finding nearby mosques...'} />
           </View>
         ) : filteredMosques.length > 0 ? (
           <FlatList
@@ -276,22 +300,63 @@ export const NearestMosquesScreen: React.FC = () => {
             renderItem={renderMosqueCard}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
-            onRefresh={refetch}
-            refreshing={loading}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[colors.primary]}
+                tintColor={colors.primary}
+              />
+            }
           />
         ) : (
           <View style={styles.centerContainer}>
-            <Compass size={44} color="#ffffffff" />
-            <Text style={styles.emptyTitle}>
-              {searchQuery ? 'No Mosques Found' : error ? 'Network Error' : 'No Nearby Mosques'}
-            </Text>
-            <Text style={styles.emptyText}>
-              {searchQuery
-                ? 'Try searching with a different mosque name or area.'
-                : error
-                  ? 'Unable to connect to the network. Please check your internet connection.'
-                  : 'Unable to find mosques near your location. Please check your GPS location.'}
-            </Text>
+            {!onlineManager.isOnline() && mosques.length === 0 ? (
+              <EmptyState
+                isOffline
+                title={isRtl ? 'انٹرنیٹ دستیاب نہیں ہے' : 'Internet Unavailable'}
+                description={
+                  isRtl
+                    ? 'آپ آف لائن ہیں۔ مساجد لوڈ کرنے کے لیے انٹرنیٹ سے رابطہ کریں۔'
+                    : 'You are currently offline. Connect to the internet to load mosques.'
+                }
+                onRetry={onRefresh}
+                retryLabel={isRtl ? 'دوبارہ کوشش کریں' : 'Retry'}
+              />
+            ) : error && mosques.length === 0 ? (
+              <EmptyState
+                title={isRtl ? 'نیٹ ورک کی خرابی' : 'Network Error'}
+                description={
+                  isRtl
+                    ? 'مساجد لوڈ کرنے میں دشواری پیش آئی۔ براہ کرم دوبارہ کوشش کریں۔'
+                    : 'Unable to connect to the network. Please check your connection and retry.'
+                }
+                onRetry={onRefresh}
+                retryLabel={isRtl ? 'دوبارہ کوشش کریں' : 'Retry'}
+              />
+            ) : searchQuery ? (
+              <EmptyState
+                icon={<Compass size={44} color={colors.secondary} />}
+                title={isRtl ? 'کوئی مسجد نہیں ملی' : 'No Mosques Found'}
+                description={
+                  isRtl
+                    ? 'مختلف نام یا علاقے سے تلاش کرنے کی کوشش کریں۔'
+                    : 'Try searching with a different mosque name or area.'
+                }
+              />
+            ) : (
+              <EmptyState
+                icon={<Compass size={44} color={colors.secondary} />}
+                title={isRtl ? 'کوئی مسجد دستیاب نہیں' : 'No Nearby Mosques'}
+                description={
+                  isRtl
+                    ? 'آپ کے مقام کے قریب کوئی مسجد نہیں ملی۔'
+                    : 'Unable to find mosques near your location. Please check your GPS location.'
+                }
+                onRetry={onRefresh}
+                retryLabel={isRtl ? 'دوبارہ لوڈ کریں' : 'Refresh'}
+              />
+            )}
           </View>
         )}
       </View>

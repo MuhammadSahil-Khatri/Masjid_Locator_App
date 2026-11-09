@@ -11,8 +11,8 @@ export const CustomToast: React.FC<CustomToastProps> = ({ message }) => {
   if (!message) return null;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.toast}>
+    <View style={styles.container} pointerEvents="box-none">
+      <View style={styles.toast} pointerEvents="auto">
         <Text style={styles.text}>{message}</Text>
       </View>
     </View>

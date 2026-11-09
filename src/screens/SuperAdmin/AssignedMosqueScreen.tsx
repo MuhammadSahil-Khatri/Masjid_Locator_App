@@ -6,41 +6,43 @@ import {
     ScrollView,
     TextInput,
     TouchableOpacity,
-    Modal,
     ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
     Switch,
     Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-    ArrowLeft,
-    X,
     Save,
     Camera,
     WifiOff,
-    Building2,
-    Tag,
     MapPin,
-    Clock,
+    RefreshCw,
 } from 'lucide-react-native';
 import { colors, spacing, typography } from '../../theme';
 import { useApp } from '../../context/AppContext';
-import { useNavigation } from '../../navigation/NavigationContext';
-import { mosqueService, MosqueWithAdmin, MosqueTag } from '../../services/mosqueService';
+import { mosqueService } from '../../services/mosqueService';
+import SectionHeader from './components/SectionHeader';
 import * as ImagePicker from 'expo-image-picker';
 
+// Only the columns that exist in the DB schema
+interface MosqueFields {
+    id: string;
+    name: string;
+    address: string;
+    city: string;
+    latitude: number;
+    longitude: number;
+    image_url: string | null;
+    is_active: boolean;
+}
+
 export const AssignedMosqueScreen: React.FC = () => {
-    const { goBack } = useNavigation();
     const { triggerToast } = useApp();
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [mosque, setMosque] = useState<MosqueWithAdmin | null>(null);
-    const [allTags, setAllTags] = useState<MosqueTag[]>([]);
+    const [mosque, setMosque] = useState<MosqueFields | null>(null);
 
-    // Edit form
+    // Edit form state — mirrors schema columns only
     const [editName, setEditName] = useState('');
     const [editAddress, setEditAddress] = useState('');
     const [editCity, setEditCity] = useState('');
@@ -48,7 +50,6 @@ export const AssignedMosqueScreen: React.FC = () => {
     const [editLongitude, setEditLongitude] = useState('');
     const [editImageUrl, setEditImageUrl] = useState('');
     const [editIsActive, setEditIsActive] = useState(true);
-    const [editSelectedTagIds, setEditSelectedTagIds] = useState<string[]>([]);
     const [saving, setSaving] = useState(false);
     const [imageUploading, setImageUploading] = useState(false);
 
@@ -57,7 +58,7 @@ export const AssignedMosqueScreen: React.FC = () => {
             setError(null);
             const data = await mosqueService.fetchAdminMosque();
             if (!data) {
-                setError('No mosque assigned to your account.');
+                setError('No mosque is assigned to your account.');
                 setMosque(null);
                 return;
             }
@@ -69,13 +70,6 @@ export const AssignedMosqueScreen: React.FC = () => {
             setEditLongitude(data.longitude?.toString() || '');
             setEditImageUrl(data.image_url || '');
             setEditIsActive(data.is_active);
-
-            // Load tags
-            const tags = await mosqueService.fetchAllTags();
-            setAllTags(tags);
-
-            const tagIds = await mosqueService.getMosqueTagIds(data.id);
-            setEditSelectedTagIds(tagIds);
         } catch (err: any) {
             console.error('Failed to load mosque:', err);
             setError(err?.message || 'Failed to load mosque data.');
@@ -88,7 +82,7 @@ export const AssignedMosqueScreen: React.FC = () => {
         loadMosque();
     }, [loadMosque]);
 
-    // Image picker
+    // Image picker + upload
     const pickAndUploadImage = useCallback(async (): Promise<string | null> => {
         try {
             const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -108,42 +102,55 @@ export const AssignedMosqueScreen: React.FC = () => {
             const uploadedUrl = await mosqueService.uploadMosqueImage(result.assets[0].uri);
             return uploadedUrl;
         } catch (err: any) {
-            triggerToast(`Error: ${err?.message}`);
+            triggerToast(`Image upload failed: ${err?.message || 'Unknown error'}`);
             return null;
         }
     }, [triggerToast]);
 
     const handleSave = useCallback(async () => {
         if (!mosque) return;
-        setSaving(true);
 
+        const lat = parseFloat(editLatitude);
+        const lng = parseFloat(editLongitude);
+
+        if (!editName.trim()) {
+            triggerToast('Mosque name is required.');
+            return;
+        }
+        if (!editAddress.trim()) {
+            triggerToast('Address is required.');
+            return;
+        }
+        if (!editCity.trim()) {
+            triggerToast('City is required.');
+            return;
+        }
+        if (isNaN(lat) || isNaN(lng)) {
+            triggerToast('Please enter valid latitude and longitude values.');
+            return;
+        }
+
+        setSaving(true);
         try {
             await mosqueService.updateMosque(mosque.id, {
-                name: editName,
-                address: editAddress,
-                city: editCity,
-                latitude: parseFloat(editLatitude) || 0,
-                longitude: parseFloat(editLongitude) || 0,
-                image_url: editImageUrl || null,
+                name: editName.trim(),
+                address: editAddress.trim(),
+                city: editCity.trim(),
+                latitude: lat,
+                longitude: lng,
+                image_url: editImageUrl.trim() || null,
                 is_active: editIsActive,
             });
-
-            await mosqueService.updateMosqueTags(mosque.id, editSelectedTagIds);
-
             triggerToast('Mosque updated successfully.');
-            loadMosque();
+            await loadMosque();
         } catch (err: any) {
-            triggerToast(`Error: ${err?.message || 'Failed to update mosque.'}`);
+            triggerToast(`Failed to update: ${err?.message || 'Unknown error'}`);
         } finally {
             setSaving(false);
         }
-    }, [mosque, editName, editAddress, editCity, editLatitude, editLongitude, editImageUrl, editIsActive, editSelectedTagIds, triggerToast, loadMosque]);
+    }, [mosque, editName, editAddress, editCity, editLatitude, editLongitude, editImageUrl, editIsActive, triggerToast, loadMosque]);
 
-    const toggleTag = useCallback((tagId: string) => {
-        setEditSelectedTagIds((prev) =>
-            prev.includes(tagId) ? prev.filter((t) => t !== tagId) : [...prev, tagId]
-        );
-    }, []);
+    // ── Loading ──────────────────────────────────────────────────────────────
 
     if (loading) {
         return (
@@ -155,55 +162,44 @@ export const AssignedMosqueScreen: React.FC = () => {
         );
     }
 
+    // ── Error ────────────────────────────────────────────────────────────────
+
     if (error) {
         return (
             <View style={styles.safeArea}>
-                <View style={styles.headerWrapper}>
-                    <View style={styles.pillContainer}>
-                        <TouchableOpacity onPress={goBack} style={styles.backButton} activeOpacity={0.7} accessibilityLabel="Go back">
-                            <ArrowLeft size={18} color="#1D3B6D" />
-                        </TouchableOpacity>
-                        <Text style={styles.headerTitle}>Assigned Mosque</Text>
-                        <View style={{ width: 34 }} />
-                    </View>
-                </View>
+                <SectionHeader title="Assigned Mosque" />
                 <View style={styles.centered}>
                     <WifiOff size={48} color={colors.danger} />
+                    <Text style={styles.errorTitle}>Failed to Load</Text>
                     <Text style={styles.errorText}>{error}</Text>
+                    <TouchableOpacity
+                        style={styles.retryBtn}
+                        onPress={() => { setLoading(true); loadMosque(); }}
+                        activeOpacity={0.7}
+                    >
+                        <RefreshCw size={16} color="#ffffff" />
+                        <Text style={styles.retryBtnText}>Retry</Text>
+                    </TouchableOpacity>
                 </View>
             </View>
         );
     }
 
+    // ── Main ─────────────────────────────────────────────────────────────────
+
     return (
         <View style={styles.safeArea}>
-            <View style={styles.headerWrapper}>
-                <View style={styles.pillContainer}>
-                    <TouchableOpacity onPress={goBack} style={styles.backButton} activeOpacity={0.7} accessibilityLabel="Go back">
-                        <ArrowLeft size={18} color="#1D3B6D" />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Assigned Mosque</Text>
-                    <TouchableOpacity
-                        style={[styles.saveHeaderBtn, saving && { opacity: 0.6 }]}
-                        onPress={handleSave}
-                        disabled={saving}
-                        activeOpacity={0.7}
-                    >
-                        {saving ? (
-                            <ActivityIndicator size="small" color="#ffffff" />
-                        ) : (
-                            <Save size={16} color="#ffffff" />
-                        )}
-                    </TouchableOpacity>
-                </View>
-            </View>
+            {/* Header */}
+            <SectionHeader title="Assigned Mosque" />
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                {/* Image preview / upload */}
+
+                {/* Image preview */}
                 {editImageUrl ? (
                     <Image source={{ uri: editImageUrl }} style={styles.bannerImage} resizeMode="cover" />
                 ) : null}
 
+                {/* Image upload */}
                 <TouchableOpacity
                     style={styles.uploadArea}
                     onPress={async () => {
@@ -220,14 +216,20 @@ export const AssignedMosqueScreen: React.FC = () => {
                     ) : (
                         <>
                             <Camera size={28} color={colors.primary} />
-                            <Text style={styles.uploadText}>{editImageUrl ? 'Change Mosque Image' : 'Upload Mosque Image'}</Text>
+                            <Text style={styles.uploadText}>
+                                {editImageUrl ? 'Change Mosque Image' : 'Upload Mosque Image'}
+                            </Text>
+                            <Text style={styles.uploadHint}>JPEG, PNG, or WebP · max 5 MB</Text>
                         </>
                     )}
                 </TouchableOpacity>
 
-                {/* Is Active toggle */}
+                {/* Active Status */}
                 <View style={styles.toggleRow}>
-                    <Text style={styles.fieldLabel}>Active Status</Text>
+                    <View>
+                        <Text style={styles.fieldLabel}>Active Status</Text>
+                        <Text style={styles.fieldHint}>Visible to public when active</Text>
+                    </View>
                     <Switch
                         value={editIsActive}
                         onValueChange={setEditIsActive}
@@ -236,51 +238,69 @@ export const AssignedMosqueScreen: React.FC = () => {
                     />
                 </View>
 
-                {/* Form fields */}
-                <Text style={styles.fieldLabel}>Mosque Name</Text>
-                <TextInput style={styles.fieldInput} value={editName} onChangeText={setEditName} placeholderTextColor={colors.light.textMuted} />
+                {/* Mosque Name */}
+                <FieldRow label="Mosque Name *">
+                    <TextInput
+                        style={styles.fieldInput}
+                        value={editName}
+                        onChangeText={setEditName}
+                        placeholder="e.g. Masjid Al-Noor"
+                        placeholderTextColor={colors.light.textMuted}
+                    />
+                </FieldRow>
 
-                <Text style={styles.fieldLabel}>Address</Text>
-                <TextInput style={styles.fieldInput} value={editAddress} onChangeText={setEditAddress} placeholderTextColor={colors.light.textMuted} />
+                {/* Address */}
+                <FieldRow label="Address *">
+                    <TextInput
+                        style={styles.fieldInput}
+                        value={editAddress}
+                        onChangeText={setEditAddress}
+                        placeholder="Street / local address"
+                        placeholderTextColor={colors.light.textMuted}
+                    />
+                </FieldRow>
 
-                <Text style={styles.fieldLabel}>City</Text>
-                <TextInput style={styles.fieldInput} value={editCity} onChangeText={setEditCity} placeholderTextColor={colors.light.textMuted} />
+                {/* City */}
+                <FieldRow label="City *">
+                    <TextInput
+                        style={styles.fieldInput}
+                        value={editCity}
+                        onChangeText={setEditCity}
+                        placeholder="e.g. Karachi"
+                        placeholderTextColor={colors.light.textMuted}
+                    />
+                </FieldRow>
 
+                {/* Coordinates */}
+                <Text style={[styles.fieldLabel, { marginTop: spacing.sm }]}>
+                    Coordinates *
+                </Text>
                 <View style={styles.row}>
                     <View style={styles.halfField}>
-                        <Text style={styles.fieldLabel}>Latitude</Text>
-                        <TextInput style={styles.fieldInput} value={editLatitude} onChangeText={setEditLatitude} keyboardType="numeric" placeholderTextColor={colors.light.textMuted} />
+                        <Text style={styles.coordLabel}>Latitude</Text>
+                        <TextInput
+                            style={styles.fieldInput}
+                            value={editLatitude}
+                            onChangeText={setEditLatitude}
+                            keyboardType="numeric"
+                            placeholder="e.g. 24.8607"
+                            placeholderTextColor={colors.light.textMuted}
+                        />
                     </View>
                     <View style={styles.halfField}>
-                        <Text style={styles.fieldLabel}>Longitude</Text>
-                        <TextInput style={styles.fieldInput} value={editLongitude} onChangeText={setEditLongitude} keyboardType="numeric" placeholderTextColor={colors.light.textMuted} />
+                        <Text style={styles.coordLabel}>Longitude</Text>
+                        <TextInput
+                            style={styles.fieldInput}
+                            value={editLongitude}
+                            onChangeText={setEditLongitude}
+                            keyboardType="numeric"
+                            placeholder="e.g. 67.0011"
+                            placeholderTextColor={colors.light.textMuted}
+                        />
                     </View>
                 </View>
 
-                {/* Tags */}
-                <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>Tags</Text>
-                <View style={styles.tagsContainer}>
-                    {allTags.map((tag) => {
-                        const selected = editSelectedTagIds.includes(tag.id);
-                        return (
-                            <TouchableOpacity
-                                key={tag.id}
-                                style={[styles.tagChip, selected && styles.tagChipSelected]}
-                                onPress={() => toggleTag(tag.id)}
-                                activeOpacity={0.7}
-                            >
-                                <Text style={[styles.tagChipText, selected && styles.tagChipTextSelected]}>
-                                    {tag.name}
-                                </Text>
-                            </TouchableOpacity>
-                        );
-                    })}
-                    {allTags.length === 0 && (
-                        <Text style={styles.noDataText}>No tags available.</Text>
-                    )}
-                </View>
-
-                {/* Save button */}
+                {/* Save Button */}
                 <TouchableOpacity
                     style={[styles.saveButton, saving && { opacity: 0.6 }]}
                     onPress={handleSave}
@@ -303,110 +323,145 @@ export const AssignedMosqueScreen: React.FC = () => {
     );
 };
 
+// ── Field Row Helper ─────────────────────────────────────────────────────────
+
+const FieldRow: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+    <View style={{ marginTop: spacing.sm }}>
+        <Text style={styles.fieldLabel}>{label}</Text>
+        {children}
+    </View>
+);
+
+// ── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: colors.light.background },
-    centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl, gap: spacing.md },
-    errorText: { fontSize: typography.sizes.sm, color: colors.light.textMuted, textAlign: 'center' },
-
-    // Header
-    headerWrapper: {
-        paddingHorizontal: spacing.lg,
-        paddingTop: Platform.OS === 'android' ? spacing.sm : 0,
-        paddingBottom: spacing.sm,
+    centered: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: spacing.xl,
+        gap: spacing.md,
     },
-    pillContainer: {
+
+    // Error state
+    errorTitle: {
+        fontSize: typography.sizes.lg,
+        fontWeight: '700',
+        color: colors.danger,
+    },
+    errorText: {
+        fontSize: typography.sizes.sm,
+        color: colors.light.textMuted,
+        textAlign: 'center',
+    },
+    retryBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: '#FFFFFF',
-        height: 48,
-        borderRadius: 24,
-        paddingHorizontal: 10,
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.08,
-                shadowRadius: 6,
-            },
-            android: {
-                elevation: 3,
-            },
-            default: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.08,
-                shadowRadius: 6,
-            },
-        }),
-    },
-    backButton: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        backgroundColor: 'rgba(29, 59, 109, 0.08)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    headerTitle: {
-        fontSize: typography.sizes.base + 1,
-        color: '#1D3B6D',
-        textAlign: 'center',
-        flex: 1,
-        paddingHorizontal: spacing.xs,
-        fontWeight: 'bold',
-    },
-    saveHeaderBtn: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        justifyContent: 'center',
-        alignItems: 'center',
+        gap: spacing.xs,
         backgroundColor: colors.primary,
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.sm,
+        borderRadius: 12,
+        marginTop: spacing.sm,
+    },
+    retryBtnText: {
+        fontSize: typography.sizes.sm,
+        fontWeight: '700',
+        color: '#ffffff',
     },
 
+    // Scroll
     scrollContent: { padding: spacing.lg },
 
     // Image
     bannerImage: { width: '100%', height: 180, borderRadius: 16, marginBottom: spacing.md },
     uploadArea: {
-        borderWidth: 1.5, borderColor: 'rgba(246, 139, 53, 0.3)', borderStyle: 'dashed',
-        borderRadius: 16, padding: spacing.xl, alignItems: 'center',
-        justifyContent: 'center', backgroundColor: 'rgba(246, 139, 53, 0.04)', minHeight: 120, marginBottom: spacing.md,
+        borderWidth: 1.5,
+        borderColor: 'rgba(246, 139, 53, 0.3)',
+        borderStyle: 'dashed',
+        borderRadius: 16,
+        padding: spacing.xl,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(246, 139, 53, 0.04)',
+        minHeight: 110,
+        marginBottom: spacing.md,
     },
-    uploadText: { fontSize: typography.sizes.sm, fontWeight: '600', color: colors.primary, textAlign: 'center', marginTop: spacing.sm },
+    uploadText: {
+        fontSize: typography.sizes.sm,
+        fontWeight: '600',
+        color: colors.primary,
+        textAlign: 'center',
+        marginTop: spacing.sm,
+    },
+    uploadHint: {
+        fontSize: typography.sizes.xs,
+        color: colors.light.textMuted,
+        marginTop: 4,
+    },
 
     // Toggle
-    toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
+    toggleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: spacing.sm,
+        backgroundColor: '#ffffff',
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: colors.light.border,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+    },
 
     // Fields
-    fieldLabel: { fontSize: typography.sizes.sm, fontWeight: '600', color: '#1D3B6D', marginBottom: spacing.xs, marginTop: spacing.sm },
+    fieldLabel: {
+        fontSize: typography.sizes.sm,
+        fontWeight: '600',
+        color: '#1D3B6D',
+        marginBottom: spacing.xs,
+    },
+    fieldHint: {
+        fontSize: typography.sizes.xs,
+        color: colors.light.textMuted,
+        marginTop: 2,
+    },
     fieldInput: {
-        borderWidth: 1, borderColor: 'rgba(29, 59, 109, 0.12)', borderRadius: 14,
-        paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: typography.sizes.base,
-        color: colors.light.text, backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: 'rgba(29, 59, 109, 0.15)',
+        borderRadius: 14,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        fontSize: typography.sizes.base,
+        color: colors.light.text,
+        backgroundColor: '#FFFFFF',
+    },
+    coordLabel: {
+        fontSize: typography.sizes.xs,
+        fontWeight: '600',
+        color: colors.light.textMuted,
+        marginBottom: spacing.xs,
     },
     row: { flexDirection: 'row', gap: spacing.sm },
     halfField: { flex: 1 },
 
-    // Tags
-    tagsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md },
-    tagChip: {
-        paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: 20, borderWidth: 1,
-        borderColor: colors.light.border, backgroundColor: '#FFFFFF',
-    },
-    tagChipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-    tagChipText: { fontSize: typography.sizes.xs, fontWeight: '600', color: colors.light.textMuted },
-    tagChipTextSelected: { color: '#ffffff' },
-    noDataText: { fontSize: typography.sizes.sm, color: colors.light.textMuted, fontStyle: 'italic' },
-
     // Save
     saveButton: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
-        backgroundColor: colors.primary, paddingVertical: spacing.md, borderRadius: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.sm,
+        backgroundColor: colors.primary,
+        paddingVertical: spacing.md,
+        borderRadius: 16,
         marginTop: spacing.lg,
     },
-    saveButtonText: { fontSize: typography.sizes.base, fontWeight: '700', color: '#ffffff' },
+    saveButtonText: {
+        fontSize: typography.sizes.base,
+        fontWeight: '700',
+        color: '#ffffff',
+    },
 });
 
 export default AssignedMosqueScreen;

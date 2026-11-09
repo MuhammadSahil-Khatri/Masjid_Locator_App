@@ -107,6 +107,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           email: supabaseUser.email || '',
           name: profile.name,
           role: uiRole,
+          assignedMasjidId: profile.mosque_id || undefined,
           region: 'Karachi',
           phone: profile.phone,
           is_blocked: profile.is_blocked,
@@ -271,12 +272,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const handleRoleToggle = (role: 'worshipper' | 'admin' | 'super_admin') => {
-    setActiveRole(role);
-    const primaryForRole = users.find(u => u.role === role);
-    if (primaryForRole) {
-      setCurrentUser(primaryForRole);
+    if (!supabaseUser || !profile) {
+      setActiveRole('worshipper');
+      return;
+    }
+    // Super admins can preview viewports, but users cannot escalate privileges
+    if (profile.role === 'super_admin') {
+      setActiveRole(role);
+    } else if (profile.role === 'admin' && role !== 'super_admin') {
+      setActiveRole(role);
     } else {
-      setCurrentUser(null);
+      setActiveRole(profile.role);
     }
   };
 

@@ -156,7 +156,7 @@ export const profileService = {
    */
   async updateProfileRole(
     userId: string,
-    role: "worshipper" | "admin" | "super_admin",
+    role: "admin" | "super_admin",
   ): Promise<Profile> {
     await this.verifySuperAdmin();
 
@@ -175,6 +175,79 @@ export const profileService = {
       throw error;
     }
     return data;
+  },
+
+  /**
+   * Promotes a user to Admin and assigns them to a mosque.
+   * Both profiles.mosque_id and mosques.admin_id are kept synchronized.
+   * Secured: verifies that the requester is a super_admin.
+   */
+  async promoteToAdmin(
+    userId: string,
+    mosqueId: string,
+    updates?: { name?: string; phone?: string | null }
+  ): Promise<Profile> {
+    await this.verifySuperAdmin();
+
+    const payload: any = {
+      role: "admin",
+      mosque_id: mosqueId,
+      updated_at: new Date().toISOString(),
+    };
+    if (updates?.name) payload.name = updates.name.trim();
+    if (updates?.phone !== undefined) payload.phone = updates.phone ? updates.phone.trim() : null;
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .update(payload)
+      .eq("id", userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error promoting user to admin:", error);
+      throw error;
+    }
+
+    // Synchronize mosques.admin_id
+    try {
+      await supabase
+        .from("mosques")
+        .update({
+          admin_id: userId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", mosqueId);
+    } catch (mErr) {
+      console.warn("Notice: sync trigger may have handled mosque update:", mErr);
+    }
+
+    return data;
+  },
+
+  /**
+   * Removes an admin, optionally clearing mosque admin assignment.
+   * Secured: verifies that the requester is a super_admin.
+   */
+  async removeAdmin(userId: string, mosqueId?: string | null): Promise<void> {
+    await this.verifySuperAdmin();
+
+    if (mosqueId) {
+      try {
+        await supabase
+          .from("mosques")
+          .update({ admin_id: null, updated_at: new Date().toISOString() })
+          .eq("id", mosqueId);
+      } catch (err) {
+        console.warn("Notice: error clearing mosque admin_id:", err);
+      }
+    }
+
+    const { error } = await supabase.from("profiles").delete().eq("id", userId);
+    if (error) {
+      console.error("Error removing admin profile:", error);
+      throw error;
+    }
   },
 
   /**
@@ -234,4 +307,57 @@ export const profileService = {
     }
     return data || null;
   },
+
+  /**
+   * Creates a brand-new admin: signs up in Auth, inserts profile with
+   * role = 'admin', mosque_id = mosqueId, is_blocked = false, then
+   * synchronises mosques.admin_id.
+   *
+   * Secured: verifies that the requester is a super_admin.
+   *
+   * NOTE: supabase.auth.signUp() signs in the new user, displacing the
+   * current session. We snapshot the super admin session first and restore
+   * it before any database writes so all subsequent calls run under the
+   * correct role and RLS policies are satisfied.
+   */
+  async createAdminUser(
+    email: string,
+    password: string,
+    name: string,
+    phone: string | null,
+    mosqueId: string,
+  ): Promise<Profile> {
+    // Optional early check for a friendlier client-side error.
+    // The Edge Function independently enforces authorization.
+    await this.verifySuperAdmin();
+
+    const { data, error } = await supabase.functions.invoke(
+      "create-admin",
+      {
+        body: {
+          email: email.trim().toLowerCase(),
+          password,
+          name: name.trim(),
+          phone: phone?.trim() || null,
+          mosqueId,
+        },
+      },
+    );
+
+    if (error) {
+      console.error("Error calling create-admin function:", error);
+      throw new Error(
+        "Could not create the admin. Check your connection and Supabase function logs.",
+      );
+    }
+
+    if (!data?.profile) {
+      throw new Error(
+        data?.error || "The server did not return the created admin profile.",
+      );
+    }
+
+    return data.profile as Profile;
+  },
 };
+

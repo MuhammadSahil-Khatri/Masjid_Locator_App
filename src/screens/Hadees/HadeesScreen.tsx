@@ -19,6 +19,9 @@ import { useApp } from '../../context/AppContext';
 import { hadithService, Hadith } from '../../services/hadithService';
 import { usePublicHadithQuery } from '../../queries/useHadithQueries';
 import { typography } from '../../theme/typography';
+import { LoadingState } from '../../components/common/LoadingState';
+import { EmptyState } from '../../components/common/EmptyState';
+import { onlineManager } from '@tanstack/react-query';
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 const BackArrowIcon = ({ color = '#1D3B6D', size = 14 }: { color?: string; size?: number }) => (
@@ -165,13 +168,24 @@ export const HadeesScreen: React.FC = () => {
   const error = queryError && hadiths.length === 0 ? ((queryError as Error).message || 'Failed to load Ahadees') : null;
 
   const onRefresh = useCallback(async () => {
+    if (refreshing) return;
     setRefreshing(true);
     try {
+      if (!onlineManager.isOnline()) {
+        triggerToast(
+          isRtl
+            ? 'آپ آف لائن ہیں۔ محفوظ شدہ احادیث دکھائی جا رہی ہیں۔'
+            : 'You are offline. Showing cached Ahadees.'
+        );
+        return;
+      }
       await refetch();
+    } catch (err) {
+      console.warn('[HadeesScreen] Refresh failed:', err);
     } finally {
       setRefreshing(false);
     }
-  }, [refetch]);
+  }, [refreshing, refetch, isRtl, triggerToast]);
 
   return (
     <ImageBackground
@@ -203,21 +217,44 @@ export const HadeesScreen: React.FC = () => {
       <View style={styles.mainContainer}>
         {loading ? (
           <View style={styles.centeredState}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.stateText}>{isRtl ? 'لوڈ ہو رہا ہے...' : 'Loading Ahadees...'}</Text>
+            <LoadingState message={isRtl ? 'احادیث لوڈ ہو رہی ہیں...' : 'Loading Ahadees...'} />
           </View>
         ) : error ? (
           <View style={styles.centeredState}>
-            <Text style={styles.errorText}>⚠️</Text>
-            <Text style={styles.stateText}>{error}</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()} activeOpacity={0.8}>
-              <Text style={styles.retryBtnText}>{isRtl ? 'دوبارہ کوشش کریں' : 'Retry'}</Text>
-            </TouchableOpacity>
+            {!onlineManager.isOnline() ? (
+              <EmptyState
+                isOffline
+                title={isRtl ? 'انٹرنیٹ دستیاب نہیں ہے' : 'Internet Unavailable'}
+                description={
+                  isRtl
+                    ? 'آپ آف لائن ہیں اور کوئی محفوظ شدہ حدیث دستیاب نہیں ہے۔'
+                    : 'You are offline and no cached Ahadees are available yet.'
+                }
+                onRetry={onRefresh}
+                retryLabel={isRtl ? 'دوبارہ کوشش کریں' : 'Retry'}
+              />
+            ) : (
+              <EmptyState
+                title={isRtl ? 'نیٹ ورک کی خرابی' : 'Unable to Load Ahadees'}
+                description={
+                  isRtl
+                    ? 'احادیث لوڈ کرنے میں دشواری پیش آئی۔ براہ کرم دوبارہ کوشش کریں۔'
+                    : 'We encountered an issue loading Ahadees. Please check your connection and retry.'
+                }
+                onRetry={onRefresh}
+                retryLabel={isRtl ? 'دوبارہ کوشش کریں' : 'Retry'}
+              />
+            )}
           </View>
         ) : hadiths.length === 0 ? (
           <View style={styles.centeredState}>
-            <Text style={styles.errorText}>📖</Text>
-            <Text style={styles.stateText}>{isRtl ? 'کوئی حدیث دستیاب نہیں' : 'No Ahadees available'}</Text>
+            <EmptyState
+              icon={<Text style={{ fontSize: 36 }}>📖</Text>}
+              title={isRtl ? 'کوئی حدیث دستیاب نہیں' : 'No Ahadees Available'}
+              description={isRtl ? 'فی الحال کوئی حدیث موجود نہیں ہے۔' : 'No Ahadees are currently available.'}
+              onRetry={onRefresh}
+              retryLabel={isRtl ? 'دوبارہ لوڈ کریں' : 'Refresh'}
+            />
           </View>
         ) : (
           <ScrollView

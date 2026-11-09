@@ -11,7 +11,7 @@ export const RootNavigator: React.FC = () => {
   const { currentScreen } = useNavigation();
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.light.background }]}>
+    <View style={[styles.container, { backgroundColor: currentScreen === 'Splash' ? 'transparent' : colors.light.background }]}>
       {currentScreen === 'Splash' ? (
         <SplashScreen />
       ) : currentScreen === 'Welcome' ? (

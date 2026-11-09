@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -9,10 +9,6 @@ import {
   RefreshControl,
   Platform,
   useWindowDimensions,
-  ActivityIndicator,
-  Modal,
-  Animated,
-  StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '../../components/ui/Text';
@@ -20,6 +16,7 @@ import { useApp } from '../../context/AppContext';
 import { colors } from '../../theme';
 import { useNavigation } from '../../navigation/NavigationContext';
 import { usePrayerTimes } from '../../hooks/usePrayerTimes';
+import { onlineManager } from '@tanstack/react-query';
 import {
   FajrIcon,
   ShuruqIcon,
@@ -54,7 +51,7 @@ const PRAYER_LIST = [
 export const HomeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
-  const { currentUser, language, setLanguage, isRtl } = useApp();
+  const { currentUser, language, setLanguage, isRtl, triggerToast } = useApp();
   const { navigate } = useNavigation();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -129,28 +126,26 @@ export const HomeScreen: React.FC = () => {
     return () => clearInterval(timer);
   }, [currentDate]);
 
-  // Loading overlay fade animation
-  const overlayOpacity = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(overlayOpacity, {
-      toValue: refreshing ? 1 : 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-  }, [refreshing, overlayOpacity]);
-
   const onRefresh = useCallback(async () => {
+    if (refreshing) return;
     setRefreshing(true);
     try {
-      // Force fresh API fetch (bypasses cache)
-      await refetchPrayer();
+      if (!onlineManager.isOnline()) {
+        triggerToast(
+          isRtl
+            ? 'آپ آف لائن ہیں۔ محفوظ شدہ ڈیٹا دکھایا جا رہا ہے۔'
+            : 'You are offline. Showing cached data.'
+        );
+        return;
+      }
+      // Force fresh API fetch
+      await Promise.all([refetchPrayer(), refetchCategories()]);
     } catch (err) {
       console.warn('[HomeScreen] Refresh failed:', err);
     } finally {
       setRefreshing(false);
     }
-  }, [refetchPrayer]);
+  }, [refreshing, refetchPrayer, refetchCategories, isRtl, triggerToast]);
 
   // Format 12-hour clean time (e.g. "05:20" or "00:00")
   const formatPrayerTime = (timeStr?: string) => {
@@ -225,30 +220,9 @@ export const HomeScreen: React.FC = () => {
   const fontScale = Math.min(Math.max(screenWidth / 375, 1.0), 1.2);
 
   return (
-    <>
-      {/* ── REFRESH LOADING OVERLAY ── */}
-      <Modal
-        visible={refreshing}
-        transparent
-        animationType="none"
-        statusBarTranslucent
-      >
-        <Animated.View
-          style={[styles.loadingOverlay, { opacity: overlayOpacity }]}
-          pointerEvents="box-only"
-        >
-          <View style={styles.loadingCard}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.loadingText}>
-              {isRtl ? 'لوڈ ہو رہا ہے...' : 'Updating...'}
-            </Text>
-          </View>
-        </Animated.View>
-      </Modal>
-
-      <View pointerEvents={refreshing ? 'none' : 'auto'} style={styles.screenWrapper}>
-        <ScrollView
-          style={styles.container}
+    <View style={styles.screenWrapper}>
+      <ScrollView
+        style={styles.container}
           contentContainerStyle={[
             styles.scrollContent,
             { paddingBottom: Math.max(insets.bottom, 20) + 80 },
@@ -499,7 +473,6 @@ export const HomeScreen: React.FC = () => {
           </View>
         </ScrollView>
       </View>
-    </>
   );
 };
 
@@ -538,7 +511,7 @@ const styles = StyleSheet.create({
     paddingRight: 10,
   },
   greetingText: {
-    color: '#8E7343',
+    color: '#1B365D',
     // fontSize: 25,
     fontWeight: '500',
   },

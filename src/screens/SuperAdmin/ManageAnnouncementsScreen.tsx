@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Switch,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -28,6 +29,9 @@ import {
   Tag,
   Filter,
   Calendar,
+  ChevronDown,
+  Check,
+  Globe,
 } from 'lucide-react-native';
 import { colors, spacing, typography } from '../../theme';
 import SectionHeader from './components/SectionHeader';
@@ -35,6 +39,7 @@ import { useApp } from '../../context/AppContext';
 import { useNavigation } from '../../navigation/NavigationContext';
 import { supabase } from '../../lib/supabase';
 import { announcementService, Announcement, AnnouncementCategory } from '../../services/announcementService';
+import { mosqueService } from '../../services/mosqueService';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -163,11 +168,15 @@ export const ManageAnnouncementsScreen: React.FC = () => {
   // Data state
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [categories, setCategories] = useState<AnnouncementCategory[]>([]);
-  const [mosques, setMosques] = useState<{ id: string; name: string }[]>([]);
+  const [mosques, setMosques] = useState<{ id: string; name: string; city?: string; address?: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Caller role and assigned mosque
+  const [userRole, setUserRole] = useState<'admin' | 'super_admin' | 'worshipper'>('super_admin');
+  const [adminMosque, setAdminMosque] = useState<{ id: string; name: string; address?: string } | null>(null);
 
   // UI state
   const [searchTerm, setSearchTerm] = useState('');
@@ -179,7 +188,7 @@ export const ManageAnnouncementsScreen: React.FC = () => {
     announcementTitle: '',
   });
 
-  // Add/Edit modal
+  // Add/Edit modal state
   const [showModal, setShowModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -189,15 +198,30 @@ export const ManageAnnouncementsScreen: React.FC = () => {
   const [formCategoryId, setFormCategoryId] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
   const [formCreatedAt, setFormCreatedAt] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [mosqueInput, setMosqueInput] = useState('');
-  const [mosqueError, setMosqueError] = useState<string | null>(null);
-  const [mosqueName, setMosqueName] = useState<string | null>(null);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
-  // Category creation modal
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState('');
-  const [categoryCreating, setCategoryCreating] = useState(false);
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setIsKeyboardVisible(true)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setIsKeyboardVisible(false)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  // Mosque picker modal for announcement scope
+  const [showMosquePicker, setShowMosquePicker] = useState(false);
+  const [mosquePickerSearch, setMosquePickerSearch] = useState('');
+
+
 
   // Filter modal
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -225,6 +249,30 @@ export const ManageAnnouncementsScreen: React.FC = () => {
       setAnnouncements(announcementsData);
       setCategories(categoriesData);
       setMosques(mosquesData);
+
+      // Determine caller role and assigned mosque
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role, mosque_id')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        const role = profile?.role || 'admin';
+        setUserRole(role);
+
+        if (role === 'admin') {
+          const mosque = await mosqueService.fetchAdminMosque();
+          if (mosque) {
+            setAdminMosque({ id: mosque.id, name: mosque.name, address: mosque.address });
+          } else {
+            setAdminMosque(null);
+          }
+        } else {
+          setAdminMosque(null);
+        }
+      }
     } catch (err: any) {
       console.error('Failed to load data:', err);
       setError(err?.message || 'Failed to load data from database.');
@@ -292,77 +340,90 @@ export const ManageAnnouncementsScreen: React.FC = () => {
     return result;
   }, [announcements, searchTerm, appliedFilters]);
 
+  // Mosque Picker filtering
+  const filteredPickerMosques = useMemo(() => {
+    const q = mosquePickerSearch.trim().toLowerCase();
+    if (!q) return mosques;
+    return mosques.filter(
+      (m) =>
+        m.name?.toLowerCase().includes(q) ||
+        m.city?.toLowerCase().includes(q) ||
+        m.address?.toLowerCase().includes(q)
+    );
+  }, [mosques, mosquePickerSearch]);
+
   // ── Modal Handlers ──────────────────────────────────────────────────────
 
   const openAddModal = useCallback(() => {
+    if (userRole === 'admin' && !adminMosque) {
+      triggerToast('No mosque is assigned to your admin account.');
+      return;
+    }
     setEditMode(false);
     setEditId(null);
     setFormDescriptionEn('');
     setFormDescriptionUr('');
-    setFormMosqueId(null);
-    setFormCategoryId('');
+    setFormMosqueId(userRole === 'admin' ? adminMosque?.id || null : null);
+    setFormCategoryId(categories[0]?.id || '');
     setFormIsActive(true);
     setFormCreatedAt(null);
-    setMosqueInput('');
-    setMosqueError(null);
-    setMosqueName(null);
+    setFormError(null);
+    setMosquePickerSearch('');
     setShowModal(true);
-  }, []);
+  }, [categories, userRole, adminMosque, triggerToast]);
 
   const openEditModal = useCallback((item: Announcement) => {
     setEditMode(true);
     setEditId(item.id);
     setFormDescriptionEn(item.description_en || item.description || '');
     setFormDescriptionUr(item.description_ur || '');
-    setFormMosqueId(item.mosque_id || null);
+    setFormMosqueId(userRole === 'admin' ? adminMosque?.id || item.mosque_id || null : (item.mosque_id || null));
     setFormCategoryId(item.category_id || '');
     setFormIsActive(item.is_active);
     setFormCreatedAt(item.created_at || null);
-    // Pre-fill mosque input from existing mosque_id
-    const existing = mosques.find((m) => m.id === item.mosque_id);
-    setMosqueInput(existing?.name || '');
-    setMosqueName(existing?.name || null);
-    setMosqueError(null);
+    setFormError(null);
+    setMosquePickerSearch('');
     setShowModal(true);
-  }, [mosques]);
+  }, [userRole, adminMosque]);
 
   const closeModal = useCallback(() => {
+    if (saving) return;
     setShowModal(false);
-  }, []);
-
-  const handleMosqueLookup = useCallback(() => {
-    const query = mosqueInput.trim();
-    if (!query) {
-      // Empty means None
-      setFormMosqueId(null);
-      setMosqueName(null);
-      setMosqueError(null);
-      return;
-    }
-    const match = mosques.find(
-      (m) => m.name.toLowerCase() === query.toLowerCase()
-    ) || mosques.find(
-      (m) => m.name.toLowerCase().includes(query.toLowerCase())
-    );
-    if (match) {
-      setFormMosqueId(match.id);
-      setMosqueName(match.name);
-      setMosqueError(null);
-      setMosqueInput(match.name);
-    } else {
-      setFormMosqueId(null);
-      setMosqueName(null);
-      setMosqueError(`No mosque found matching "${query}"`);
-    }
-  }, [mosqueInput, mosques]);
+    setShowMosquePicker(false);
+    setFormError(null);
+  }, [saving]);
 
   const handleSave = useCallback(async () => {
-    if (!formDescriptionEn.trim() && !formDescriptionUr.trim()) {
-      triggerToast('Error: Description (English or Urdu) is required.');
+    setFormError(null);
+
+    const descEn = formDescriptionEn.trim();
+    const descUr = formDescriptionUr.trim();
+
+    if (!descEn) {
+      setFormError('English description is required.');
+      return;
+    }
+    if (descEn.length < 3) {
+      setFormError('English description must be at least 3 characters.');
+      return;
+    }
+    if (!descUr) {
+      setFormError('Urdu description is required.');
+      return;
+    }
+    if (descUr.length < 3) {
+      setFormError('Urdu description must be at least 3 characters.');
       return;
     }
     if (!formCategoryId) {
-      triggerToast('Error: Category is required.');
+      setFormError('Category is required. Please select a category.');
+      return;
+    }
+
+    const targetMosqueId = userRole === 'admin' ? (adminMosque?.id || null) : (formMosqueId || null);
+
+    if (userRole === 'admin' && !targetMosqueId) {
+      setFormError('You do not have an assigned mosque. Cannot save announcement.');
       return;
     }
 
@@ -372,22 +433,26 @@ export const ManageAnnouncementsScreen: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id;
 
+      if (!userId) {
+        throw new Error('Authentication required. Please sign in again.');
+      }
+
       if (editMode && editId) {
         await announcementService.updateAnnouncement(editId, {
-          description_en: formDescriptionEn.trim(),
-          description_ur: formDescriptionUr.trim(),
-          mosque_id: formMosqueId || null,
+          description_en: descEn,
+          description_ur: descUr,
+          mosque_id: targetMosqueId,
           category_id: formCategoryId,
           is_active: formIsActive,
         });
         triggerToast('Announcement updated successfully.');
       } else {
         await announcementService.createAnnouncement({
-          mosque_id: formMosqueId || null,
+          mosque_id: targetMosqueId,
           category_id: formCategoryId,
-          description_en: formDescriptionEn.trim(),
-          description_ur: formDescriptionUr.trim(),
-          created_by: userId || '',
+          description_en: descEn,
+          description_ur: descUr,
+          created_by: userId,
           is_active: formIsActive,
         });
         triggerToast('Announcement created successfully.');
@@ -396,11 +461,12 @@ export const ManageAnnouncementsScreen: React.FC = () => {
       closeModal();
       loadData();
     } catch (err: any) {
-      triggerToast(`Error: ${err?.message || 'Failed to save announcement.'}`);
+      console.error('Failed to save announcement:', err);
+      setFormError(err?.message || 'Failed to save announcement.');
     } finally {
       setSaving(false);
     }
-  }, [formDescriptionEn, formDescriptionUr, formMosqueId, formCategoryId, formIsActive, editMode, editId, triggerToast, closeModal, loadData]);
+  }, [formDescriptionEn, formDescriptionUr, formMosqueId, formCategoryId, formIsActive, editMode, editId, userRole, adminMosque, triggerToast, closeModal, loadData]);
 
   const handleEdit = useCallback((item: any) => {
     openEditModal(item);
@@ -447,30 +513,7 @@ export const ManageAnnouncementsScreen: React.FC = () => {
     setConfirm({ visible: false, announcementId: null, announcementTitle: '' });
   }, [actionLoading]);
 
-  // ── Category Creation ──────────────────────────────────────────────────
 
-  const handleCreateCategory = useCallback(async () => {
-    const name = newCategoryName.trim();
-    if (!name) {
-      triggerToast('Please enter a category name.');
-      return;
-    }
-
-    setCategoryCreating(true);
-    try {
-      const newCategory = await announcementService.createCategory(name);
-      setCategories((prev) => [...prev, newCategory]);
-      setFormCategoryId(newCategory.id);
-      setNewCategoryName('');
-      setShowCategoryModal(false);
-      const catDisplayName = newCategory.name_en || newCategory.name || newCategory.name_ur || name;
-      triggerToast(`Category "${catDisplayName}" created.`);
-    } catch (err: any) {
-      triggerToast(`Error: ${err?.message || 'Failed to create category.'}`);
-    } finally {
-      setCategoryCreating(false);
-    }
-  }, [newCategoryName, triggerToast]);
 
   // ── Filter Handlers ────────────────────────────────────────────────────
 
@@ -559,6 +602,25 @@ export const ManageAnnouncementsScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
+      {/* Admin Assigned Mosque Scope Banner */}
+      {userRole === 'admin' && adminMosque && (
+        <View style={styles.adminScopeBanner}>
+          <Building2 size={16} color={colors.primary} />
+          <Text style={styles.adminScopeBannerText} numberOfLines={1}>
+            Announcements for <Text style={styles.adminScopeBannerBold}>{adminMosque.name}</Text>
+          </Text>
+        </View>
+      )}
+
+      {userRole === 'admin' && !adminMosque && (
+        <View style={styles.adminNoMosqueBanner}>
+          <WifiOff size={16} color={colors.danger} />
+          <Text style={styles.adminNoMosqueBannerText}>
+            No masjid is assigned to your account. Contact Super Admin to assign a masjid.
+          </Text>
+        </View>
+      )}
+
       {/* Active filters indicator */}
       {hasActiveFilters && (
         <View style={styles.activeFiltersBar}>
@@ -602,8 +664,17 @@ export const ManageAnnouncementsScreen: React.FC = () => {
 
       {/* Floating Add Button */}
       <TouchableOpacity
-        style={styles.addButton}
-        onPress={openAddModal}
+        style={[
+          styles.addButton,
+          userRole === 'admin' && !adminMosque && { opacity: 0.5 },
+        ]}
+        onPress={() => {
+          if (userRole === 'admin' && !adminMosque) {
+            triggerToast('No mosque is assigned to your admin account.');
+            return;
+          }
+          openAddModal();
+        }}
         activeOpacity={0.8}
       >
         <Plus size={20} color="#ffffff" />
@@ -621,21 +692,154 @@ export const ManageAnnouncementsScreen: React.FC = () => {
           style={styles.modalOverlay}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <View style={styles.modalContainer}>
+          <View style={[styles.modalContainer, isKeyboardVisible && styles.modalContainerWithKeyboard]}>
             {/* Modal Header */}
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {editMode ? 'Edit Announcement' : 'Add Announcement'}
-              </Text>
+              <View>
+                <Text style={styles.modalTitle}>
+                  {editMode ? 'Edit Announcement' : 'Add Announcement'}
+                </Text>
+              </View>
               <TouchableOpacity onPress={closeModal} style={styles.modalCloseBtn}>
                 <X size={20} color={colors.light.text} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
-              {/* 1. Active Toggle */}
+            {formError && (
+              <View style={styles.modalBannerError}>
+                <Text style={styles.modalBannerErrorText}>✕ {formError}</Text>
+              </View>
+            )}
+
+            <ScrollView
+              style={styles.modalScroll}
+              contentContainerStyle={[
+                styles.modalScrollContent,
+                isKeyboardVisible && styles.modalScrollContentWithKeyboard,
+              ]}
+              showsVerticalScrollIndicator={isKeyboardVisible}
+              persistentScrollbar={isKeyboardVisible}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text style={styles.requiredHint}>Fields marked with * are required</Text>
+
+              {/* 1. Target Scope / Mosque */}
+              <Text style={styles.detailLabel}>
+                {userRole === 'admin' ? 'Assigned Mosque' : 'Select Mosque'}
+              </Text>
+              <TouchableOpacity
+                style={[
+                  styles.mosqueSelectBtn,
+                  formMosqueId ? styles.mosqueSelectBtnActive : null,
+                  userRole === 'admin' && styles.mosqueSelectBtnDisabled,
+                ]}
+                onPress={() => {
+                  if (userRole === 'super_admin') {
+                    setShowMosquePicker(true);
+                  }
+                }}
+                activeOpacity={userRole === 'super_admin' ? 0.7 : 1}
+                disabled={userRole === 'admin'}
+              >
+                <View style={styles.mosqueSelectInfo}>
+                  <View style={[styles.scopeIconBox, formMosqueId ? styles.scopeIconBoxMosque : styles.scopeIconBoxGlobal]}>
+                    {formMosqueId ? (
+                      <Building2 size={18} color={colors.primary} />
+                    ) : (
+                      <Globe size={18} color="#03BECD" />
+                    )}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[
+                        styles.mosqueSelectText,
+                        styles.mosqueSelectTextActive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {formMosqueId
+                        ? (userRole === 'admin' && adminMosque
+                          ? adminMosque.name
+                          : (mosques.find((m) => m.id === formMosqueId)?.name || 'Selected Mosque'))
+                        : 'Global Announcement (All Mosques)'}
+                    </Text>
+                    <Text style={styles.scopeSubText}>
+                      {userRole === 'admin'
+                        ? (adminMosque?.address ? `${adminMosque.address} (Locked to your assigned masjid)` : 'Locked to your assigned masjid')
+                        : (formMosqueId
+                          ? `${mosques.find((m) => m.id === formMosqueId)?.address || 'Assigned masjid'}`
+                          : 'Visible to all users across all masjids')}
+                    </Text>
+                  </View>
+                </View>
+                {userRole === 'super_admin' && <ChevronDown size={18} color={colors.light.textMuted} />}
+              </TouchableOpacity>
+
+              {/* 2. Category Selection */}
+              <Text style={styles.detailLabel}>Category *</Text>
+              <View style={styles.categoryChipsContainer}>
+                {categories.map((cat) => {
+                  const isSelected = formCategoryId === cat.id;
+                  const catNameEn = cat.name_en || cat.name || '';
+                  const catNameUr = cat.name_ur || '';
+                  return (
+                    <TouchableOpacity
+                      key={cat.id}
+                      style={[styles.categoryChip, isSelected && styles.categoryChipSelected]}
+                      onPress={() => {
+                        setFormCategoryId(cat.id);
+                        setFormError(null);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.categoryChipText, isSelected && styles.categoryChipTextSelected]}>
+                        {catNameEn} {catNameUr && catNameUr !== catNameEn ? `• ${catNameUr}` : ''}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                {categories.length === 0 && (
+                  <Text style={styles.noDataText}>No categories available.</Text>
+                )}
+              </View>
+
+              {/* 3. English Description */}
+              <Text style={styles.detailLabel}>Description (English) *</Text>
+              <TextInput
+                style={[styles.fieldInput, styles.fieldInputMultiline]}
+                value={formDescriptionEn}
+                onChangeText={(text) => {
+                  setFormDescriptionEn(text);
+                  setFormError(null);
+                }}
+                placeholder="Enter announcement description in English..."
+                placeholderTextColor={colors.light.textMuted}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+
+              {/* 4. Urdu Description */}
+              <Text style={styles.detailLabel}>Description (Urdu) *</Text>
+              <TextInput
+                style={[styles.fieldInput, styles.fieldInputMultiline, styles.urduInput]}
+                value={formDescriptionUr}
+                onChangeText={(text) => {
+                  setFormDescriptionUr(text);
+                  setFormError(null);
+                }}
+                placeholder="اردو میں اعلان کی تفصیل درج کریں..."
+                placeholderTextColor={colors.light.textMuted}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+
+              {/* 5. Active Status Toggle */}
               <View style={styles.activeToggleRow}>
-                <Text style={styles.fieldLabel}>Active</Text>
+                <View style={{ flex: 1, marginRight: spacing.sm }}>
+                  <Text style={styles.detailLabel}>Active Status</Text>
+                </View>
                 <Switch
                   value={formIsActive}
                   onValueChange={setFormIsActive}
@@ -644,95 +848,7 @@ export const ManageAnnouncementsScreen: React.FC = () => {
                 />
               </View>
 
-              {/* 2. English Description */}
-              <Text style={styles.fieldLabel}>Description (English) *</Text>
-              <TextInput
-                style={[styles.fieldInput, styles.fieldInputMultiline]}
-                value={formDescriptionEn}
-                onChangeText={setFormDescriptionEn}
-                placeholder="Enter announcement description in English"
-                placeholderTextColor={colors.light.textMuted}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-
-              {/* 3. Urdu Description */}
-              <Text style={styles.fieldLabel}>Description (Urdu) *</Text>
-              <TextInput
-                style={[styles.fieldInput, styles.fieldInputMultiline, { textAlign: 'right' }]}
-                value={formDescriptionUr}
-                onChangeText={setFormDescriptionUr}
-                placeholder="اردو میں اعلان کی تفصیل درج کریں"
-                placeholderTextColor={colors.light.textMuted}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-
-              {/* 4. Mosque (Optional) */}
-              <Text style={styles.fieldLabel}>Mosque (Optional)</Text>
-              <View style={styles.mosqueInputRow}>
-                <TextInput
-                  style={[styles.fieldInput, { flex: 1 }]}
-                  value={mosqueInput}
-                  onChangeText={(text) => {
-                    setMosqueInput(text);
-                    setMosqueError(null);
-                    setMosqueName(null);
-                    setFormMosqueId(null);
-                  }}
-                  placeholder="Type mosque name"
-                  placeholderTextColor={colors.light.textMuted}
-                />
-                <TouchableOpacity
-                  style={styles.mosqueLookupBtn}
-                  onPress={handleMosqueLookup}
-                  activeOpacity={0.7}
-                >
-                  <Search size={18} color="#ffffff" />
-                </TouchableOpacity>
-              </View>
-              {mosqueError ? (
-                <Text style={styles.mosqueErrorText}>✕ {mosqueError}</Text>
-              ) : mosqueName ? (
-                <Text style={styles.mosqueVerifiedText}>✓ Mosque: {mosqueName}</Text>
-              ) : null}
-
-              {/* 5. Category */}
-              <Text style={styles.fieldLabel}>Category *</Text>
-              <View style={styles.categoryChipsContainer}>
-                {categories.map((cat) => {
-                  const catName = cat.name_en || cat.name || cat.name_ur || 'Unnamed';
-                  return (
-                    <TouchableOpacity
-                      key={cat.id}
-                      style={[styles.categoryChip, formCategoryId === cat.id && styles.categoryChipSelected]}
-                      onPress={() => setFormCategoryId(cat.id)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.categoryChipText, formCategoryId === cat.id && styles.categoryChipTextSelected]}>
-                        {catName}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-                <TouchableOpacity
-                  style={styles.addCategoryChipBtn}
-                  onPress={() => {
-                    setNewCategoryName('');
-                    setShowCategoryModal(true);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Plus size={16} color={colors.primary} />
-                </TouchableOpacity>
-                {categories.length === 0 && (
-                  <Text style={styles.noDataText}>No categories yet.</Text>
-                )}
-              </View>
-
-              {/* Date of Creation */}
+              {/* Date of Creation (Edit Mode only) */}
               {editMode && formCreatedAt ? (
                 <View style={styles.createdAtContainer}>
                   <Calendar size={14} color={colors.light.textMuted} />
@@ -749,7 +865,7 @@ export const ManageAnnouncementsScreen: React.FC = () => {
                 </View>
               ) : null}
 
-              {/* Action buttons */}
+              {/* Modal Action Buttons */}
               <View style={styles.modalActions}>
                 {editMode ? (
                   <TouchableOpacity
@@ -766,6 +882,7 @@ export const ManageAnnouncementsScreen: React.FC = () => {
                     style={[styles.modalActionBtn, styles.cancelBtn]}
                     onPress={closeModal}
                     activeOpacity={0.7}
+                    disabled={saving}
                   >
                     <Text style={styles.cancelBtnText}>Cancel</Text>
                   </TouchableOpacity>
@@ -787,53 +904,126 @@ export const ManageAnnouncementsScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
 
-              <View style={{ height: 40 }} />
+              <View style={{ height: 32 }} />
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ── Category Creation Modal ──────────────────────────────────────── */}
+      {/* ── Mosque Picker Modal ──────────────────────────────────────────── */}
       <Modal
-        visible={showCategoryModal}
+        visible={showMosquePicker}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowCategoryModal(false)}
+        onRequestClose={() => setShowMosquePicker(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.smallModalContainer}>
-            <Text style={styles.smallModalTitle}>Create New Category</Text>
-            <TextInput
-              style={styles.smallModalInput}
-              placeholder="Enter category name"
-              placeholderTextColor={colors.light.textMuted}
-              value={newCategoryName}
-              onChangeText={setNewCategoryName}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <View style={styles.smallModalActions}>
+          <View style={styles.pickerModalContainer}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Select Mosque</Text>
+              </View>
               <TouchableOpacity
-                style={[styles.smallModalBtn, styles.cancelBtn]}
-                onPress={() => setShowCategoryModal(false)}
+                onPress={() => setShowMosquePicker(false)}
+                style={styles.modalCloseBtn}
               >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.smallModalBtn, { backgroundColor: colors.primary }]}
-                onPress={handleCreateCategory}
-                disabled={categoryCreating}
-              >
-                {categoryCreating ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <Text style={[styles.smallModalBtnText, { color: '#ffffff' }]}>Create</Text>
-                )}
+                <X size={20} color={colors.light.text} />
               </TouchableOpacity>
             </View>
+
+            {/* Mosque Search */}
+            <View style={styles.pickerSearchRow}>
+              <Search size={16} color={colors.light.textMuted} />
+              <TextInput
+                style={styles.pickerSearchInput}
+                placeholder="Search mosque name, city, address..."
+                placeholderTextColor={colors.light.textMuted}
+                value={mosquePickerSearch}
+                onChangeText={setMosquePickerSearch}
+                clearButtonMode="while-editing"
+              />
+            </View>
+
+            {/* List with Global option first */}
+            <FlatList
+              data={filteredPickerMosques}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.pickerListContent}
+              ListHeaderComponent={
+                <TouchableOpacity
+                  style={[
+                    styles.pickerItem,
+                    formMosqueId === null && styles.pickerItemSelected,
+                  ]}
+                  onPress={() => {
+                    setFormMosqueId(null);
+                    setShowMosquePicker(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.pickerGlobalIconContainer}>
+                    <Globe size={18} color="#03BECD" />
+                  </View>
+                  <View style={styles.pickerItemTextContainer}>
+                    <Text
+                      style={[
+                        styles.pickerItemTitle,
+                        formMosqueId === null && styles.pickerItemTitleSelected,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      General Announcement
+                    </Text>
+                  </View>
+                  {formMosqueId === null && <Check size={18} color={colors.primary} />}
+                </TouchableOpacity>
+              }
+              renderItem={({ item }) => {
+                const isSelected = formMosqueId === item.id;
+                return (
+                  <TouchableOpacity
+                    style={[
+                      styles.pickerItem,
+                      isSelected && styles.pickerItemSelected,
+                    ]}
+                    onPress={() => {
+                      setFormMosqueId(item.id);
+                      setShowMosquePicker(false);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.pickerMosqueIconContainer}>
+                      <Building2 size={18} color={colors.primary} />
+                    </View>
+                    <View style={styles.pickerItemTextContainer}>
+                      <Text
+                        style={[
+                          styles.pickerItemTitle,
+                          isSelected && styles.pickerItemTitleSelected,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {item.name}
+                      </Text>
+                      <Text style={styles.pickerItemSubtitle} numberOfLines={1}>
+                        {[item.city, item.address].filter(Boolean).join(' • ') || 'Mosque'}
+                      </Text>
+                    </View>
+                    {isSelected && <Check size={18} color={colors.primary} />}
+                  </TouchableOpacity>
+                );
+              }}
+              ListEmptyComponent={
+                <View style={styles.pickerEmpty}>
+                  <Text style={styles.pickerEmptyText}>No mosques found matching search.</Text>
+                </View>
+              }
+            />
           </View>
         </View>
       </Modal>
+
+
 
       {/* ── Filter Modal ──────────────────────────────────────────────────── */}
       <Modal
@@ -1277,6 +1467,9 @@ const styles = StyleSheet.create({
     borderRadius: spacing.borderRadiusLg,
     overflow: 'hidden',
   },
+  modalContainerWithKeyboard: {
+    maxHeight: Platform.OS === 'ios' ? '68%' : '94%',
+  },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1303,6 +1496,12 @@ const styles = StyleSheet.create({
   modalScroll: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
+  },
+  modalScrollContent: {
+    paddingBottom: spacing.lg,
+  },
+  modalScrollContentWithKeyboard: {
+    // paddingBottom: 160,
   },
 
   // Active toggle row
@@ -1409,54 +1608,199 @@ const styles = StyleSheet.create({
   categoryChipTextSelected: {
     color: '#ffffff',
   },
-  addCategoryChipBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(246, 139, 53, 0.08)',
-  },
 
-  // Mosque input row (same pattern as ManageMosquesScreen admin email field)
-  mosqueInputRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  mosqueLookupBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: spacing.borderRadiusMd,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  mosqueVerifiedText: {
+
+  // Modal Subtitle & Error Banner
+  modalSubtitle: {
     fontSize: typography.sizes.xs,
-    color: colors.success,
-    fontWeight: '600',
+    color: colors.light.textMuted,
     marginTop: 2,
-    marginBottom: spacing.sm,
   },
-  mosqueErrorText: {
-    fontSize: typography.sizes.xs,
+  modalBannerError: {
+    backgroundColor: 'rgba(228, 72, 72, 0.1)',
+    borderLeftWidth: 3,
+    borderLeftColor: colors.danger,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    borderRadius: spacing.borderRadiusSm,
+  },
+  modalBannerErrorText: {
+    fontSize: typography.sizes.sm,
     color: colors.danger,
     fontWeight: '600',
-    marginTop: 2,
-    marginBottom: spacing.sm,
   },
-  mosqueNoneText: {
+  requiredHint: {
     fontSize: typography.sizes.xs,
     color: colors.light.textMuted,
     fontStyle: 'italic',
-    marginTop: 2,
+    marginBottom: spacing.md,
+  },
+  detailLabel: {
+    fontSize: typography.sizes.xs,
+    fontWeight: '700',
+    color: colors.light.text,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+    marginTop: spacing.sm,
+  },
+  detailFieldHint: {
+    fontSize: typography.sizes.xs,
+    color: colors.light.textMuted,
+    marginBottom: spacing.xs,
+  },
+  urduInput: {
+    textAlign: 'right',
+  },
+
+  // Mosque Scope Selector Button
+  mosqueSelectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.light.surface,
+    borderRadius: spacing.borderRadiusMd,
+    borderWidth: 1,
+    borderColor: colors.light.inputBorder,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     marginBottom: spacing.sm,
   },
+  mosqueSelectBtnActive: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(15, 107, 115, 0.03)',
+  },
+  mosqueSelectInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  scopeIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scopeIconBoxGlobal: {
+    backgroundColor: '#E6F7F9',
+  },
+  scopeIconBoxMosque: {
+    backgroundColor: 'rgba(15, 107, 115, 0.1)',
+  },
+  mosqueSelectText: {
+    fontSize: typography.sizes.sm,
+    color: colors.light.textMuted,
+    fontWeight: '600',
+  },
+  mosqueSelectTextActive: {
+    color: colors.light.text,
+  },
+  scopeSubText: {
+    fontSize: 11,
+    color: colors.light.textMuted,
+    marginTop: 1,
+  },
+
+  // Mosque Picker Modal
+  pickerModalContainer: {
+    backgroundColor: colors.light.surface,
+    borderRadius: spacing.borderRadiusLg,
+    maxHeight: '80%',
+    width: '100%',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  pickerSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.light.background,
+    borderRadius: spacing.borderRadiusMd,
+    borderWidth: 1,
+    borderColor: colors.light.border,
+    marginHorizontal: spacing.lg,
+    marginVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    gap: spacing.xs,
+  },
+  pickerSearchInput: {
+    flex: 1,
+    fontSize: typography.sizes.sm,
+    color: colors.light.text,
+    paddingVertical: 6,
+  },
+  pickerListContent: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+    gap: spacing.xs,
+  },
+  pickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: spacing.borderRadiusMd,
+    backgroundColor: colors.light.surface,
+    borderWidth: 1,
+    borderColor: colors.light.border,
+    gap: spacing.sm,
+    marginBottom: 4,
+  },
+  pickerItemSelected: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(15, 107, 115, 0.06)',
+  },
+  pickerGlobalIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#E6F7F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerMosqueIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(15, 107, 115, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerItemTextContainer: {
+    flex: 1,
+  },
+  pickerItemTitle: {
+    fontSize: typography.sizes.sm,
+    fontWeight: '700',
+    color: colors.light.text,
+    marginBottom: 1,
+  },
+  pickerItemTitleSelected: {
+    color: colors.primary,
+  },
+  pickerItemSubtitle: {
+    fontSize: typography.sizes.xs,
+    color: colors.light.textMuted,
+  },
+  pickerEmpty: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+  },
+  pickerEmptyText: {
+    fontSize: typography.sizes.sm,
+    color: colors.light.textMuted,
+  },
+
+
 
   // Date/Time
   dateTimeButton: {
@@ -1665,6 +2009,56 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     color: colors.light.text,
     fontWeight: '600',
+  },
+
+  // Admin Scope Banners
+  adminScopeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: 'rgba(15, 107, 115, 0.08)',
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: spacing.borderRadiusMd,
+    borderWidth: 1,
+    borderColor: 'rgba(15, 107, 115, 0.2)',
+  },
+  adminScopeBannerText: {
+    fontSize: typography.sizes.sm,
+    color: colors.primary,
+    fontWeight: '500',
+    flex: 1,
+  },
+  adminScopeBannerBold: {
+    fontWeight: '700',
+  },
+  adminNoMosqueBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: spacing.borderRadiusMd,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  adminNoMosqueBannerText: {
+    fontSize: typography.sizes.sm,
+    color: colors.danger,
+    fontWeight: '600',
+    flex: 1,
+  },
+  mosqueSelectBtnDisabled: {
+    opacity: 0.9,
+    backgroundColor: 'rgba(15, 107, 115, 0.04)',
+    borderColor: 'rgba(15, 107, 115, 0.3)',
   },
 });
 

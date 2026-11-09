@@ -16,8 +16,11 @@ import { Text } from '../../components/ui/Text';
 import { colors } from '../../theme';
 import { useNavigation } from '../../navigation/NavigationContext';
 import { useApp } from '../../context/AppContext';
-import { announcementService, Announcement } from '../../services/announcementService';
+import { Announcement } from '../../services/announcementService';
 import { usePublicAnnouncementsQuery } from '../../queries/useAnnouncementsQueries';
+import { onlineManager } from '@tanstack/react-query';
+import { EmptyState } from '../../components/common/EmptyState';
+import { LoadingState } from '../../components/common/LoadingState';
 
 // ── Back Arrow SVG matching SettingsScreen ──────────────────────────────────
 const BackArrowIcon = ({ color = '#1D3B6D', size = 14 }: { color?: string; size?: number }) => (
@@ -130,16 +133,39 @@ const AnnouncementItemCard: React.FC<AnnouncementCardProps> = ({ item, isRtl }) 
 export const CategoryAnnouncementsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { params, goBack } = useNavigation();
-  const { isRtl } = useApp();
+  const { isRtl, triggerToast } = useApp();
 
   const categoryId: string = params?.categoryId || '';
   const categoryNameEn: string = params?.categoryName || params?.categoryNameEn || 'Announcement';
   const categoryNameUr: string = params?.categoryNameUr || '';
 
   const [refreshing, setRefreshing] = useState(false);
+  const [isScreenLoading, setIsScreenLoading] = useState(true);
+  const [isOnline, setIsOnline] = useState(onlineManager.isOnline());
+
+  // Track real connectivity changes
+  useEffect(() => {
+    const unsub = onlineManager.subscribe((online) => setIsOnline(online));
+    return unsub;
+  }, []);
 
   // Source from the persistent query cache — no network required for cached data
-  const { data: allAnnouncements = [], isLoading, isError, refetch } = usePublicAnnouncementsQuery();
+  const { data: allAnnouncements = [], isLoading, isError, error, refetch } = usePublicAnnouncementsQuery();
+
+  useEffect(() => {
+    let mounted = true;
+    setIsScreenLoading(true);
+    if (isOnline) {
+      // Only force refetch when online
+      refetch().finally(() => {
+        if (mounted) setIsScreenLoading(false);
+      });
+    } else {
+      // Offline: resolve immediately with whatever is cached
+      setIsScreenLoading(false);
+    }
+    return () => { mounted = false; };
+  }, [isOnline]); // re-run when connectivity changes
 
   const dbAnnouncements: Announcement[] = React.useMemo(() => {
     if (!allAnnouncements || allAnnouncements.length === 0) return [];
@@ -152,15 +178,29 @@ export const CategoryAnnouncementsScreen: React.FC = () => {
   }, [allAnnouncements, categoryId, categoryNameEn]);
 
   const onRefresh = async () => {
+    if (refreshing) return;
     setRefreshing(true);
     try {
+      if (!onlineManager.isOnline()) {
+        triggerToast(
+          isRtl
+            ? 'آپ آف لائن ہیں۔ محفوظ شدہ اعلانات دکھائے جا رہے ہیں۔'
+            : 'You are offline. Showing cached announcements.'
+        );
+        return;
+      }
       await refetch();
+    } catch (err) {
+      console.warn('[CategoryAnnouncementsScreen] Refresh error:', err);
     } finally {
       setRefreshing(false);
     }
   };
 
-  const loading = isLoading && allAnnouncements.length === 0;
+  const loading = isScreenLoading || (isLoading && !isError);
+  // Distinguish offline-no-cache vs network error vs no announcements
+  const isOfflineNoCache = !isOnline && (error as any)?.message === 'offline_no_cache';
+  const isNetworkError = isError && isOnline;
   const hasError = isError && allAnnouncements.length === 0;
 
   const categoryDisplayName = isRtl && categoryNameUr ? categoryNameUr : categoryNameEn;
@@ -203,28 +243,47 @@ export const CategoryAnnouncementsScreen: React.FC = () => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" />
         }
       >
-        {loading && !refreshing ? (
+        {loading && !refreshing && dbAnnouncements.length === 0 ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#FFFFFF" />
+            <LoadingState message={isRtl ? 'اعلانات لوڈ ہو رہے ہیں...' : 'Loading announcements...'} color="#FFFFFF" />
           </View>
         ) : dbAnnouncements.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>
-                {hasError
-                  ? (isRtl ? 'انٹرنیٹ کنکشن کی خرابی' : 'Network Error')
-                  : (isRtl ? 'کوئی اعلان موجود نہیں ہے' : 'No Announcements Found')}
-              </Text>
-              <Text style={styles.emptySubtitle}>
-                {hasError
-                  ? (isRtl
+            {isOfflineNoCache ? (
+              <EmptyState
+                isOffline
+                title={isRtl ? 'انٹرنیٹ دستیاب نہیں ہے' : 'Internet Unavailable'}
+                description={
+                  isRtl
+                    ? 'آپ آف لائن ہیں اور ابھی تک کوئی کیشڈ ڈیٹا موجود نہیں ہے۔ انٹرنیٹ سے رابطہ کریں۔'
+                    : 'You are offline and no cached data is available yet. Please connect to the internet.'
+                }
+                onRetry={onRefresh}
+                retryLabel={isRtl ? 'دوبارہ کوشش کریں' : 'Retry'}
+              />
+            ) : isNetworkError ? (
+              <EmptyState
+                title={isRtl ? 'نیٹ ورک کی خرابی' : 'Network Error'}
+                description={
+                  isRtl
                     ? 'اعلان لوڈ کرنے میں ناکامی۔ براہ کرم اپنا انٹرنیٹ کنکشن چیک کریں۔'
-                    : 'Unable to load announcements. Please check your internet connection.')
-                  : (isRtl
+                    : 'Unable to load announcements. Please check your internet connection.'
+                }
+                onRetry={onRefresh}
+                retryLabel={isRtl ? 'دوبارہ کوشش کریں' : 'Retry'}
+              />
+            ) : (
+              <EmptyState
+                title={isRtl ? 'کوئی اعلان موجود نہیں ہے' : 'No Announcements Found'}
+                description={
+                  isRtl
                     ? 'اس زمرے کے لیے فی الحال کوئی فعال اعلان دستیاب نہیں ہے۔'
-                    : `There are currently no active announcements in ${categoryDisplayName}.`)}
-              </Text>
-            </View>
+                    : `There are currently no active announcements in ${categoryDisplayName}.`
+                }
+                onRetry={onRefresh}
+                retryLabel={isRtl ? 'دوبارہ لوڈ کریں' : 'Refresh'}
+              />
+            )}
           </View>
         ) : (
           dbAnnouncements.map((item) => (

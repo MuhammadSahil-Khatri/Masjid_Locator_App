@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
-import { X, Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react-native';
+import { X, Mail, Lock, Eye, EyeOff, LogIn, AlertCircle } from 'lucide-react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -128,6 +128,8 @@ export const SettingsScreen: React.FC = () => {
   // Modals state
   const [loginModalVisible, setLoginModalVisible] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
@@ -142,33 +144,50 @@ export const SettingsScreen: React.FC = () => {
     defaultValues: { email: '', password: '' },
   });
 
-  const onLoginSubmit = loginForm.handleSubmit(async (data: LoginFormData) => {
-    try {
-      await login(data.email, data.password);
-      triggerToast(language === 'ur' ? 'لاگ ان کامیاب!' : 'Logged in successfully!');
-      setLoginModalVisible(false);
-      loginForm.reset();
-    } catch (err: any) {
-      const msg: string = err?.message || '';
-      if (msg.toLowerCase().includes('email not confirmed')) {
-        triggerToast(
-          language === 'ur'
+  const onLoginSubmit = loginForm.handleSubmit(
+    async (data: LoginFormData) => {
+      try {
+        setIsLoggingIn(true);
+        setLoginError(null);
+        await login(data.email, data.password);
+        setLoginModalVisible(false);
+        loginForm.reset();
+        triggerToast(language === 'ur' ? 'لاگ ان کامیاب!' : 'Logged in successfully!');
+      } catch (err: any) {
+        const msg: string = err?.message || '';
+        let errorText = '';
+        if (msg.toLowerCase().includes('email not confirmed')) {
+          errorText = language === 'ur'
             ? 'ای میل تصدیق نہیں ہوئی۔ ان باکس چیک کریں۔'
-            : 'Email not confirmed. Check your inbox.'
-        );
-      } else if (msg.toLowerCase().includes('invalid login credentials')) {
-        triggerToast(
-          language === 'ur' ? 'ای میل یا پاس ورڈ غلط ہے۔' : 'Incorrect email or password.'
-        );
-      } else {
-        triggerToast(msg || (language === 'ur' ? 'سائن ان ناکام ہوا۔' : 'Login failed. Please try again.'));
+            : 'Email not confirmed. Check your inbox.';
+        } else if (
+          msg.toLowerCase().includes('invalid login credentials') ||
+          msg.toLowerCase().includes('invalid credentials') ||
+          msg.toLowerCase().includes('invalid')
+        ) {
+          errorText = language === 'ur'
+            ? 'ای میل یا پاس ورڈ غلط ہے۔'
+            : 'Incorrect email or password.';
+        } else {
+          errorText = msg || (language === 'ur' ? 'سائن ان ناکام ہوا۔ دوبارہ کوشش کریں۔' : 'Login failed. Please try again.');
+        }
+        setLoginError(errorText);
+      } finally {
+        setIsLoggingIn(false);
+      }
+    },
+    (errors) => {
+      if (errors.email?.message) {
+        setLoginError(errors.email.message);
+      } else if (errors.password?.message) {
+        setLoginError(errors.password.message);
       }
     }
-  });
+  );
 
-  const isSuperAdmin = currentUser?.role === 'super_admin' || profile?.role === 'super_admin';
-  const isAdmin = currentUser?.role === 'admin' || profile?.role === 'admin';
-  const isAuthenticated = !!user;
+  const isAuthenticated = Boolean(user);
+  const isSuperAdmin = isAuthenticated && profile?.role === 'super_admin';
+  const isAdmin = isAuthenticated && profile?.role === 'admin';
 
   const handleFeedbackSubmit = () => {
     if (!feedbackText.trim()) {
@@ -183,9 +202,17 @@ export const SettingsScreen: React.FC = () => {
   const confirmLogout = async () => {
     try {
       setLoggingOut(true);
-      await logout();
+      const res = await logout();
       setLogoutModalVisible(false);
-      triggerToast(language === 'ur' ? 'کامیابی سے لاگ آؤٹ ہو گیا' : 'Logged out successfully');
+      if (res && res.serverRevoked === false) {
+        triggerToast(
+          language === 'ur'
+            ? 'مقامی طور پر لاگ آؤٹ ہو گیا (سرور غیر مصدقہ)'
+            : 'Logged out locally (server revocation unconfirmed)'
+        );
+      } else {
+        triggerToast(language === 'ur' ? 'کامیابی سے لاگ آؤٹ ہو گئے' : 'Logged out successfully');
+      }
     } catch (err: any) {
       setLogoutModalVisible(false);
       triggerToast(err?.message || 'Logout failed');
@@ -307,7 +334,7 @@ export const SettingsScreen: React.FC = () => {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.loginCardTitle, isRtl && styles.textRtl]}>
-                    {isRtl ? 'انتظامی لاگ ان' : 'Admin Login'}
+                    {isRtl ? ' لاگ ان' : 'Login'}
                   </Text>
                   <Text style={[styles.loginCardSub, isRtl && [styles.textRtl, { lineHeight: 32 }]]}>
                     {isRtl
@@ -321,6 +348,9 @@ export const SettingsScreen: React.FC = () => {
                 style={styles.loginSubmitButton}
                 onPress={() => {
                   loginForm.reset();
+                  setLoginError(null);
+                  setIsLoggingIn(false);
+                  setShowPassword(false);
                   setLoginModalVisible(true);
                 }}
                 activeOpacity={0.85}
@@ -433,7 +463,9 @@ export const SettingsScreen: React.FC = () => {
         visible={loginModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setLoginModalVisible(false)}
+        onRequestClose={() => {
+          if (!isLoggingIn) setLoginModalVisible(false);
+        }}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -450,13 +482,26 @@ export const SettingsScreen: React.FC = () => {
                 </Text>
               </View>
               <TouchableOpacity
-                onPress={() => setLoginModalVisible(false)}
+                onPress={() => {
+                  if (!isLoggingIn) setLoginModalVisible(false);
+                }}
                 accessibilityLabel="Close"
                 style={styles.modalCloseBtn}
+                disabled={isLoggingIn}
               >
                 <X size={20} color="#1D3B6D" />
               </TouchableOpacity>
             </View>
+
+            {/* Error Message Banner */}
+            {loginError ? (
+              <View style={[styles.loginErrorBanner, isRtl && styles.rowReverse]}>
+                <AlertCircle size={18} color="#DC2626" style={styles.loginErrorIcon} />
+                <Text style={[styles.loginErrorText, isRtl && styles.textRtl]}>
+                  {loginError}
+                </Text>
+              </View>
+            ) : null}
 
             <View style={styles.loginFormBody}>
               <Controller
@@ -466,12 +511,16 @@ export const SettingsScreen: React.FC = () => {
                   <FormInput
                     placeholder={isRtl ? 'ای میل درج کریں' : 'Enter your email'}
                     value={value}
-                    onChangeText={onChange}
+                    onChangeText={(text) => {
+                      onChange(text);
+                      if (loginError) setLoginError(null);
+                    }}
                     onBlur={onBlur}
                     error={error}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     leftIcon={<Mail size={18} color="#1D3B6D" />}
+                    editable={!isLoggingIn}
                   />
                 )}
               />
@@ -483,14 +532,28 @@ export const SettingsScreen: React.FC = () => {
                   <FormInput
                     placeholder={isRtl ? 'پاس ورڈ درج کریں' : 'Enter your password'}
                     value={value}
-                    onChangeText={onChange}
+                    onChangeText={(text) => {
+                      onChange(text);
+                      if (loginError) setLoginError(null);
+                    }}
                     onBlur={onBlur}
                     secureTextEntry={!showPassword}
                     error={error}
                     leftIcon={<Lock size={18} color="#1D3B6D" />}
+                    editable={!isLoggingIn}
                     rightIcon={
-                      <TouchableOpacity onPress={() => setShowPassword(v => !v)}>
-                        {showPassword ? <EyeOff size={18} color="#1D3B6D" /> : <Eye size={18} color="#1D3B6D" />}
+                      <TouchableOpacity
+                        onPress={() => setShowPassword((v) => !v)}
+                        style={styles.eyeButton}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                        activeOpacity={0.7}
+                        disabled={isLoggingIn}
+                      >
+                        {showPassword ? (
+                          <Eye size={18} color="#1D3B6D" />
+                        ) : (
+                          <EyeOff size={18} color="#1D3B6D" />
+                        )}
                       </TouchableOpacity>
                     }
                   />
@@ -500,7 +563,7 @@ export const SettingsScreen: React.FC = () => {
               <TouchableOpacity
                 style={styles.loginModalSubmitBtn}
                 onPress={onLoginSubmit}
-                disabled={loginForm.formState.isSubmitting}
+                disabled={isLoggingIn}
                 activeOpacity={0.85}
               >
                 <LinearGradient
@@ -509,18 +572,26 @@ export const SettingsScreen: React.FC = () => {
                   end={{ x: 1, y: 1 }}
                   style={styles.loginModalGradient}
                 >
-                  {loginForm.formState.isSubmitting ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={[styles.loginModalSubmitText, isRtl && { lineHeight: 30 }]}>
-                      {isRtl ? 'لاگ ان کریں' : 'Log In'}
-                    </Text>
-                  )}
+                  <Text style={[styles.loginModalSubmitText, isRtl && { lineHeight: 30 }]}>
+                    {isRtl ? 'لاگ ان کریں' : 'Log In'}
+                  </Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
           </View>
         </KeyboardAvoidingView>
+
+        {/* Blocking light white opacity overlay with loader */}
+        {isLoggingIn && (
+          <View style={styles.loginBlockingOverlay}>
+            <View style={styles.loginLoaderBox}>
+              <ActivityIndicator size="large" color="#0088A5" />
+              <Text style={[styles.loginLoaderText, isRtl && styles.textRtl]}>
+                {isRtl ? 'لاگ ان ہو رہا ہے...' : 'Signing in...'}
+              </Text>
+            </View>
+          </View>
+        )}
       </Modal>
 
       {/* ── Feedback Modal ── */}
@@ -916,6 +987,75 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
+  },
+  loginErrorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 14,
+    marginBottom: -4,
+    gap: 8,
+  },
+  loginErrorIcon: {
+    marginRight: 4,
+  },
+  loginErrorText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#DC2626',
+    lineHeight: 18,
+  },
+  eyeButton: {
+    padding: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loginBlockingOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(255, 255, 255, 0.78)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+    elevation: 20,
+  },
+  loginLoaderBox: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 22,
+    paddingHorizontal: 32,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 8,
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+      },
+    }),
+  },
+  loginLoaderText: {
+    marginTop: 14,
+    fontSize: 14.5,
+    fontWeight: '700',
+    color: '#1D3B6D',
   },
 
   // ── Section Headers ─────────────────────────────────────────────────────────

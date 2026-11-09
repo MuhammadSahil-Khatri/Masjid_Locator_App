@@ -1,4 +1,4 @@
-require('dotenv').config();
+
 
 export default {
   expo: {
@@ -9,23 +9,26 @@ export default {
     icon: "./assets/logo.png",
     userInterfaceStyle: "light",
 
-    splash: {
-      image: "./assets/logo.png",
-      resizeMode: "contain",
+    androidStatusBar: {
+      barStyle: "light-content",
       backgroundColor: "#020617",
+      translucent: false,
     },
 
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.sahilkhatri.masjidlocatorapp",
+      bundleIdentifier: "com.khubaibkhatri.jah",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
       },
     },
 
     android: {
-      package: "com.sahilkhatri.masjidlocatorapp",
-      softwareKeyboardLayoutMode: "pan",
+      package: "com.khubaibkhatri.jah",
+      softwareKeyboardLayoutMode: "resize",
+      blockedPermissions: [
+        "android.permission.ACTIVITY_RECOGNITION",
+      ],
 
       config: {
         googleMaps: {
@@ -49,6 +52,7 @@ export default {
       "expo-asset",
       "expo-font",
       "@react-native-community/datetimepicker",
+      "./plugins/withWorkManagerFix",
     ],
 
     extra: {

@@ -38,6 +38,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Text } from '../../components/ui/Text';
 import { colors, spacing, typography } from '../../theme';
 import { useApp } from '../../context/AppContext';
+import { EmptyState } from '../../components/common/EmptyState';
+import { onlineManager } from '@tanstack/react-query';
 import { useUserLocation } from '../../hooks/useUserLocation';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigation } from '../../navigation/NavigationContext';
@@ -275,7 +277,7 @@ const BackArrowIcon = ({ color = '#1D3B6D', size = 14 }: { color?: string; size?
 
 // ─── SearchScreen ──────────────────────────────────────────────────────────────
 export const SearchScreen: React.FC = () => {
-  const { isRtl } = useApp();
+  const { isRtl, triggerToast } = useApp();
   const insets = useSafeAreaInsets();
   const theme = colors.light;
   const { location, loading: locationLoading, refreshLocation } = useUserLocation();
@@ -382,7 +384,17 @@ export const SearchScreen: React.FC = () => {
 
   // ── Handlers ──────────────────────────────────────────────────────────────────
   const handleClearSearch = useCallback(() => setSearchText(''), []);
-  const handleRetryFetch = useCallback(() => refetch(), [refetch]);
+  const handleRetryFetch = useCallback(() => {
+    if (!onlineManager.isOnline()) {
+      triggerToast(
+        isRtl
+          ? 'آپ آف لائن ہیں۔ محفوظ شدہ مساجد دکھائی جا رہی ہیں۔'
+          : 'You are offline. Showing cached mosques.'
+      );
+      return;
+    }
+    refetch();
+  }, [refetch, isRtl, triggerToast]);
 
   const handleMarkerPress = useCallback((mosqueId: string) => {
     const mosque = mosques.find((m) => m.id === mosqueId);
@@ -566,8 +578,8 @@ export const SearchScreen: React.FC = () => {
           </View>
         )}
 
-        {/* Loading overlay */}
-        {loading && (
+        {/* Loading overlay - only when no cached data exists */}
+        {loading && mosques.length === 0 && (
           <View style={[styles.overlayCentered, { backgroundColor: 'rgba(255,255,255,0.7)' }]}>
             <ActivityIndicator size="large" color={colors.primary} />
             <Text style={[styles.loadingText, { color: theme.textMuted, fontWeight: '600' }]}>
@@ -576,21 +588,16 @@ export const SearchScreen: React.FC = () => {
           </View>
         )}
 
-        {/* Error overlay */}
-        {error && (
+        {/* Error overlay - only when no cached data exists */}
+        {error && mosques.length === 0 && (
           <View style={[styles.overlayCentered, { backgroundColor: 'rgba(255,255,255,0.95)' }]}>
-            <Text style={{ color: colors.danger, fontWeight: '600', fontSize: typography.sizes.base, textAlign: 'center', marginHorizontal: 30, marginBottom: 12 }}>
-              {error}
-            </Text>
-            <TouchableOpacity
-              style={[styles.retryBtn, { backgroundColor: colors.primary }]}
-              onPress={handleRetryFetch}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.retryBtnText}>
-                {isRtl ? 'دوبارہ کوشش کریں' : 'Retry'}
-              </Text>
-            </TouchableOpacity>
+            <EmptyState
+              title={!onlineManager.isOnline() ? (isRtl ? 'انٹرنیٹ دستیاب نہیں ہے' : 'No Internet Connection') : (isRtl ? 'خرابی پیش آگئی' : 'Failed to Load Mosques')}
+              message={!onlineManager.isOnline() ? (isRtl ? 'براہ کرم اپنا انٹرنیٹ کنکشن چیک کریں۔ کیش کردہ ڈیٹا دستیاب نہیں ہے۔' : 'You are currently offline and no cached mosques were found.') : error}
+              isOffline={!onlineManager.isOnline()}
+              onRetry={handleRetryFetch}
+              retryText={isRtl ? 'دوبارہ کوشش کریں' : 'Retry'}
+            />
           </View>
         )}
       </View>

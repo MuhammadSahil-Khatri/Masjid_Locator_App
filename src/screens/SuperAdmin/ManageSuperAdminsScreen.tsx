@@ -198,7 +198,7 @@ export const ManageSuperAdminsScreen: React.FC = () => {
 
     try {
       if (confirm.type === 'remove') {
-        await profileService.updateProfileRole(confirm.user.id, 'worshipper');
+        await profileService.removeWorshiper(confirm.user.id);
         setSuperAdmins((prev) => prev.filter((a) => a.id !== confirm.user!.id));
         triggerToast('Super Admin removed successfully.');
       } else if (confirm.type === 'addConfirm') {

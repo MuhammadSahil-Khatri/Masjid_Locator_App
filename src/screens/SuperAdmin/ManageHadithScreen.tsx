@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Switch,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -168,6 +169,23 @@ export const ManageHadithScreen: React.FC = () => {
   const [formIsActive, setFormIsActive] = useState(true);
   const [formCreatedAt, setFormCreatedAt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setIsKeyboardVisible(true)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setIsKeyboardVisible(false)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // Filter modal
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -262,6 +280,7 @@ export const ManageHadithScreen: React.FC = () => {
     setFormReference('');
     setFormIsActive(true);
     setFormCreatedAt(null);
+    setFormError(null);
     setShowModal(true);
   }, []);
 
@@ -274,16 +293,45 @@ export const ManageHadithScreen: React.FC = () => {
     setFormReference(item.reference || '');
     setFormIsActive(item.is_active);
     setFormCreatedAt(item.created_at || null);
+    setFormError(null);
     setShowModal(true);
   }, []);
 
   const closeModal = useCallback(() => {
     setShowModal(false);
+    setFormError(null);
   }, []);
 
   const handleSave = useCallback(async () => {
-    if (!formArabicText.trim() || !formEnglishTranslation.trim() || !formReference.trim()) {
-      triggerToast('Error: Arabic Text, English Translation, and Reference are required.');
+    setFormError(null);
+
+    const arabic = formArabicText.trim();
+    const english = formEnglishTranslation.trim();
+    const reference = formReference.trim();
+    const urdu = formUrduTranslation.trim();
+
+    if (!arabic) {
+      setFormError('Arabic text is required.');
+      return;
+    }
+    if (arabic.length < 3) {
+      setFormError('Arabic text must be at least 3 characters.');
+      return;
+    }
+    if (!english) {
+      setFormError('English translation is required.');
+      return;
+    }
+    if (english.length < 3) {
+      setFormError('English translation must be at least 3 characters.');
+      return;
+    }
+    if (!reference) {
+      setFormError('Reference is required (e.g. Sahih Bukhari, Hadith #...).');
+      return;
+    }
+    if (reference.length < 2) {
+      setFormError('Reference must be at least 2 characters.');
       return;
     }
 
@@ -293,22 +341,26 @@ export const ManageHadithScreen: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id;
 
+      if (!userId) {
+        throw new Error('Authentication required. Please sign in again.');
+      }
+
       if (editMode && editId) {
         await hadithService.updateHadith(editId, {
-          arabic_text: formArabicText.trim(),
-          urdu_translation: formUrduTranslation.trim() || '',
-          english_translation: formEnglishTranslation.trim(),
-          reference: formReference.trim(),
+          arabic_text: arabic,
+          urdu_translation: urdu,
+          english_translation: english,
+          reference: reference,
           is_active: formIsActive,
         });
         triggerToast('Hadith updated successfully.');
       } else {
         await hadithService.createHadith({
-          arabic_text: formArabicText.trim(),
-          urdu_translation: formUrduTranslation.trim() || '',
-          english_translation: formEnglishTranslation.trim(),
-          reference: formReference.trim(),
-          created_by: userId || '',
+          arabic_text: arabic,
+          urdu_translation: urdu,
+          english_translation: english,
+          reference: reference,
+          created_by: userId,
         });
         triggerToast('Hadith created successfully.');
       }
@@ -316,7 +368,7 @@ export const ManageHadithScreen: React.FC = () => {
       closeModal();
       loadData();
     } catch (err: any) {
-      triggerToast(`Error: ${err?.message || 'Failed to save hadith.'}`);
+      setFormError(err?.message || 'Failed to save hadith.');
     } finally {
       setSaving(false);
     }
@@ -506,7 +558,7 @@ export const ManageHadithScreen: React.FC = () => {
           style={styles.modalOverlay}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <View style={styles.modalContainer}>
+          <View style={[styles.modalContainer, isKeyboardVisible && styles.modalContainerWithKeyboard]}>
             {/* Modal Header */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
@@ -517,7 +569,24 @@ export const ManageHadithScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+            {formError && (
+              <View style={styles.modalBannerError}>
+                <Text style={styles.modalBannerErrorText}>✕ {formError}</Text>
+              </View>
+            )}
+
+            <ScrollView
+              style={styles.modalScroll}
+              contentContainerStyle={[
+                styles.modalScrollContent,
+                isKeyboardVisible && styles.modalScrollContentWithKeyboard,
+              ]}
+              showsVerticalScrollIndicator={isKeyboardVisible}
+              persistentScrollbar={isKeyboardVisible}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text style={styles.requiredHint}>Fields marked with * are required</Text>
+
               {/* Active Toggle */}
               <View style={styles.activeToggleRow}>
                 <Text style={styles.fieldLabel}>Active</Text>
@@ -534,7 +603,10 @@ export const ManageHadithScreen: React.FC = () => {
               <TextInput
                 style={[styles.fieldInput, styles.fieldInputArabic]}
                 value={formArabicText}
-                onChangeText={setFormArabicText}
+                onChangeText={(t) => {
+                  setFormArabicText(t);
+                  setFormError(null);
+                }}
                 placeholder="اللَّهُمَّ اغْفِرْ لِي"
                 placeholderTextColor={colors.light.textMuted}
                 textAlign="right"
@@ -547,7 +619,10 @@ export const ManageHadithScreen: React.FC = () => {
               <TextInput
                 style={[styles.fieldInput, styles.fieldInputMultiline]}
                 value={formUrduTranslation}
-                onChangeText={setFormUrduTranslation}
+                onChangeText={(t) => {
+                  setFormUrduTranslation(t);
+                  setFormError(null);
+                }}
                 placeholder="اے اللہ! مجھے بخش دے"
                 placeholderTextColor={colors.light.textMuted}
                 textAlign="right"
@@ -560,7 +635,10 @@ export const ManageHadithScreen: React.FC = () => {
               <TextInput
                 style={[styles.fieldInput, styles.fieldInputMultiline]}
                 value={formEnglishTranslation}
-                onChangeText={setFormEnglishTranslation}
+                onChangeText={(t) => {
+                  setFormEnglishTranslation(t);
+                  setFormError(null);
+                }}
                 placeholder="O Allah, forgive me..."
                 placeholderTextColor={colors.light.textMuted}
                 multiline
@@ -573,7 +651,10 @@ export const ManageHadithScreen: React.FC = () => {
               <TextInput
                 style={styles.fieldInput}
                 value={formReference}
-                onChangeText={setFormReference}
+                onChangeText={(t) => {
+                  setFormReference(t);
+                  setFormError(null);
+                }}
                 placeholder="Sahih Bukhari, Hadith #..."
                 placeholderTextColor={colors.light.textMuted}
               />
@@ -1027,6 +1108,30 @@ const styles = StyleSheet.create({
     borderRadius: spacing.borderRadiusLg,
     overflow: 'hidden',
   },
+  modalContainerWithKeyboard: {
+    maxHeight: Platform.OS === 'ios' ? '68%' : '94%',
+  },
+  modalBannerError: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    borderRadius: spacing.borderRadiusMd,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+  },
+  modalBannerErrorText: {
+    color: '#DC2626',
+    fontSize: typography.sizes.sm,
+    fontWeight: '600',
+  },
+  requiredHint: {
+    fontSize: typography.sizes.xs,
+    color: colors.light.textMuted,
+    fontStyle: 'italic',
+    marginBottom: spacing.xs,
+  },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1053,6 +1158,12 @@ const styles = StyleSheet.create({
   modalScroll: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
+  },
+  modalScrollContent: {
+    paddingBottom: spacing.lg,
+  },
+  modalScrollContentWithKeyboard: {
+    // paddingBottom: 100,
   },
 
   // Active toggle row

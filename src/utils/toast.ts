@@ -49,13 +49,13 @@ const triggerToast = (
 };
 
 export const showSuccess = (message: string, title = 'Success') => {
-  triggerToast('success', message, title, 3000);
+  triggerToast('success', message, title, 2500);
 };
 
 export const showError = (message: string, title = 'Error') => {
-  triggerToast('error', message, title, 4000);
+  triggerToast('error', message, title, 3500);
 };
 
 export const showInfo = (message: string, title = 'Info') => {
-  triggerToast('info', message, title, 3000);
+  triggerToast('info', message, title, 2500);
 };

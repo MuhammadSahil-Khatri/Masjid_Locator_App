@@ -12,3 +12,7 @@ coverage/
 devreadme.md
 
 .env.local
+*.jks
+*.keystore
+*.p8
+*.p12

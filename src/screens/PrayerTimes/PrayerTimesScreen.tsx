@@ -7,6 +7,7 @@ import {
   ImageBackground,
   Platform,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -17,6 +18,7 @@ import { useApp } from '../../context/AppContext';
 import { usePrayerTimes } from '../../hooks/usePrayerTimes';
 import { useUserLocation } from '../../hooks/useUserLocation';
 import { fetchPrayerTimes, PrayerTimesResult } from '../../services/prayerTimesService';
+import { onlineManager } from '@tanstack/react-query';
 import {
   FajrIcon,
   ShuruqIcon,
@@ -76,7 +78,7 @@ const MAX_DAY_OFFSET = 7;
 export const PrayerTimesScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { goBack } = useNavigation();
-  const { language, isRtl } = useApp();
+  const { language, isRtl, triggerToast } = useApp();
   const { location } = useUserLocation();
 
   const {
@@ -85,7 +87,29 @@ export const PrayerTimesScreen: React.FC = () => {
     gregorianDate: todayGregorianDate,
     city,
     upcoming,
+    refetch,
   } = usePrayerTimes(language);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      if (!onlineManager.isOnline()) {
+        triggerToast(
+          isRtl
+            ? 'آپ آف لائن ہیں۔ محفوظ شدہ اوقات دکھائے جا رہے ہیں۔'
+            : 'You are offline. Showing cached prayer times.'
+        );
+        return;
+      }
+      await refetch();
+    } catch (err) {
+      console.warn('[PrayerTimesScreen] Refresh error:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshing, refetch, isRtl, triggerToast]);
 
   // ── Date offset for day navigation (-7 to +7) ──
   const [dayOffset, setDayOffset] = useState(0);
@@ -326,7 +350,14 @@ export const PrayerTimesScreen: React.FC = () => {
             { paddingBottom: Math.max(insets.bottom, 20) + 80 },
           ]}
           showsVerticalScrollIndicator={false}
-          bounces={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[colors.primary]}
+              tintColor={colors.primary}
+            />
+          }
         >
           {PRAYERS_CONFIG.map((prayer) => {
             const rawTime = currentResult?.timings ? (currentResult.timings as any)[prayer.key] : undefined;

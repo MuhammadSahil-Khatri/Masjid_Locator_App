@@ -2,11 +2,21 @@ import { supabase } from "../lib/supabase";
 import { User, Session } from "@supabase/supabase-js";
 import { profileService } from "./profileService";
 import { Profile } from "../types";
+import { onlineManager } from "@tanstack/react-query";
+
+export interface LogoutResult {
+  serverRevoked: boolean;
+  error?: string | null;
+}
 
 export const authService = {
   async login(email: string, password: string) {
+    if (!onlineManager.isOnline()) {
+      throw new Error("Internet connection unavailable. Please check your network and try again.");
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: email.trim().toLowerCase(),
       password,
     });
     if (error) throw error;
@@ -31,30 +41,6 @@ export const authService = {
     });
     if (error) throw error;
 
-    if (data.user) {
-      try {
-        await profileService.createProfile({
-          id: data.user.id,
-          name: metadata.name,
-          email: email,
-          phone: metadata.phone,
-          role: "worshipper",
-          is_blocked: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-      } catch (profileError: any) {
-        // Prevent the app from continuing in a partially created authenticated state
-        await supabase.auth.signOut();
-        console.error(
-          "Failed to create user profile during signUp:",
-          profileError,
-        );
-        throw new Error(
-          `Profile creation failed: ${profileError?.message || "Please try again."}`,
-        );
-      }
-    }
     return data;
   },
 
@@ -96,9 +82,45 @@ export const authService = {
     return data;
   },
 
-  async logout() {
-    const { error } = await supabase.auth.signOut();
+  /**
+   * Safe logout handling distinction between server-side revocation and local cleanup.
+   */
+  async logout(options?: { scope?: "global" | "local" }): Promise<LogoutResult> {
+    const isOnline = onlineManager.isOnline();
+
+    if (isOnline && options?.scope !== "local") {
+      try {
+        const { error } = await supabase.auth.signOut({ scope: "global" });
+        if (error) {
+          await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+          return { serverRevoked: false, error: error.message };
+        }
+        return { serverRevoked: true };
+      } catch (err: any) {
+        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+        return { serverRevoked: false, error: err?.message || "Failed to contact auth server" };
+      }
+    }
+
+    // Offline or explicit local scope: clear local session only
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } catch (err: any) {
+      return { serverRevoked: false, error: err?.message || "Local sign out failed" };
+    }
+    return { serverRevoked: false, error: "Device offline; session cleared locally only" };
+  },
+
+  isSessionExpired(session: Session | null): boolean {
+    if (!session || !session.expires_at) return true;
+    // expires_at is unix timestamp in seconds
+    return session.expires_at * 1000 <= Date.now();
+  },
+
+  async refreshSession(): Promise<Session | null> {
+    const { data, error } = await supabase.auth.refreshSession();
     if (error) throw error;
+    return data.session;
   },
 
   async forgotPassword(email: string) {
@@ -136,3 +158,4 @@ export const authService = {
     return data.user;
   },
 };
+

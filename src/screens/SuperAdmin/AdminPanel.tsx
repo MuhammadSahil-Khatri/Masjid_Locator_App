@@ -64,11 +64,14 @@ export const AdminPanel: React.FC = () => {
   const { navigate } = useNavigation();
   const insets = useSafeAreaInsets();
   const [hasMosque, setHasMosque] = useState<boolean | null>(null);
+  const [adminMosque, setAdminMosque] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     mosqueService.fetchAdminMosque().then((mosque) => {
+      setAdminMosque(mosque ? { id: mosque.id, name: mosque.name } : null);
       setHasMosque(!!mosque);
     }).catch(() => {
+      setAdminMosque(null);
       setHasMosque(false);
     });
   }, []);
@@ -95,11 +98,13 @@ export const AdminPanel: React.FC = () => {
     {
       key: 'ManageAnnouncements',
       title: 'Manage Announcements',
-      subtitle: 'Publish community updates and broadcast alerts',
+      subtitle: adminMosque?.name
+        ? `Publish & manage updates for ${adminMosque.name}`
+        : 'Publish updates for your assigned masjid',
       icon: <Bell size={22} color="#9333EA" />,
       iconBg: 'rgba(147, 51, 234, 0.12)',
       route: 'ManageAnnouncements' as const,
-      visible: true,
+      visible: hasMosque === true,
     },
   ];
 

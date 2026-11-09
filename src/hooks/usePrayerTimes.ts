@@ -169,6 +169,8 @@ export const usePrayerTimes = (
     },
     staleTime: 1000 * 60 * 60 * 12, // 12 hours
     gcTime: 1000 * 60 * 60 * 24 * 7, // 7 days in persistent storage
+    refetchOnMount: true,
+    refetchOnReconnect: true,
   });
 
   // Fallback for offline usage: if today's query has no data (e.g. date changed while offline),

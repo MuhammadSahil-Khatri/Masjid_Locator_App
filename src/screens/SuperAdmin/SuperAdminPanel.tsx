@@ -81,28 +81,12 @@ export const SuperAdminPanel: React.FC = () => {
       route: 'ManageMosques' as const,
     },
     {
-      key: 'ManageWorshipers',
-      title: 'Manage Worshipers',
-      subtitle: 'Audit user accounts, toggle blocks, or remove accounts',
-      icon: <Users size={22} color="#2E75B6" />,
-      iconBg: 'rgba(46, 117, 182, 0.12)',
-      route: 'ManageWorshipers' as const,
-    },
-    {
       key: 'ManageAdmins',
       title: 'Manage Admins',
       subtitle: 'Configure local mosque admins & verify requests',
       icon: <UserCheck size={22} color="#CB9E67" />,
       iconBg: 'rgba(203, 158, 103, 0.15)',
       route: 'ManageAdmins' as const,
-    },
-    {
-      key: 'ManageSuperAdmins',
-      title: 'Manage Super Admins',
-      subtitle: 'Assign root administrators & security roles',
-      icon: <ShieldCheck size={22} color="#DC2626" />,
-      iconBg: 'rgba(220, 38, 38, 0.12)',
-      route: 'ManageSuperAdmins' as const,
     },
     {
       key: 'ManageHadith',

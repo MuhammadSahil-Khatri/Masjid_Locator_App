@@ -18,9 +18,10 @@ export interface Profile {
   id: string;
   name: string;
   phone?: string;
-  role: "worshipper" | "admin" | "super_admin";
+  role: 'admin' | 'super_admin';
   email?: string;
   is_blocked: boolean;
+  mosque_id?: string | null;
   created_at?: string;
   updated_at?: string;
 }

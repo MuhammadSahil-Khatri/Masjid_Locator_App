@@ -2,6 +2,7 @@ import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Text } from '../components/ui/Text';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../hooks/useAuth';
 import { colors } from '../theme';
 import { useNavigation } from './NavigationContext';
 import { useSystemBars, getScreenBgColor } from '../hooks/useSystemBars';
@@ -27,7 +28,7 @@ import { ManageSuperAdminsScreen } from '../screens/SuperAdmin/ManageSuperAdmins
 import { ManageHadithScreen } from '../screens/SuperAdmin/ManageHadithScreen';
 import { ManageAnnouncementsScreen } from '../screens/SuperAdmin/ManageAnnouncementsScreen';
 import { ManageWorshipersScreen } from '../screens/SuperAdmin/ManageWorshipersScreen';
-import { AdminPanel } from '../screens/SuperAdmin/AdminPanel.tsx';
+import { AdminPanel } from '../screens/SuperAdmin/AdminPanel';
 import { AssignedMosqueScreen } from '../screens/SuperAdmin/AssignedMosqueScreen';
 import { LinearGradient } from 'expo-linear-gradient';
 import { HomeIcon, AnnouncementIcon, MapIcon, MasjidIcon, SupplicationIcon, SettingsIcon } from './NavbarIcons';
@@ -40,6 +41,28 @@ export const MainNavigator: React.FC = () => {
   // Synchronize status bar and Android navigation bar with the active screen background
   const activeBgColor = getScreenBgColor(currentScreen, isDark);
   useSystemBars(activeBgColor);
+
+  const { user } = useAuth();
+
+  // Reset protected navigation and return to unauthenticated screen on logout
+  React.useEffect(() => {
+    const PROTECTED_SCREENS = [
+      'SuperAdminPanel',
+      'ManageMosques',
+      'ManageAdmins',
+      'ManageSuperAdmins',
+      'ManageHadith',
+      'ManageAnnouncements',
+      'ManageWorshipers',
+      'AdminPanel',
+      'AssignedMosque',
+      'ChangePassword',
+      'EditProfile',
+    ];
+    if (!user && PROTECTED_SCREENS.includes(currentScreen)) {
+      navigate('Settings');
+    }
+  }, [user, currentScreen, navigate]);
 
   // Hydrate storageService at app start
   React.useEffect(() => {
