@@ -46,7 +46,7 @@ The **Masjid Locator App** is built to make your daily worship effortless, wheth
 - **Know Mosque Facilities in Advance**: Easily check if a mosque has a dedicated women's prayer hall, wheelchair ramps, wudu area, parking, or air conditioning.
 - **Find the Kaaba (Qibla)**: Rotate your phone to find the exact direction of the Kaaba in Makkah with a smooth, calibrated compass.
 - **Daily Inspiration**: Read an authentic Hadith every day with clear Arabic text, English and Urdu translations, and practical life lessons.
-- **Stay Connected with Your Local Mosque**: Receive announcements about Friday sermons, lectures, fundraising, madarsa updates, and funeral (Janaza) notices.
+- **Stay Connected with Your Local Mosque**: Receive announcements about Friday sermons, lectures, fundraising, madarsa update, and funeral (Janaza) notices.
 
 ---
 
@@ -236,7 +236,7 @@ The app is fully bilingual and supports **English** and **اردو (Urdu)**:
   5. 📅 **Daily Programs** (`روزانہ کے پروگرام`): Regular Dars-e-Quran, Hadith circles, and daily study halaqas.
   6. 🎪 **Mega Programs** (`بڑے پروگرام`): Annual conferences, Eid gatherings, and Seerah programs.
   7. 🕊️ **Janaza / Funerals** (`جنازہ`): Funeral prayer timings, deceased information, and cemetery locations.
-  8. 📚 **Madarsa Updates** (`مدرسہ کی تازہ معلومات`): Student admissions, Hifz completions, and examination schedules.
+  8. 📚 **Madarsa Update** (`مدرسہ کی تازہ معلومات`): Student admissions, Hifz completions, and examination schedules.
 - **How to use it**: Tap any category card to view all current notices belonging to that topic.
 
 ---
@@ -334,7 +334,7 @@ The app is fully bilingual and supports **English** and **اردو (Urdu)**:
 | **Daily Programs** | روزانہ کے پروگرام | 📅 Open Book | Daily Dars-e-Quran circles, post-Fajr Hadith readings, and regular evening halaqas. |
 | **Mega Programs** | بڑے پروگرام | 🎪 Grand Stage | Annual Islamic conferences, Eid gatherings, Seerah symposiums, and community banquets. |
 | **Janaza / Funerals** | جنازہ | 🕊️ Janaza Bier | Timely funeral prayer alerts, deceased names, Janaza prayer times, and graveyard details. |
-| **Madarsa Updates** | مدرسہ کی تازہ معلومات | 📚 Quran Tablet | New student admissions, Hifz graduation celebrations, exam schedules, and holiday dates. |
+| **Madarsa Update** | مدرسہ کی تازہ معلومات | 📚 Quran Tablet | New student admissions, Hifz graduation celebrations, exam schedules, and holiday dates. |
 
 ---
 

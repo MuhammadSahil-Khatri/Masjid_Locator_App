@@ -21,6 +21,7 @@ import { usePublicAnnouncementsQuery } from '../../queries/useAnnouncementsQueri
 import { onlineManager } from '@tanstack/react-query';
 import { EmptyState } from '../../components/common/EmptyState';
 import { LoadingState } from '../../components/common/LoadingState';
+import { useNotifications } from '../../context/NotificationContext';
 
 // ── Back Arrow SVG matching SettingsScreen ──────────────────────────────────
 const BackArrowIcon = ({ color = '#1D3B6D', size = 14 }: { color?: string; size?: number }) => (
@@ -36,8 +37,15 @@ interface AnnouncementCardProps {
 }
 
 const AnnouncementItemCard: React.FC<AnnouncementCardProps> = ({ item, isRtl }) => {
+  const { markRecordAsRead } = useNotifications();
   const [showEnglish, setShowEnglish] = useState(!isRtl);
   const [isExpanded, setIsExpanded] = useState(false);
+
+  useEffect(() => {
+    if (item.id) {
+      markRecordAsRead('announcement', item.id);
+    }
+  }, [item.id, markRecordAsRead]);
 
   useEffect(() => {
     setShowEnglish(!isRtl);

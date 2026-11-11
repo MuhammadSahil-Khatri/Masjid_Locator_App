@@ -7,7 +7,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { Profile } from '../types';
 import { queryClient } from '../lib/queryClient';
 import { onlineManager } from '@tanstack/react-query';
-import { ANNOUNCEMENTS_QUERY_KEYS } from '../queries/useAnnouncementsQueries';
+import { ANNOUNCEMENTS_QUERY_KEYS } from '../queries/queryKeys';
 
 const CACHED_PROFILE_KEY = 'user_cached_profile_v1';
 const getUserProfileKey = (userId: string) => `user_cached_profile_${userId}`;

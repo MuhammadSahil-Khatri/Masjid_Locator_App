@@ -6,7 +6,7 @@ export const HADITH_QUERY_KEYS = {
 };
 
 /**
- * Hook to load public Ahadees with offline persistence.
+ * Hook to load public Hadith with offline persistence.
  */
 export function usePublicHadithQuery() {
   return useQuery<Hadith[]>({

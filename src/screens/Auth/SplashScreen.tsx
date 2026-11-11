@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '../../navigation/NavigationContext';
 
 export const SplashScreen = () => {
-  const { navigate } = useNavigation();
+  const { currentScreen, navigate } = useNavigation();
   const navigatedRef = React.useRef(false);
   const insets = useSafeAreaInsets();
 
@@ -12,8 +12,10 @@ export const SplashScreen = () => {
     if (navigatedRef.current) return;
     navigatedRef.current = true;
 
-    navigate('Home');
-  }, [navigate]);
+    if (currentScreen === 'Splash') {
+      navigate('Home');
+    }
+  }, [navigate, currentScreen]);
 
   // Branding display timer for custom splash screen
   useEffect(() => {
@@ -70,10 +72,10 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   logoImage: {
-    width: 200,
-    height: 200,
+    width: 250,
+    height: 250,
     maxWidth: '100%',
-    maxHeight: 200,
+    maxHeight: 250,
   },
   textContainer: {
     marginTop: 16,

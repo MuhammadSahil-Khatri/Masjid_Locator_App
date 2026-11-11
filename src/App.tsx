@@ -16,6 +16,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from './context/AppContext';
 import { NavigationProvider, useNavigation } from './navigation/NavigationContext';
 import { AuthProvider } from './context/AuthContext';
+import { NotificationProvider } from './context/NotificationContext';
 import RootNavigator from './navigation/RootNavigator';
 import { CustomToast } from './components/common/CustomToast';
 import Toast from 'react-native-toast-message';
@@ -93,8 +94,10 @@ export default function App() {
           <AppProvider>
             <GestureHandlerRootView style={{ flex: 1 }}>
               <NavigationProvider>
-                <AppMain />
-                <AppToastConsumer />
+                <NotificationProvider>
+                  <AppMain />
+                  <AppToastConsumer />
+                </NotificationProvider>
               </NavigationProvider>
             </GestureHandlerRootView>
           </AppProvider>

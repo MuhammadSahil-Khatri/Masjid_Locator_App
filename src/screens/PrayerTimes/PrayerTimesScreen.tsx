@@ -295,7 +295,7 @@ export const PrayerTimesScreen: React.FC = () => {
           </TouchableOpacity>
 
           <Text style={styles.pillTitle}>
-            {isRtl ? 'نماز کے اوقات' : 'Prayer Times'}
+            {isRtl ? 'نماز کے اوقات' : 'Pray Time'}
           </Text>
 
           {/* Balance layout */}

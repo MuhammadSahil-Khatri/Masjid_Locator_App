@@ -31,6 +31,7 @@ import {
   ActionQiblaIcon,
 } from '../../components/icons/HomeActionIcons';
 import { AnnouncementCard } from '../../components/cards/AnnouncementCard';
+import { NotificationBell } from '../../components/notifications/NotificationBell';
 import {
   ANNOUNCEMENT_CATEGORIES,
   type AnnouncementCategory,
@@ -223,256 +224,264 @@ export const HomeScreen: React.FC = () => {
     <View style={styles.screenWrapper}>
       <ScrollView
         style={styles.container}
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingBottom: Math.max(insets.bottom, 20) + 80 },
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom, 20) + 80 },
+        ]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
+      >
+        {/* ── TOP DAY CARD SECTION ── */}
+        <ImageBackground
+          source={require('../../../assets/prayer_time_daycard_bg.png')}
+          style={[styles.headerCard, { paddingTop: 20, paddingBottom: 30 }]}
+          imageStyle={[
+            styles.headerCardImage,
+            isRtl && { transform: [{ scaleX: -1 }] },
           ]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={[colors.primary]}
-              tintColor={colors.primary}
-            />
-          }
+          resizeMode="stretch"
         >
-          {/* ── TOP DAY CARD SECTION ── */}
-          <ImageBackground
-            source={require('../../../assets/prayer_time_daycard_bg.png')}
-            style={[styles.headerCard, { paddingTop: 20, paddingBottom: 30 }]}
-            imageStyle={[
-              styles.headerCardImage,
-              isRtl && { transform: [{ scaleX: -1 }] },
-            ]}
-            resizeMode="stretch"
-          >
-            {/* Top Controls Row — flipped in RTL */}
-            <View style={[styles.topControlsRow, isRtl && { flexDirection: 'row-reverse' }]}>
+          {/* Top Controls Row — flipped in RTL */}
+          <View style={[styles.topControlsRow, isRtl && { flexDirection: 'row-reverse' }]}>
 
-              {/* Text Block (left in EN, right in UR) */}
-              <View style={[styles.topLeftTextBlock, isRtl && { alignItems: 'flex-end', paddingLeft: 0, paddingRight: 12 }]}>
-                <Text style={[styles.greetingText, { fontSize: 13, marginBottom: 5 }, isRtl && { textAlign: 'right' }]}>
-                  {isRtl ? 'السلام علیکم' : 'Assalam-o-Alaikum'}
-                </Text>
-                <Text style={[styles.hijriDateText, { fontSize: 15 }, isRtl && { textAlign: 'right' }]}>{formattedHijri}</Text>
-                <Text style={[styles.gregorianDateText, { fontSize: 15 }, isRtl && { textAlign: 'right' }]}>{formattedGregorian}</Text>
-                <Text style={[styles.liveClockText, { fontSize: 28 }, isRtl && { textAlign: 'right' }]}>{currentTime}</Text>
-                <Text style={[styles.countdownText, { fontSize: 15 }, isRtl && { textAlign: 'right' }]}>{countdownText}</Text>
-              </View>
-
-              {/* Action Controls (right in EN, left in UR) */}
-              <View style={[styles.topRightControls, isRtl && { paddingRight: 0, paddingLeft: 15 }]}>
-                {/* Qibla Direction Button */}
-                <TouchableOpacity
-                  onPress={() => navigate('Qibla')}
-                  activeOpacity={0.8}
-                  style={styles.qiblaRoundButton}
-                >
-                  <Image
-                    source={require('../../../assets/qibla_direction_icon.png')}
-                    style={styles.qiblaIconImage}
-                    resizeMode="contain"
-                  />
-                </TouchableOpacity>
-
-                {/* Language Switcher Pill */}
-                <View style={styles.langPillContainer}>
-                  <TouchableOpacity
-                    style={[
-                      styles.langTab,
-                      language === 'en' ? styles.langTabActive : styles.langTabInactive,
-                    ]}
-                    onPress={() => setLanguage('en')}
-                    activeOpacity={0.8}
-                  >
-                    <Text
-                      style={[
-                        styles.langTabText,
-                        language === 'en' ? styles.langTabTextActive : styles.langTabTextInactive,
-                      ]}
-                    >
-                      EN
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.langTab,
-                      language === 'ur' ? styles.langTabActive : styles.langTabInactive,
-                    ]}
-                    onPress={() => setLanguage('ur')}
-                    activeOpacity={0.8}
-                  >
-                    <Text
-                      style={[
-                        styles.langTabText,
-                        language === 'ur' ? styles.langTabTextActive : styles.langTabTextInactive,
-                      ]}
-                    >
-                      UR
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+            {/* Text Block (left in EN, right in UR) */}
+            <View style={[styles.topLeftTextBlock, isRtl && { alignItems: 'flex-end', paddingLeft: 0, paddingRight: 12 }]}>
+              <Text style={[styles.greetingText, { fontSize: 13, marginBottom: 5 }, isRtl && { textAlign: 'right' }]}>
+                {isRtl ? 'السلام علیکم' : 'Assalam-o-Alaikum'}
+              </Text>
+              <Text style={[styles.hijriDateText, { fontSize: 15 }, isRtl && { textAlign: 'right' }]}>{formattedHijri}</Text>
+              <Text style={[styles.gregorianDateText, { fontSize: 15 }, isRtl && { textAlign: 'right' }]}>{formattedGregorian}</Text>
+              <Text style={[styles.liveClockText, { fontSize: 28 }, isRtl && { textAlign: 'right' }]}>{currentTime}</Text>
+              <Text style={[styles.countdownText, { fontSize: 15 }, isRtl && { textAlign: 'right' }]}>{countdownText}</Text>
             </View>
 
-            {/* Prayer Times Row Card — reversed in RTL */}
-            <TouchableOpacity
-              style={[styles.prayerTimesPanel, isRtl && { flexDirection: 'row-reverse' }]}
-              activeOpacity={1}
-              onPress={() => navigate('PrayerTimes')}
-              accessibilityLabel="View full Prayer Times"
-            >
-              {PRAYER_LIST.map((prayer, index) => {
-                const isActive =
-                  prayer.key === activePrayerName ||
-                  (prayer.key === 'Fajr' && !upcoming);
-                const prayerTimeVal = timings ? timings[prayer.key] : undefined;
-                const formattedTime = formatPrayerTime(prayerTimeVal);
-                const displayLabel = isRtl ? prayer.labelUr : prayer.label;
-
-                return (
-                  <View
-                    key={prayer.key}
-                    style={[
-                      styles.prayerColumn,
-                      isActive && styles.activePrayerCard,
-                      // !isActive && index < PRAYER_LIST.length - 1 && styles.prayerDivider,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.prayerNameText,
-                        isActive && styles.activePrayerNameText,
-                        { fontSize: Math.round(12 * fontScale) },
-                        // isRtl && { fontFamily: undefined },
-                      ]}
-                    >
-                      {displayLabel}
-                    </Text>
-
-                    <View style={styles.prayerIconWrapper}>
-                      <prayer.Icon size={26} color="#1B365D" />
-                    </View>
-
-                    <Text
-                      style={[
-                        styles.prayerTimeText,
-                        isActive && styles.activePrayerTimeText,
-                        { fontSize: Math.round(11 * fontScale) },
-                      ]}
-                    >
-                      {formattedTime}
-                    </Text>
-                  </View>
-                );
-              })}
-            </TouchableOpacity>
-          </ImageBackground>
-
-          {/* ── QUICK ACTION BUTTONS ROW ── */}
-          <View style={styles.actionRowContainer}>
-            {/* Pray Time */}
-            <View style={styles.actionItemWrapper}>
-              <TouchableOpacity
-                style={[styles.actionTile, { width: actionTileWidth, height: actionTileWidth }]}
-                activeOpacity={0.8}
-                onPress={() => navigate('PrayerTimes')}
-              >
-                <ActionPrayerTimeIcon size={35} color="#153258" />
-              </TouchableOpacity>
-              <Text style={styles.actionTileLabel}>{isRtl ? 'نماز اوقات' : 'Pray Time'}</Text>
-            </View>
-
-            {/* Hadith */}
-            <View style={styles.actionItemWrapper}>
-              <TouchableOpacity
-                style={[styles.actionTile, { width: actionTileWidth, height: actionTileWidth }]}
-                activeOpacity={0.8}
-                onPress={() => navigate('Hadees')}
-              >
-                <ActionHadithIcon size={35} color="#153258" />
-              </TouchableOpacity>
-              <Text style={styles.actionTileLabel}>{isRtl ? 'احادیث' : 'Hadith'}</Text>
-            </View>
-
-            {/* Qibla */}
-            <View style={styles.actionItemWrapper}>
-              <TouchableOpacity
-                style={[styles.actionTile, { width: actionTileWidth, height: actionTileWidth }]}
-                activeOpacity={0.8}
-                onPress={() => navigate('Qibla')}
-              >
-                <ActionQiblaIcon size={35} color="#153258" />
-              </TouchableOpacity>
-              <Text style={styles.actionTileLabel}>{isRtl ? 'قبلہ' : 'Qibla'}</Text>
-            </View>
-
-            {/* Madarsa */}
-            <View style={styles.actionItemWrapper}>
-              <TouchableOpacity
-                style={[styles.actionTile, { width: actionTileWidth, height: actionTileWidth }]}
-                activeOpacity={0.8}
-                onPress={() => {
-                  const madarsaCategory = categories.find(
-                    (c) => c.id === 'ee65eb1f-037e-464c-a196-4e7bdc008e76' ||
-                      c.name_en?.toLowerCase().includes('madarsa')
-                  );
-                  if (madarsaCategory) {
-                    navigate('CategoryAnnouncements', {
-                      categoryId: madarsaCategory.id,
-                      categoryName: madarsaCategory.name_en,
-                      categoryNameEn: madarsaCategory.name_en,
-                      categoryNameUr: madarsaCategory.name_ur,
-                    });
-                  } else {
-                    navigate('Announcements');
-                  }
+            {/* Action Controls (right in EN, left in UR) */}
+            <View style={[styles.topRightControls, isRtl && { paddingRight: 0, paddingLeft: 15 }]}>
+              {/* Notification Bell with animated unread indicator */}
+              <NotificationBell
+                style={{
+                  marginRight: isRtl ? 0 : 8,
+                  marginLeft: isRtl ? 8 : 0,
                 }}
+              />
+
+              {/* Qibla Direction Button */}
+              <TouchableOpacity
+                onPress={() => navigate('Qibla')}
+                activeOpacity={0.8}
+                style={styles.qiblaRoundButton}
               >
                 <Image
-                  source={require('../../../assets/madarsa.webp')}
-                  style={{ width: actionTileWidth * 0.75, height: actionTileWidth * 0.75 }}
+                  source={require('../../../assets/qibla_direction_icon.png')}
+                  style={styles.qiblaIconImage}
                   resizeMode="contain"
                 />
               </TouchableOpacity>
-              <Text style={styles.actionTileLabel}>{isRtl ? 'مدرسہ' : 'Madarsa'}</Text>
+
+              {/* Language Switcher Pill */}
+              <View style={styles.langPillContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.langTab,
+                    language === 'en' ? styles.langTabActive : styles.langTabInactive,
+                  ]}
+                  onPress={() => setLanguage('en')}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.langTabText,
+                      language === 'en' ? styles.langTabTextActive : styles.langTabTextInactive,
+                    ]}
+                  >
+                    EN
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.langTab,
+                    language === 'ur' ? styles.langTabActive : styles.langTabInactive,
+                  ]}
+                  onPress={() => setLanguage('ur')}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.langTabText,
+                      language === 'ur' ? styles.langTabTextActive : styles.langTabTextInactive,
+                    ]}
+                  >
+                    UR
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
 
-          {/* ── ANNOUNCEMENT SECTION ── */}
-          <View style={styles.announcementSection}>
-            {/* Header with Title and "See All" */}
-            <View style={[styles.announcementHeader, isRtl && { flexDirection: 'row-reverse' }]}>
-              <Text style={[styles.announcementSectionTitle, isRtl && { marginLeft: 0, marginRight: 10, textAlign: 'right' }]}>
-                {isRtl ? 'اعلانات' : 'Announcement'}
+          {/* Prayer Times Row Card — reversed in RTL */}
+          <TouchableOpacity
+            style={[styles.prayerTimesPanel, isRtl && { flexDirection: 'row-reverse' }]}
+            activeOpacity={1}
+            onPress={() => navigate('PrayerTimes')}
+            accessibilityLabel="View full Prayer Times"
+          >
+            {PRAYER_LIST.map((prayer, index) => {
+              const isActive =
+                prayer.key === activePrayerName ||
+                (prayer.key === 'Fajr' && !upcoming);
+              const prayerTimeVal = timings ? timings[prayer.key] : undefined;
+              const formattedTime = formatPrayerTime(prayerTimeVal);
+              const displayLabel = isRtl ? prayer.labelUr : prayer.label;
+
+              return (
+                <View
+                  key={prayer.key}
+                  style={[
+                    styles.prayerColumn,
+                    isActive && styles.activePrayerCard,
+                    // !isActive && index < PRAYER_LIST.length - 1 && styles.prayerDivider,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.prayerNameText,
+                      isActive && styles.activePrayerNameText,
+                      { fontSize: Math.round(12 * fontScale) },
+                      // isRtl && { fontFamily: undefined },
+                    ]}
+                  >
+                    {displayLabel}
+                  </Text>
+
+                  <View style={styles.prayerIconWrapper}>
+                    <prayer.Icon size={26} color="#1B365D" />
+                  </View>
+
+                  <Text
+                    style={[
+                      styles.prayerTimeText,
+                      isActive && styles.activePrayerTimeText,
+                      { fontSize: Math.round(11 * fontScale) },
+                    ]}
+                  >
+                    {formattedTime}
+                  </Text>
+                </View>
+              );
+            })}
+          </TouchableOpacity>
+        </ImageBackground>
+
+        {/* ── QUICK ACTION BUTTONS ROW ── */}
+        <View style={styles.actionRowContainer}>
+          {/* Pray Time */}
+          <View style={styles.actionItemWrapper}>
+            <TouchableOpacity
+              style={[styles.actionTile, { width: actionTileWidth, height: actionTileWidth }]}
+              activeOpacity={0.8}
+              onPress={() => navigate('PrayerTimes')}
+            >
+              <ActionPrayerTimeIcon size={35} color="#153258" />
+            </TouchableOpacity>
+            <Text style={styles.actionTileLabel}>{isRtl ? 'اوقاتِ نماز' : 'Pray Time\nDetail'}</Text>
+          </View>
+
+          {/* Hadith */}
+          <View style={styles.actionItemWrapper}>
+            <TouchableOpacity
+              style={[styles.actionTile, { width: actionTileWidth, height: actionTileWidth }]}
+              activeOpacity={0.8}
+              onPress={() => navigate('Hadees')}
+            >
+              <ActionHadithIcon size={35} color="#153258" />
+            </TouchableOpacity>
+            <Text style={styles.actionTileLabel}>{isRtl ? 'روزانہ حدیث' : 'Daily\nHadith'}</Text>
+          </View>
+
+          {/* Qibla */}
+          <View style={styles.actionItemWrapper}>
+            <TouchableOpacity
+              style={[styles.actionTile, { width: actionTileWidth, height: actionTileWidth }]}
+              activeOpacity={0.8}
+              onPress={() => navigate('Qibla')}
+            >
+              <ActionQiblaIcon size={35} color="#153258" />
+            </TouchableOpacity>
+            <Text style={styles.actionTileLabel}>{isRtl ? 'قبلہ' : 'Qibla\nDirection'}</Text>
+          </View>
+
+          {/* Madarsa */}
+          <View style={styles.actionItemWrapper}>
+            <TouchableOpacity
+              style={[styles.actionTile, { width: actionTileWidth, height: actionTileWidth }]}
+              activeOpacity={0.8}
+              onPress={() => {
+                const madarsaCategory = categories.find(
+                  (c) => c.id === 'ee65eb1f-037e-464c-a196-4e7bdc008e76' ||
+                    c.name_en?.toLowerCase().includes('madarsa')
+                );
+                if (madarsaCategory) {
+                  navigate('CategoryAnnouncements', {
+                    categoryId: madarsaCategory.id,
+                    categoryName: madarsaCategory.name_en,
+                    categoryNameEn: madarsaCategory.name_en,
+                    categoryNameUr: madarsaCategory.name_ur,
+                  });
+                } else {
+                  navigate('Announcements');
+                }
+              }}
+            >
+              <Image
+                source={require('../../../assets/madarsa.webp')}
+                style={{ width: actionTileWidth * 0.75, height: actionTileWidth * 0.75 }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+            <Text style={styles.actionTileLabel}>{isRtl ? 'مدرسہ' : 'Madarsa\nUpdate'}</Text>
+          </View>
+        </View>
+
+        {/* ── ANNOUNCEMENT SECTION ── */}
+        <View style={styles.announcementSection}>
+          {/* Header with Title and "See All" */}
+          <View style={[styles.announcementHeader, isRtl && { flexDirection: 'row-reverse' }]}>
+            <Text style={[styles.announcementSectionTitle, isRtl && { marginLeft: 0, marginRight: 10, textAlign: 'right' }]}>
+              {isRtl ? 'اعلانات' : 'Announcement'}
+            </Text>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => navigate('Announcements')}
+            >
+              <Text style={[styles.seeAllText, isRtl && { marginRight: 0, marginLeft: 10, lineHeight: 35 }]}>
+                {isRtl ? 'مزید دیکھیں' : 'See All'}
               </Text>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => navigate('Announcements')}
-              >
-                <Text style={[styles.seeAllText, isRtl && { marginRight: 0, marginLeft: 10, lineHeight: 35 }]}>
-                  {isRtl ? 'مزید دیکھیں' : 'See All'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* List of Announcement Cards */}
-            <View style={styles.announcementList}>
-              {homeCategories.map((item) => (
-                <AnnouncementCard
-                  key={item.id}
-                  id={item.id}
-                  title={isRtl ? (item.name_ur || item.name_en || '') : (item.name_en || '')}
-                  onPress={() => handleCategoryPress(item)}
-                  isRtl={isRtl}
-                />
-              ))}
-            </View>
+            </TouchableOpacity>
           </View>
-        </ScrollView>
-      </View>
+
+          {/* List of Announcement Cards */}
+          <View style={styles.announcementList}>
+            {homeCategories.map((item) => (
+              <AnnouncementCard
+                key={item.id}
+                id={item.id}
+                title={isRtl ? (item.name_ur || item.name_en || '') : (item.name_en || '')}
+                onPress={() => handleCategoryPress(item)}
+                isRtl={isRtl}
+              />
+            ))}
+          </View>
+        </View>
+      </ScrollView>
+    </View>
   );
 };
 

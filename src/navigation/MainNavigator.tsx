@@ -19,6 +19,9 @@ import { QiblaScreen } from '../screens/Qibla/QiblaScreen';
 import { storageService } from '../services/storageService';
 import { HadeesScreen } from '../screens/Hadees/HadeesScreen';
 import { DuaScreen } from '../screens/Duas/DuaScreen';
+import { NotificationsScreen } from '../screens/Notifications/NotificationsScreen';
+import { AnnouncementDetailScreen } from '../screens/Notifications/AnnouncementDetailScreen';
+import { HadithDetailScreen } from '../screens/Notifications/HadithDetailScreen';
 
 // Super Admin Imports
 import { SuperAdminPanel } from '../screens/SuperAdmin/SuperAdminPanel';
@@ -117,6 +120,12 @@ export const MainNavigator: React.FC = () => {
         return <ChangePasswordScreen />;
       case 'EditProfile':
         return <EditProfileScreen />;
+      case 'Notifications':
+        return <NotificationsScreen />;
+      case 'AnnouncementDetail':
+        return <AnnouncementDetailScreen />;
+      case 'HadithDetail':
+        return <HadithDetailScreen />;
       default:
         return <HomeScreen />;
     }
@@ -137,7 +146,7 @@ export const MainNavigator: React.FC = () => {
     },
     {
       key: 'Masjids' as const,
-      label: isRtl ? 'مساجد' : 'Masjid',
+      label: isRtl ? 'نزدیکی مساجد' : 'Nearby\nMasjids',
       Icon: MasjidIcon,
       iconSize: 20,
     },

@@ -68,7 +68,7 @@ export const ANNOUNCEMENT_CATEGORIES: AnnouncementCategory[] = [
   },
   {
     id: 'ee65eb1f-037e-464c-a196-4e7bdc008e76',
-    name_en: 'Madarsa Updates',
+    name_en: 'Madarsa Update',
     name_ur: 'مدرسہ کی تازہ معلومات',
   },
 ];

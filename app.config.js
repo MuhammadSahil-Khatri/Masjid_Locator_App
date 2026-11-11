@@ -1,5 +1,3 @@
-
-
 export default {
   expo: {
     name: "Jamiyat Ahl-e-Hadith Hyd",
@@ -37,8 +35,8 @@ export default {
       },
 
       adaptiveIcon: {
-        foregroundImage: "./assets/logo.png",
-        backgroundColor: "#020617",
+        foregroundImage: "./assets/app_icon.png",
+        backgroundColor: "#ffffffff",
       },
 
       jsEngine: "hermes",
@@ -53,6 +51,21 @@ export default {
       "expo-font",
       "@react-native-community/datetimepicker",
       "./plugins/withWorkManagerFix",
+      [
+        "expo-splash-screen",
+        {
+          image: "./assets/logo.png",
+          imageWidth: 250,
+          resizeMode: "contain",
+          backgroundColor: "#ffffffff",
+        },
+      ],
+      [
+        "expo-notifications",
+        {
+          color: "#1D3B6D",
+        },
+      ],
     ],
 
     extra: {

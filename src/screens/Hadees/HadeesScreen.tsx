@@ -19,8 +19,9 @@ import { useApp } from '../../context/AppContext';
 import { hadithService, Hadith } from '../../services/hadithService';
 import { usePublicHadithQuery } from '../../queries/useHadithQueries';
 import { typography } from '../../theme/typography';
-import { LoadingState } from '../../components/common/LoadingState';
 import { EmptyState } from '../../components/common/EmptyState';
+import { LoadingState } from '../../components/common/LoadingState';
+import { useNotifications } from '../../context/NotificationContext';
 import { onlineManager } from '@tanstack/react-query';
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -84,7 +85,14 @@ interface HadithCardProps {
 }
 
 const HadithCard = ({ hadith, isRtl }: HadithCardProps) => {
+  const { markRecordAsRead } = useNotifications();
   const [showEnglish, setShowEnglish] = useState(!isRtl);
+
+  useEffect(() => {
+    if (hadith.id) {
+      markRecordAsRead('hadith', hadith.id);
+    }
+  }, [hadith.id, markRecordAsRead]);
 
   useEffect(() => {
     setShowEnglish(!isRtl);
@@ -165,7 +173,7 @@ export const HadeesScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
 
   const loading = isLoading && hadiths.length === 0;
-  const error = queryError && hadiths.length === 0 ? ((queryError as Error).message || 'Failed to load Ahadees') : null;
+  const error = queryError && hadiths.length === 0 ? ((queryError as Error).message || 'Failed to load Hidths') : null;
 
   const onRefresh = useCallback(async () => {
     if (refreshing) return;
@@ -175,7 +183,7 @@ export const HadeesScreen: React.FC = () => {
         triggerToast(
           isRtl
             ? 'آپ آف لائن ہیں۔ محفوظ شدہ احادیث دکھائی جا رہی ہیں۔'
-            : 'You are offline. Showing cached Ahadees.'
+            : 'You are offline. Showing cached Hadiths.'
         );
         return;
       }
@@ -207,7 +215,7 @@ export const HadeesScreen: React.FC = () => {
             <BackArrowIcon size={14} color="#1D3B6D" />
           </TouchableOpacity>
 
-          <Text style={styles.pillTitle}>{isRtl ? 'احادیث' : 'Ahadees'}</Text>
+          <Text style={styles.pillTitle}>{isRtl ? 'روزانہ حدیث' : 'Daily Hadith'}</Text>
 
           <View style={styles.pillActionPlaceholder} />
         </View>
@@ -217,7 +225,7 @@ export const HadeesScreen: React.FC = () => {
       <View style={styles.mainContainer}>
         {loading ? (
           <View style={styles.centeredState}>
-            <LoadingState message={isRtl ? 'احادیث لوڈ ہو رہی ہیں...' : 'Loading Ahadees...'} />
+            <LoadingState message={isRtl ? 'احادیث لوڈ ہو رہی ہیں...' : 'Loading Hadiths...'} />
           </View>
         ) : error ? (
           <View style={styles.centeredState}>
@@ -228,18 +236,18 @@ export const HadeesScreen: React.FC = () => {
                 description={
                   isRtl
                     ? 'آپ آف لائن ہیں اور کوئی محفوظ شدہ حدیث دستیاب نہیں ہے۔'
-                    : 'You are offline and no cached Ahadees are available yet.'
+                    : 'You are offline and no cached Hadiths are available yet.'
                 }
                 onRetry={onRefresh}
                 retryLabel={isRtl ? 'دوبارہ کوشش کریں' : 'Retry'}
               />
             ) : (
               <EmptyState
-                title={isRtl ? 'نیٹ ورک کی خرابی' : 'Unable to Load Ahadees'}
+                title={isRtl ? 'نیٹ ورک کی خرابی' : 'Unable to Load Hadiths'}
                 description={
                   isRtl
                     ? 'احادیث لوڈ کرنے میں دشواری پیش آئی۔ براہ کرم دوبارہ کوشش کریں۔'
-                    : 'We encountered an issue loading Ahadees. Please check your connection and retry.'
+                    : 'We encountered an issue loading Hadiths. Please check your connection and retry.'
                 }
                 onRetry={onRefresh}
                 retryLabel={isRtl ? 'دوبارہ کوشش کریں' : 'Retry'}
@@ -250,8 +258,8 @@ export const HadeesScreen: React.FC = () => {
           <View style={styles.centeredState}>
             <EmptyState
               icon={<Text style={{ fontSize: 36 }}>📖</Text>}
-              title={isRtl ? 'کوئی حدیث دستیاب نہیں' : 'No Ahadees Available'}
-              description={isRtl ? 'فی الحال کوئی حدیث موجود نہیں ہے۔' : 'No Ahadees are currently available.'}
+              title={isRtl ? 'کوئی حدیث دستیاب نہیں' : 'No Hadiths Available'}
+              description={isRtl ? 'فی الحال کوئی حدیث موجود نہیں ہے۔' : 'No Hadiths are currently available.'}
               onRetry={onRefresh}
               retryLabel={isRtl ? 'دوبارہ لوڈ کریں' : 'Refresh'}
             />

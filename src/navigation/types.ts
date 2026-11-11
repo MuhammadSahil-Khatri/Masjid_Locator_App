@@ -41,7 +41,10 @@ export type AppScreen =
   | 'AdminPanel'
   | 'AssignedMosque'
   | 'ChangePassword'
-  | 'EditProfile';
+  | 'EditProfile'
+  | 'Notifications'
+  | 'AnnouncementDetail'
+  | 'HadithDetail';
 
 export interface NavigationProps {
   currentScreen: AppScreen;

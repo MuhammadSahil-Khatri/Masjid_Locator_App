@@ -1,13 +1,10 @@
 import { useQuery, onlineManager } from '@tanstack/react-query';
 import { announcementService, Announcement, AnnouncementCategory } from '../services/announcementService';
 import { storageService } from '../services/storageService';
-import { useApp } from '../context/AppContext';
 import { queryClient } from '../lib/queryClient';
+import { ANNOUNCEMENTS_QUERY_KEYS } from './queryKeys';
 
-export const ANNOUNCEMENTS_QUERY_KEYS = {
-  allPublic: ['announcements', 'public'] as const,
-  categories: ['announcements', 'categories'] as const,
-};
+export { ANNOUNCEMENTS_QUERY_KEYS };
 
 /**
  * Hook to load public announcements with offline persistence.
@@ -47,12 +44,11 @@ export function usePublicAnnouncementsQuery() {
  * Hook to load announcement categories.
  * Only runs when the user is authenticated — the table rejects anonymous reads.
  */
-export function useAnnouncementCategoriesQuery() {
-  const { currentUser } = useApp();
+export function useAnnouncementCategoriesQuery(options?: { enabled?: boolean }) {
   return useQuery<AnnouncementCategory[]>({
     queryKey: ANNOUNCEMENTS_QUERY_KEYS.categories,
     queryFn: () => announcementService.fetchCategories(),
-    enabled: !!currentUser,
+    enabled: options?.enabled ?? true,
     staleTime: 1000 * 60 * 60,        // 1 hour
     gcTime: 1000 * 60 * 60 * 24 * 7, // 7 days in persistent storage
     refetchOnMount: true,
