@@ -4,7 +4,7 @@ export default {
     slug: "masjid-locator-app",
     version: "1.0.0",
     orientation: "portrait",
-    icon: "./assets/logo.png",
+    icon: "./assets/app_icon.png",
     userInterfaceStyle: "light",
 
     androidStatusBar: {
@@ -25,9 +25,7 @@ export default {
       package: "com.khubaibkhatri.jah",
       softwareKeyboardLayoutMode: "resize",
       googleServicesFile: "./google-services.json",
-      // POST_NOTIFICATIONS is required on Android 13+ (API 33+) for push notification
-      // permission dialog to appear. expo-notifications plugin adds this automatically,
-      // but listing it explicitly here prevents it being accidentally blocked.
+
       permissions: [
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.RECEIVE_BOOT_COMPLETED",
@@ -53,7 +51,7 @@ export default {
     },
 
     web: {
-      favicon: "./assets/logo.png",
+      favicon: "./assets/app_icon.png",
     },
 
     plugins: [
@@ -64,8 +62,8 @@ export default {
       [
         "expo-splash-screen",
         {
-          image: "./assets/logo.png",
-          imageWidth: 250,
+          image: "./assets/app_icon.png",
+          imageWidth: 200,
           resizeMode: "contain",
           backgroundColor: "#ffffffff",
         },
@@ -73,7 +71,7 @@ export default {
       [
         "expo-notifications",
         {
-          icon: "./assets/logo.png",
+          icon: "./assets/app_icon.png",
           color: "#1D3B6D",
           defaultChannel: "default",
         },

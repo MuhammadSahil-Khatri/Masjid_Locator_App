@@ -17,6 +17,7 @@ import { typography } from '../../theme/typography';
 import { useNavigation } from '../../navigation/NavigationContext';
 import { useApp } from '../../context/AppContext';
 import { useNotifications } from '../../context/NotificationContext';
+import { isExpoGo } from '../../services/pushNotificationService';
 import { AppNotification } from '../../types/notifications';
 import { EmptyState } from '../../components/common/EmptyState';
 
@@ -81,6 +82,10 @@ export const NotificationsScreen: React.FC = () => {
   const [permissionGranted, setPermissionGranted] = useState<boolean | null>(null);
 
   const checkPermission = React.useCallback(async () => {
+    if (isExpoGo()) {
+      setPermissionGranted(true);
+      return;
+    }
     try {
       const perm = await getNotificationPermissionStatus();
       setPermissionGranted(perm.granted);
@@ -104,6 +109,7 @@ export const NotificationsScreen: React.FC = () => {
   }, [checkPermission]);
 
   const handleBannerPress = async () => {
+    if (isExpoGo()) return;
     const current = await getNotificationPermissionStatus();
     if (current.canAskAgain) {
       const res = await requestNotificationPermissions();

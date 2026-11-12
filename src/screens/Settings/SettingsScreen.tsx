@@ -25,6 +25,7 @@ import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigation } from '../../navigation/NavigationContext';
 import { useNotifications } from '../../context/NotificationContext';
+import { isExpoGo } from '../../services/pushNotificationService';
 import { FormInput } from '../../components/ui/FormInput';
 import { loginSchema, LoginFormData } from '../../utils/validationSchemas';
 
@@ -230,6 +231,17 @@ export const SettingsScreen: React.FC = () => {
   } = useNotifications();
 
   const handleNotificationSettingsPress = async () => {
+    if (isExpoGo()) {
+      Alert.alert(
+        isRtl ? 'ایکسپو گو میں دستیاب نہیں' : 'Unavailable in Expo Go',
+        isRtl
+          ? 'اینڈرائیڈ پر ایکسپو گو میں پش نوٹیفیکیشنز دستیاب نہیں ہیں۔ ٹیسٹ کرنے کے لیے براہ کرم ای اے ایس بلڈ (APK) استعمال کریں۔'
+          : 'Remote push notifications are not supported in Expo Go on Android (SDK 53+). Please test using an EAS APK or development build.',
+        [{ text: isRtl ? 'ٹھیک ہے' : 'OK' }]
+      );
+      return;
+    }
+
     try {
       const status = await getNotificationPermissionStatus();
       if (status.granted) {

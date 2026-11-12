@@ -1,8 +1,3 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.5
- */
-
 import React from 'react';
 import {
   StyleSheet,
@@ -29,7 +24,7 @@ import { colors, spacing, typography } from './theme';
 import * as SplashScreen from 'expo-splash-screen';
 
 // Immediately dismiss any native React Native / Expo splash screen
-SplashScreen.hideAsync().catch(() => { });
+SplashScreen.preventAutoHideAsync().catch(() => { });
 
 function AppMain() {
   const { highContrast: isDark } = useApp();
@@ -43,10 +38,6 @@ function AppMain() {
       style={[styles.safeArea, { backgroundColor: isSplash ? 'transparent' : safeAreaBg }]}
     >
       <StatusBar style={isSplash ? 'light' : 'dark'} />
-
-
-
-
       <View style={styles.container}>
         <RootNavigator />
       </View>
@@ -71,9 +62,20 @@ export default function App() {
   });
 
   React.useEffect(() => {
-    SplashScreen.hideAsync().catch(() => { });
-    storageService.hydrate().catch((e) => console.warn('Initialization error:', e));
+    storageService.hydrate().catch((e) =>
+      console.warn('Initialization error:', e)
+    );
   }, []);
+
+  React.useEffect(() => {
+    if (fontsLoaded) {
+      const timer = setTimeout(() => {
+        SplashScreen.hideAsync().catch(console.warn);
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [fontsLoaded]);
 
   return (
     <PersistQueryClientProvider

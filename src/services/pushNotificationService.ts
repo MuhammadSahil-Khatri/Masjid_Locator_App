@@ -2,7 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform, Linking } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
+import { isRunningInExpoGo } from 'expo';
 
 // ─── Storage keys ─────────────────────────────────────────────────────────────
 const STORAGE_KEYS = {
@@ -15,12 +16,28 @@ const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{
 
 // ─── Expo Go detection ────────────────────────────────────────────────────────
 /**
- * Returns true when running inside Expo Go.
- * Push notifications (remote) are not available in Expo Go since SDK 53.
- * Everything except the channel/token/remote-listener code still runs.
+ * Returns true when running inside the Expo Go app.
+ * Push notifications (remote) were removed from Expo Go on Android in SDK 53+.
+ * Uses multiple detection strategies:
+ *  1. expo's native isRunningInExpoGo()
+ *  2. Constants.expoVersion (non-null only inside Expo Go)
+ *  3. Constants.executionEnvironment (ExecutionEnvironment.StoreClient)
+ *  4. Constants.appOwnership === 'expo'
  */
-function isExpoGo(): boolean {
-  return Constants.appOwnership === 'expo';
+export function isExpoGo(): boolean {
+  try {
+    if (typeof isRunningInExpoGo === 'function' && isRunningInExpoGo()) {
+      return true;
+    }
+  } catch {}
+
+  return Boolean(
+    (Constants.expoVersion !== null && Constants.expoVersion !== undefined) ||
+    Constants.executionEnvironment === ExecutionEnvironment.StoreClient ||
+    (Constants as any).executionEnvironment === 'storeClient' ||
+    Constants.appOwnership === 'expo' ||
+    (Constants as any).appOwnership === 'expo'
+  );
 }
 
 // ─── UUID generator ───────────────────────────────────────────────────────────
@@ -90,10 +107,13 @@ class PushNotificationService {
   // ── Foreground handler & Android channel ────────────────────────────────────
   /**
    * Sets the foreground notification handler and creates the Android channel.
-   * Safe to call in any environment; skips the channel in Expo Go gracefully.
-   * Channel creation MUST precede permission requests on Android.
+   * Completely disabled in Expo Go to avoid SDK 53+ crashes.
    */
   public async configureNotificationSystem(): Promise<void> {
+    if (isExpoGo()) {
+      return;
+    }
+
     // 1. Foreground presentation configuration
     if (!this.isConfigured) {
       Notifications.setNotificationHandler({
@@ -109,7 +129,7 @@ class PushNotificationService {
     }
 
     // 2. Android notification channel creation — required before requesting permission
-    if (Platform.OS === 'android' && !isExpoGo() && !this.channelCreated) {
+    if (Platform.OS === 'android' && !this.channelCreated) {
       try {
         await Notifications.setNotificationChannelAsync('default', {
           name: 'General Updates',
@@ -192,6 +212,14 @@ class PushNotificationService {
    * Reads current notification permissions without prompting the user.
    */
   public async getPermissionStatus(): Promise<PermissionStatusInfo> {
+    if (isExpoGo()) {
+      return {
+        granted: false,
+        canAskAgain: false,
+        status: Notifications.PermissionStatus.DENIED,
+      };
+    }
+
     try {
       const perms = await Notifications.getPermissionsAsync();
       const granted = perms.granted || perms.status === Notifications.PermissionStatus.GRANTED;
@@ -224,26 +252,27 @@ class PushNotificationService {
 
   // ── Manual Permission Request (Callable from UI) ─────────────────────────────
   public async requestPermissionsAndRegister(): Promise<PermissionRegistrationResult> {
-    // 1. Always ensure notification system and Android channel are configured first
-    await this.configureNotificationSystem();
-
     const installationId = await this.getOrCreateInstallationId();
 
-    // 2. Preserve Expo Go and physical-device checks
+    // 1. In Expo Go, remote push notifications are unsupported
     if (isExpoGo()) {
-      console.log('[PushNotificationService] [Manual Request] Running in Expo Go – remote push setup skipped.');
+      console.log('[PushNotificationService] [Manual Request] Running in Expo Go – remote push notifications are disabled.');
       await this.registerDevice(installationId, null);
       return { granted: false, token: null, canAskAgain: false };
     }
 
+    // 2. Emulator guard
     if (!Device.isDevice) {
       console.log('[PushNotificationService] [Manual Request] Simulator/Emulator detected – registering with null token.');
       await this.registerDevice(installationId, null);
       return { granted: false, token: null, canAskAgain: false };
     }
 
+    // 3. Ensure notification system and Android channel are configured
+    await this.configureNotificationSystem();
+
     try {
-      // 3. Inspect existing permissions
+      // 4. Inspect existing permissions
       const initialPermissions = await Notifications.getPermissionsAsync();
       const initialGranted =
         initialPermissions.granted || initialPermissions.status === Notifications.PermissionStatus.GRANTED;
@@ -257,7 +286,7 @@ class PushNotificationService {
       let finalGranted = initialGranted;
       let canAskAgain = initialPermissions.canAskAgain;
 
-      // 4. If not granted and can ask again, prompt the user
+      // 5. If not granted and can ask again, prompt the user
       if (!initialGranted) {
         if (canAskAgain) {
           console.log('[PushNotificationService] [Manual Request] Prompting user for permission...');
@@ -282,7 +311,7 @@ class PushNotificationService {
         return { granted: false, token: null, canAskAgain };
       }
 
-      // 5. Generate Expo push token only after permission is granted
+      // 6. Generate Expo push token only after permission is granted
       const projectId = this.getProjectId();
       console.log('[PushNotificationService] [Manual Request] Expo project ID availability:', {
         hasProjectId: !!projectId,
@@ -300,7 +329,7 @@ class PushNotificationService {
         console.warn('[PushNotificationService] [Manual Request] Push token generation FAILURE:', tokenErr);
       }
 
-      // 6. Register token with Supabase Edge Function
+      // 7. Register token with Supabase Edge Function
       const registered = await this.registerDevice(installationId, token);
       console.log('[PushNotificationService] [Manual Request] Supabase device registration:', registered ? 'SUCCESS' : 'FAILURE');
 
@@ -316,16 +345,6 @@ class PushNotificationService {
   /**
    * Call once from NotificationProvider on mount.
    * Works safely in Expo Go, simulators, and production builds.
-   *
-   * Flow:
-   *  1. Configure foreground handler and create Android channel (before permission checks)
-   *  2. Log environment diagnostics (device, Expo Go, OS version)
-   *  3. Check current permission status via getPermissionsAsync()
-   *  4. If granted: fetch push token and register device
-   *  5. If not granted and canAskAgain is true: request permission via requestPermissionsAsync()
-   *  6. If denied and canAskAgain is false: do NOT repeatedly prompt (expose settings guidance)
-   *  7. Register device with Supabase (pushToken if granted, null if not)
-   *  8. Set up listeners (refresh, foreground sync, tap responses)
    */
   public async initialize(
     navigationCallback?: NotificationNavigationCallback,
@@ -342,33 +361,34 @@ class PushNotificationService {
     this.isInitializing = true;
 
     try {
-      // 1. Configure foreground notification handler and Android channel
-      await this.configureNotificationSystem();
-
+      const runningInExpoGo = isExpoGo();
       const installationId = await this.getOrCreateInstallationId();
 
       // Diagnostics: Environment
       console.log('[PushNotificationService] Diagnostics:', {
         physicalDevice: Device.isDevice,
-        expoGo: isExpoGo(),
+        expoGo: runningInExpoGo,
         platform: Platform.OS,
         androidVersion: Platform.OS === 'android' ? Platform.Version : 'N/A',
         deviceModel: Device.modelName ?? 'unknown',
       });
 
-      // 2. Expo Go: register null token and exit push-specific setup
-      if (isExpoGo()) {
-        console.log('[PushNotificationService] Running in Expo Go – remote push setup skipped.');
+      // 1. Expo Go: Remote push notifications are completely disabled on Android SDK 53+
+      if (runningInExpoGo) {
+        console.log('[PushNotificationService] Running in Expo Go – remote push notifications disabled. Registering null device token with Supabase.');
         await this.registerDevice(installationId, null);
         return;
       }
 
-      // 3. Simulator / emulator: register null token
+      // 2. Simulator / emulator: register null token
       if (!Device.isDevice) {
         console.log('[PushNotificationService] Simulator/Emulator detected – registering null token without push capabilities.');
         await this.registerDevice(installationId, null);
         return;
       }
+
+      // 3. Configure foreground notification handler and Android channel (standalone / dev build only)
+      await this.configureNotificationSystem();
 
       // 4. Physical device: Check permissions with Notifications.getPermissionsAsync()
       const initialPermissions = await Notifications.getPermissionsAsync();
