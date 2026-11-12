@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "845538608773",
+    "project_id": "jamiyat-ahl-e-hadith-hyd",
+    "storage_bucket": "jamiyat-ahl-e-hadith-hyd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:845538608773:android:1ae30452708573c5348bec",
+        "android_client_info": {
+          "package_name": "com.khubaibkhatri.jah"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBmC6vyVQvWqJO59OQh_S3XpfgJI4dH5D0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

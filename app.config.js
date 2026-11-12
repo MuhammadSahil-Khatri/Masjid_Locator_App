@@ -24,6 +24,16 @@ export default {
     android: {
       package: "com.khubaibkhatri.jah",
       softwareKeyboardLayoutMode: "resize",
+      googleServicesFile: "./google-services.json",
+      // POST_NOTIFICATIONS is required on Android 13+ (API 33+) for push notification
+      // permission dialog to appear. expo-notifications plugin adds this automatically,
+      // but listing it explicitly here prevents it being accidentally blocked.
+      permissions: [
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+      ],
       blockedPermissions: [
         "android.permission.ACTIVITY_RECOGNITION",
       ],
@@ -63,7 +73,9 @@ export default {
       [
         "expo-notifications",
         {
+          icon: "./assets/logo.png",
           color: "#1D3B6D",
+          defaultChannel: "default",
         },
       ],
     ],

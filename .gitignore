@@ -11,6 +11,7 @@ coverage/
 .expo/
 devreadme.md
 
+credentials.json
 .env.local
 *.jks
 *.keystore

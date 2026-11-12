@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   Platform,
+  AppState,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -65,7 +66,52 @@ export const NotificationsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { isRtl } = useApp();
   const { goBack, navigate } = useNavigation();
-  const { notifications, unreadCount, markAsRead, markAllAsRead, sync, refreshing } = useNotifications();
+  const {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    sync,
+    refreshing,
+    getNotificationPermissionStatus,
+    requestNotificationPermissions,
+    openNotificationSettings,
+  } = useNotifications();
+
+  const [permissionGranted, setPermissionGranted] = useState<boolean | null>(null);
+
+  const checkPermission = React.useCallback(async () => {
+    try {
+      const perm = await getNotificationPermissionStatus();
+      setPermissionGranted(perm.granted);
+    } catch {
+      setPermissionGranted(true);
+    }
+  }, [getNotificationPermissionStatus]);
+
+  useEffect(() => {
+    checkPermission();
+
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        checkPermission();
+      }
+    });
+
+    return () => {
+      sub.remove();
+    };
+  }, [checkPermission]);
+
+  const handleBannerPress = async () => {
+    const current = await getNotificationPermissionStatus();
+    if (current.canAskAgain) {
+      const res = await requestNotificationPermissions();
+      setPermissionGranted(res.granted);
+    } else {
+      await openNotificationSettings();
+    }
+  };
 
   const handleNotificationPress = async (item: AppNotification) => {
     // Mark as read immediately
@@ -140,6 +186,28 @@ export const NotificationsScreen: React.FC = () => {
           />
         }
       >
+        {permissionGranted === false && (
+          <TouchableOpacity
+            style={[styles.permissionBanner, isRtl && styles.permissionBannerRtl]}
+            activeOpacity={0.8}
+            onPress={handleBannerPress}
+          >
+            <View style={styles.permissionBannerIcon}>
+              <Bell size={18} color="#D97706" />
+            </View>
+            <View style={[styles.permissionBannerTextWrapper, isRtl && { alignItems: 'flex-end' }]}>
+              <Text style={styles.permissionBannerTitle}>
+                {isRtl ? 'اطلاعات بند ہیں' : 'Notifications are turned off'}
+              </Text>
+              <Text style={styles.permissionBannerSubtitle}>
+                {isRtl
+                  ? 'اعلانات اور احادیث حاصل کرنے کے لیے ٹیپ کریں'
+                  : 'Tap to enable notifications for announcements'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
         {notifications.length === 0 ? (
           <EmptyState
             icon={<Bell size={36} color={colors.primary} />}
@@ -413,6 +481,42 @@ const styles = StyleSheet.create({
     backgroundColor: '#E44848',
     marginLeft: 6,
     marginTop: 4,
+  },
+  permissionBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  permissionBannerRtl: {
+    flexDirection: 'row-reverse',
+  },
+  permissionBannerIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FEF3C7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  permissionBannerTextWrapper: {
+    flex: 1,
+  },
+  permissionBannerTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#92400E',
+    marginBottom: 2,
+  },
+  permissionBannerSubtitle: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#B45309',
   },
 });
 

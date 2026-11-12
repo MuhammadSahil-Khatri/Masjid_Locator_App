@@ -10,10 +10,11 @@ import {
   TextInput,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
-import { X, Mail, Lock, Eye, EyeOff, LogIn, AlertCircle } from 'lucide-react-native';
+import { X, Mail, Lock, Eye, EyeOff, LogIn, AlertCircle, Bell } from 'lucide-react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,6 +24,7 @@ import { colors, spacing, typography } from '../../theme';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../hooks/useAuth';
 import { useNavigation } from '../../navigation/NavigationContext';
+import { useNotifications } from '../../context/NotificationContext';
 import { FormInput } from '../../components/ui/FormInput';
 import { loginSchema, LoginFormData } from '../../utils/validationSchemas';
 
@@ -221,6 +223,57 @@ export const SettingsScreen: React.FC = () => {
     }
   };
 
+  const {
+    requestNotificationPermissions,
+    getNotificationPermissionStatus,
+    openNotificationSettings,
+  } = useNotifications();
+
+  const handleNotificationSettingsPress = async () => {
+    try {
+      const status = await getNotificationPermissionStatus();
+      if (status.granted) {
+        Alert.alert(
+          isRtl ? 'اطلاعات فعال ہیں' : 'Notifications Enabled',
+          isRtl
+            ? 'آپ کے آلے پر اعلانات اور احادیث کے لیے اطلاعات فعال ہیں۔ کیا آپ سسٹم سیٹنگز دیکھنا چاہتے ہیں؟'
+            : 'Push notifications are currently enabled for announcements and daily updates. Would you like to manage system notification settings?',
+          [
+            { text: isRtl ? 'بند کریں' : 'Cancel', style: 'cancel' },
+            {
+              text: isRtl ? 'سیٹنگز کھولیں' : 'Open Settings',
+              onPress: () => openNotificationSettings(),
+            },
+          ]
+        );
+      } else if (status.canAskAgain) {
+        const res = await requestNotificationPermissions();
+        if (res.granted) {
+          triggerToast(isRtl ? 'اطلاعات کی اجازت مل گئی' : 'Notification permission granted');
+        } else {
+          triggerToast(isRtl ? 'اطلاعات کی اجازت نہیں ملی' : 'Notification permission was denied');
+        }
+      } else {
+        // Permanently denied (canAskAgain: false)
+        Alert.alert(
+          isRtl ? 'اطلاعات کی اجازت درکار ہے' : 'Notification Permission Required',
+          isRtl
+            ? 'اطلاعات بند ہیں۔ اعلانات اور احادیث حاصل کرنے کے لیے براہ کرم فون کی سیٹنگز میں جا کر نوٹیفیکیشن آن کریں۔'
+            : 'Push notifications are disabled. Please enable them in your device settings to receive updates.',
+          [
+            { text: isRtl ? 'منسوخ' : 'Cancel', style: 'cancel' },
+            {
+              text: isRtl ? 'سیٹنگز کھولیں' : 'Open Settings',
+              onPress: () => openNotificationSettings(),
+            },
+          ]
+        );
+      }
+    } catch (err: any) {
+      triggerToast(err?.message || 'Error checking notifications');
+    }
+  };
+
   return (
     <ImageBackground
       source={require('../../../assets/background_image_vertical.png')}
@@ -375,6 +428,25 @@ export const SettingsScreen: React.FC = () => {
         </Text>
 
         <View style={styles.groupCard}>
+          {/* Notifications */}
+          <TouchableOpacity
+            style={[styles.tileRow, isRtl && styles.rowReverse]}
+            onPress={handleNotificationSettingsPress}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.tileLeft, isRtl && styles.rowReverse]}>
+              <View style={styles.iconBox}>
+                <Bell size={19} color="#1D3B6D" />
+              </View>
+              <Text style={[styles.tileLabel, isRtl && styles.textRtl]}>
+                {isRtl ? 'اطلاعات' : 'Notifications'}
+              </Text>
+            </View>
+            <NextArrowIcon size={14} color="#1D3B6D" isRtl={isRtl} />
+          </TouchableOpacity>
+
+          <View style={styles.divider} />
+
           {/* Send Feedback */}
           <TouchableOpacity
             style={[styles.tileRow, isRtl && styles.rowReverse]}

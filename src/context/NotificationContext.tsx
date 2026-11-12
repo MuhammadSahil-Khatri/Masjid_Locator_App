@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { AppState, AppStateStatus } from 'react-native';
 import { AppNotification, NotificationType } from '../types/notifications';
 import { notificationService } from '../services/notificationService';
-import { pushNotificationService } from '../services/pushNotificationService';
+import { pushNotificationService, PermissionStatusInfo, PermissionRegistrationResult } from '../services/pushNotificationService';
 import { onlineManager } from '@tanstack/react-query';
 
 interface NotificationContextType {
@@ -15,7 +15,9 @@ interface NotificationContextType {
   markRecordAsRead: (type: NotificationType, recordId: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
   sync: () => Promise<void>;
-  requestNotificationPermissions: () => Promise<{ granted: boolean; token: string | null }>;
+  requestNotificationPermissions: () => Promise<PermissionRegistrationResult>;
+  getNotificationPermissionStatus: () => Promise<PermissionStatusInfo>;
+  openNotificationSettings: () => Promise<void>;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -47,6 +49,16 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const requestNotificationPermissions = useCallback(async () => {
     const result = await pushNotificationService.requestPermissionsAndRegister();
     return result;
+  }, []);
+
+  // Inspect permission status without prompt
+  const getNotificationPermissionStatus = useCallback(async () => {
+    return await pushNotificationService.getPermissionStatus();
+  }, []);
+
+  // Guide user to system settings
+  const openNotificationSettings = useCallback(async () => {
+    await pushNotificationService.openNotificationSettings();
   }, []);
 
   // Mark single notification as read
@@ -196,6 +208,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         markAllAsRead,
         sync,
         requestNotificationPermissions,
+        getNotificationPermissionStatus,
+        openNotificationSettings,
       }}
     >
       {children}
