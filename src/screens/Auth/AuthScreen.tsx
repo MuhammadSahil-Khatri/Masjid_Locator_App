@@ -550,7 +550,7 @@ export const AuthScreen: React.FC = () => {
             <View style={styles.brandingContainer}>
               <View style={styles.brandingLogoWrapper}>
                 <Image
-                  source={require('../../../assets/logo.png')}
+                  source={require('../../../assets/icon.png')}
                   style={styles.brandingLogo}
                   resizeMode="contain"
                 />

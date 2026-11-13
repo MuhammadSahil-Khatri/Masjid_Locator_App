@@ -55,8 +55,8 @@ export const useSystemBars = (backgroundColor: string) => {
     if (Platform.OS === "android") {
       // ── Status Bar Background (Android fallback) ───────────────────────────
       try {
-        StatusBar.setBackgroundColor("transparent", true);
-        StatusBar.setTranslucent(true);
+        (StatusBar as any).setBackgroundColor?.("transparent", true);
+        (StatusBar as any).setTranslucent?.(true);
       } catch {
         // Ignored on edge-to-edge or unsupported environments
       }

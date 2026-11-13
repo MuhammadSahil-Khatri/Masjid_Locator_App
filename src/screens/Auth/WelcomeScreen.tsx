@@ -23,7 +23,7 @@ export const WelcomeScreen: React.FC = () => {
       style={styles.container}
       resizeMode="cover"
     >
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar barStyle="light-content" />
 
       {/* Top Islamic Arch Spacing & Bismillah */}
       <View style={[styles.topSection, { paddingTop: Math.max(insets.top + 110, 60) }]}>
@@ -46,7 +46,7 @@ export const WelcomeScreen: React.FC = () => {
             end={{ x: 1, y: 1 }}
           >
             <Image
-              source={require('../../../assets/logo.png')}
+              source={require('../../../assets/icon.png')}
               style={styles.logoImage}
               resizeMode="contain"
             />

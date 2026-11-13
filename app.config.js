@@ -4,7 +4,7 @@ export default {
     slug: "masjid-locator-app",
     version: "1.0.0",
     orientation: "portrait",
-    icon: "./assets/app_icon.png",
+    icon: "./assets/icon.png",
     userInterfaceStyle: "light",
 
     androidStatusBar: {
@@ -43,15 +43,15 @@ export default {
       },
 
       adaptiveIcon: {
-        foregroundImage: "./assets/app_icon.png",
-        backgroundColor: "#ffffffff",
+        foregroundImage: "./assets/adaptive-foreground.png",
+        backgroundImage: "./assets/adaptive-background.png",
       },
 
       jsEngine: "hermes",
     },
 
     web: {
-      favicon: "./assets/app_icon.png",
+      favicon: "./assets/icon.png",
     },
 
     plugins: [
@@ -62,7 +62,7 @@ export default {
       [
         "expo-splash-screen",
         {
-          image: "./assets/app_icon.png",
+          image: "./assets/icon.png",
           imageWidth: 200,
           resizeMode: "contain",
           backgroundColor: "#ffffffff",
@@ -71,7 +71,7 @@ export default {
       [
         "expo-notifications",
         {
-          icon: "./assets/app_icon.png",
+          icon: "./assets/adaptive-foreground.png",
           color: "#1D3B6D",
           defaultChannel: "default",
         },

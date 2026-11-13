@@ -122,7 +122,7 @@ export const QiblaScreen: React.FC = () => {
         style={styles.bgImage}
         resizeMode="cover"
       >
-        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+        <StatusBar barStyle="light-content" />
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#fff" />
           <Text style={styles.loadingText}>
@@ -141,7 +141,7 @@ export const QiblaScreen: React.FC = () => {
         style={styles.bgImage}
         resizeMode="cover"
       >
-        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+        <StatusBar barStyle="light-content" />
         <View style={styles.centerContainer}>
           <AlertTriangle size={48} color={colors.warning} style={{ marginBottom: spacing.md }} />
           <Text style={styles.errorTitle}>

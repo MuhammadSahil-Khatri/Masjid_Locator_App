@@ -23,9 +23,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '../../navigation/NavigationContext';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 
-const SPLASH_TRANSITION_DURATION = 300;
-const NATIVE_SPLASH_DURATION = 2000;
-const CUSTOM_SPLASH_DURATION = 2000;
+const SPLASH_TRANSITION_DURATION = 600;
+const NATIVE_SPLASH_DURATION = 1500;
+const CUSTOM_SPLASH_DURATION = 1500;
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -157,22 +157,18 @@ export const SplashScreen = () => {
         style={styles.background}
         resizeMode="cover"
       >
-        <StatusBar
-          barStyle="light-content"
-          translucent
-          backgroundColor="transparent"
-        />
+        <StatusBar barStyle="light-content" />
 
         <View style={styles.middleSection}>
           <View style={styles.logoCardWrapper}>
             <Image
-              source={require('../../../assets/logo.png')}
+              source={require('../../../assets/adaptive-foreground.png')}
               style={styles.logoImage}
               resizeMode="contain"
             />
           </View>
 
-          <View style={styles.textContainer}>
+          <View>
             <Text style={styles.title}>
               Jamiyat Ahl-e-Hadith Hyd.
             </Text>
@@ -251,7 +247,7 @@ export const SplashScreen = () => {
             ]}
           >
             <Image
-              source={require('../../../assets/app_icon.png')}
+              source={require('../../../assets/adaptive-foreground.png')}
               style={styles.nativeLogo}
               resizeMode="contain"
             />
@@ -290,14 +286,10 @@ const styles = StyleSheet.create({
   },
 
   logoImage: {
-    width: 200,
-    height: 200,
+    width: 350,
+    height: 350,
     maxWidth: '100%',
-    maxHeight: 200,
-  },
-
-  textContainer: {
-    marginTop: 16,
+    maxHeight: 350,
   },
 
   title: {
@@ -323,7 +315,7 @@ const styles = StyleSheet.create({
   },
 
   nativeLogo: {
-    width: 200,
-    height: 200,
+    width: 350,
+    height: 350,
   },
 });

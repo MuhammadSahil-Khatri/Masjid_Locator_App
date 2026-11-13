@@ -6,7 +6,7 @@ import * as SplashScreen from 'expo-splash-screen';
 // These MUST match the expo-splash-screen plugin in app.config.js
 // (backgroundColor and imageWidth) so the handoff is seamless.
 export const SPLASH_BG = '#ffffff';
-export const SPLASH_LOGO_SIZE = 250;
+export const SPLASH_LOGO_SIZE = 350;
 
 // Height of the soft fading edge that sweeps down the screen
 const EDGE_HEIGHT = 220;
@@ -95,7 +95,7 @@ export function AnimatedSplashOverlay({ ready, onFinish }: Props) {
       {/* Logo: fixed size, centered, no scaling */}
       <View style={styles.logoWrap}>
         <Animated.Image
-          source={require('../../../assets/logo.png')}
+          source={require('../../../assets/adaptive-foreground.png')}
           resizeMode="contain"
           onLoadEnd={() => setLogoLoaded(true)}
           style={{
